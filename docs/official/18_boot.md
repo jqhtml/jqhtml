@@ -271,6 +271,27 @@ module.exports = { jqhtml };
 <%- jqhtml('Alert', { type: 'info' }, '<strong>Note:</strong> Read carefully.') %>
 ```
 
+## Full Server-Side Rendering (@jqhtml/ssr)
+
+`boot()` hydrates placeholders that a server emitted by hand. For rendering actual
+component HTML on the server, the `@jqhtml/ssr` package runs a persistent Node render
+server (jsdom-based) that a backend talks to over a newline-delimited JSON protocol
+(TCP or Unix socket). Two render modes:
+
+- **`render`** — render a single named component with args to an HTML string
+  (SEO fallbacks, emails, previews)
+- **`render_spa`** — boot a full SPA bundle set in jsdom, dispatch a URL through the
+  app's router, and render the resulting page to HTML (full-page SSR for SPA
+  frameworks built on JQHTML; added in v2.3.36 for RSpade-style integrations)
+
+The SSR flow pairs with the client-side preload API (`jqhtml.start_data_capture()`,
+`get_captured_data()`, `set_preload_data()` — see `packages/core/src/preload-data.ts`):
+data captured during the server render is replayed on the client so hydration skips
+`on_load()` entirely on preload hits.
+
+**Full documentation:** `packages/ssr/README.md` (protocol, payload shapes, options)
+and `packages/ssr/INTEGRATION_GUIDE.md`.
+
 ## Client-Side Setup
 
 ### With Build Tools (Webpack, Vite, etc.)
