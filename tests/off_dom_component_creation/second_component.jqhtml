@@ -1,0 +1,8 @@
+<Define:Second_Component>
+  <div class="second-component">
+    <h3>Second Component (Created Off-DOM)</h3>
+    <div class="children-container">
+      <Third_Level_Child $sid="child" />
+    </div>
+  </div>
+</Define:Second_Component>

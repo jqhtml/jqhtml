@@ -1,0 +1,7 @@
+<%--
+Without_On_Load - Component that does NOT have a custom on_load function
+Tests that 'loaded' event still fires at the appropriate lifecycle point
+--%>
+<Define:Without_On_Load class="test-component">
+  <p>No on_load - static component</p>
+</Define:Without_On_Load>

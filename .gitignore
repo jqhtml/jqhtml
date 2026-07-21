@@ -1,0 +1,9 @@
+# JQHTML public repository
+node_modules/
+dist/
+out/
+*.log
+test-results/
+playwright-report/
+*.vsix
+.DS_Store

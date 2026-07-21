@@ -1,0 +1,6 @@
+<Define:Rendered_Event_And_Method_Main>
+  <div>
+    <h1>rendered() Event and Method Test</h1>
+    <Rendered_Event_Test />
+  </div>
+</Define:Rendered_Event_And_Method_Main>

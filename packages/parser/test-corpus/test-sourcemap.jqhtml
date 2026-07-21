@@ -1,0 +1,29 @@
+<Define:TestComponent>
+  <div class="container">
+    <h1>Test Component</h1>
+
+    <%-- This is a multi-line comment
+         that spans several lines
+         to test line preservation
+         in the sourcemap generation
+         with proper offset handling --%>
+
+    <% function testFunction() { %>
+      <p>Line 11: Inside test function</p>
+    <% } %>
+
+    <% testFunction(); %>
+
+    <button $onclick="handleClick">
+      Click Me (Line 17)
+    </button>
+
+    <script>
+      // Line 21
+      function handleClick() {
+        console.log('Button clicked at line 23');
+        barfoo(); // Line 24 - this should error
+      }
+    </script>
+  </div>
+</Define:TestComponent>

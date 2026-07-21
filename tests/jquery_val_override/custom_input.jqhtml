@@ -1,0 +1,13 @@
+<!--
+Custom_Input - Component with custom val() implementation
+
+BEHAVIOR:
+  .val() getter - returns uppercase value
+  .val(value) setter - stores lowercase (alphanumeric only), displays uppercase
+-->
+<Define:Custom_Input>
+  <div class="custom-input">
+    <input $sid="input" type="text" placeholder="Type here..." />
+    <div>Formatted: <span $sid="formatted">-</span></div>
+  </div>
+</Define:Custom_Input>

@@ -1,0 +1,8 @@
+<!--
+Template_Extends_JS_Class_Inheritance_Test - Main entry point
+-->
+<Define:Template_Extends_JS_Class_Inheritance_Test>
+  <% console.log('[TEST] Starting template extends JS class inheritance test'); %>
+  <Tester />
+  <% console.log('[TEST] Tester component rendered'); %>
+</Define:Template_Extends_JS_Class_Inheritance_Test>

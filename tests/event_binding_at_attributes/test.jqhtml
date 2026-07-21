@@ -1,0 +1,6 @@
+<Define:Test_Event_Binding>
+  <div>
+    <h1>Event Binding @ Attributes Test</h1>
+    <Event_Binding_Component />
+  </div>
+</Define:Test_Event_Binding>

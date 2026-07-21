@@ -1,0 +1,8 @@
+<Define:Simple_Slot_Test>
+    <div class="container mt-4">
+        <h1>Simple Slot Passing Test</h1>
+        <p>Testing if a parent component can pass named slots to a child component.</p>
+
+        <Parent_Component />
+    </div>
+</Define:Simple_Slot_Test>

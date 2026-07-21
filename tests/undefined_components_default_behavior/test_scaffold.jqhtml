@@ -1,0 +1,26 @@
+<!--
+Test_Scaffold - Uses undefined components to test incremental scaffolding
+
+UNDEFINED COMPONENTS (no .jqhtml files):
+  - Undefined_Header
+  - Undefined_Logo
+  - Undefined_Nav
+  - Undefined_Link
+
+All should render as divs with component name class, content passing through.
+-->
+<Define:Test_Scaffold>
+  <div>
+    <h1>Undefined Components Default Behavior Test</h1>
+
+    <Undefined_Header>
+      <Undefined_Logo />
+      <Undefined_Nav>
+        <Undefined_Link>Home</Undefined_Link>
+        <Undefined_Link>About</Undefined_Link>
+      </Undefined_Nav>
+    </Undefined_Header>
+
+    <div $sid="results"></div>
+  </div>
+</Define:Test_Scaffold>

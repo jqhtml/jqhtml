@@ -1,0 +1,8 @@
+<Define:Unquoted_Function_Call_Attribute_Test class="test-container">
+  <h1>Unquoted Function Call Attribute Test</h1>
+  <Test_Child $sid="child1" $my_attribute=this.test_method('foobar') />
+  <Test_Child $sid="child2" $my_attribute=My_Model.field_length('last_name') />
+  <Test_Child $sid="child3" $my_attribute=-1 />
+  <Test_Child $sid="child4" $my_attribute=-45.67 />
+  <div $sid="results"></div>
+</Define:Unquoted_Function_Call_Attribute_Test>

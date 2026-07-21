@@ -1,0 +1,4 @@
+<Define:Gate_Load_Test>
+  <h2>gate_load() Lifecycle Test</h2>
+  <div $sid="results"></div>
+</Define:Gate_Load_Test>

@@ -1,0 +1,33 @@
+{
+  "$schema": "node_modules/lerna/schemas/lerna-schema.json",
+  "version": "2.3.49",
+  "npmClient": "npm",
+  "packages": [
+    "packages/*"
+  ],
+  "command": {
+    "bootstrap": {
+      "hoist": true
+    },
+    "version": {
+      "allowBranch": [
+        "master",
+        "main",
+        "release/*"
+      ],
+      "conventionalCommits": true,
+      "createRelease": "github",
+      "message": "chore(release): publish %s",
+      "push": false
+    },
+    "publish": {
+      "registry": "https://registry.npmjs.org/",
+      "verifyAccess": false,
+      "ignoreChanges": [
+        "**/*.md",
+        "**/*.test.js",
+        "**/test/**"
+      ]
+    }
+  }
+}

@@ -1,0 +1,6 @@
+<Define:Test_Load_Only_Flag>
+  <div>
+    <h1>_load_only Flag Test</h1>
+    <div $sid="results"></div>
+  </div>
+</Define:Test_Load_Only_Flag>

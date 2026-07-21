@@ -1,0 +1,16 @@
+<Define:Counter_Component>
+  <%
+    // Increment template render counter
+    if (!window.template_render_count) window.template_render_count = 0;
+    window.template_render_count++;
+    console.log(`[Counter_Component] Template render #${window.template_render_count}`);
+  %>
+  <div class="counter-display">
+    <% if (this.data.message) { %>
+      <span class="message"><%= this.data.message %></span>
+      <span class="timestamp"><%= this.data.timestamp %></span>
+    <% } else { %>
+      <span class="loading">Loading...</span>
+    <% } %>
+  </div>
+</Define:Counter_Component>

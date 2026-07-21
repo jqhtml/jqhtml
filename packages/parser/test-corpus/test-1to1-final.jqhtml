@@ -1,0 +1,18 @@
+<Define:FinalTest>
+  <!-- This is line 2 -->
+  <div>
+    <%= "Line 4 expression" %>
+    <% if (condition) { %>
+      <span>Line 6</span>
+      <NestedComp prop="value">
+        Inner content on line 8
+        <% for (let i = 0; i < 3; i++) { %>
+          <p>Item <%= i %></p>
+        <% } %>
+      </NestedComp>
+    <% } else { %>
+      <em>Alternative on line 14</em>
+    <% } %>
+  </div>
+  <!-- Final comment line 17 -->
+</Define:FinalTest>

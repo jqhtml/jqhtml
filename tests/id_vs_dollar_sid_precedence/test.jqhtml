@@ -1,0 +1,5 @@
+<Define:Id_Precedence_Test_Main>
+  <div>
+    <Id_Precedence_Test />
+  </div>
+</Define:Id_Precedence_Test_Main>

@@ -1,0 +1,6 @@
+<Define:Test_Reload_Debouncing>
+  <div>
+    <h1>reload() Debouncing Test</h1>
+    <Reload_Debounce_Test />
+  </div>
+</Define:Test_Reload_Debouncing>

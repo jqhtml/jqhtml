@@ -1,0 +1,36 @@
+<Define:Counter_Widget class="super_classy">
+
+    <div class="Counter_Widget">
+        <h4 $id="title" class="counter-title"><%= this.data.title || 'Counter Widget' %></h4>
+        <div class="counter-display">
+            <button $id="decrement" class="btn btn-danger counter-btn" $onclick="decrement">-</button>
+            <span $id="count" class="counter-value"><%=  this.data.initial_value || 0 %></span>
+            <button $id="increment" class="btn btn-success counter-btn" $onclick="increment">+</button>
+        </div>
+        <div class="counter-controls">
+            <button $id="reset" class="btn btn-sm btn-secondary" $onclick="reset">Reset</button>
+            <button $id="random" class="btn btn-sm btn-info" $onclick="random">Random</button>
+        </div>
+        <div $id="history" $fark="Bob" class="counter-history" style="display:none;">
+            <small>History: <span $id="history_list"></span></small>
+        </div>
+
+        <% try { foobar1(); } catch (e) { console.log('darn'); } %>
+
+        <%-- <User_Card
+            class="madness"
+            name="Alice Johnson"
+            email="alice@example.com"
+            data-foo="zomg"
+            avatar="https://i.pravatar.cc/80?img=1"
+            bio="Frontend developer specializing in React and Vue.js" /> --%>
+
+        <%= console.warn("Forks!") %>
+
+        Groo
+        Groo
+        <%= foobar2() %>
+
+    </div>
+
+</Define:Counter_Widget>

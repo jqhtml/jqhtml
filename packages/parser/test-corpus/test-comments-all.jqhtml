@@ -1,0 +1,22 @@
+<Define:Test_Comments>
+    <div>
+        Line 3 before comment
+        <%-- Single line comment on its own line --%>
+        Line 5 after comment
+        
+        Line 7 text before <%-- inline comment --%> text after on same line
+        
+        <%-- Multi-line comment
+        that spans
+        multiple lines
+        line 12 --%>
+        Line 13 after multi-line
+        
+        <%-- Another comment --%>
+        Line 16 final
+        
+        <%= marker1() %>
+        <%= marker2() %>
+        <%= marker3() %>
+    </div>
+</Define:Test_Comments>

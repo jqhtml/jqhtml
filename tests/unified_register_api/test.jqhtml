@@ -1,0 +1,20 @@
+<%--
+Unified_Register_Api_Test - Behavioral test for jqhtml.register() unified registration API
+
+Target: packages/core/src/component-registry.ts register() (lines ~349-389)
+
+Verifies register() auto-detects the source type and delegates correctly:
+  1. A compiled TEMPLATE object (__jqhtml_template: true) -> register_template()
+  2. A CLASS extending Jqhtml_Component (__jqhtml_component: true, no
+     static component_name) -> register_component() using the class name
+  3. A CLASS with static component_name set -> register_component() using
+     that explicit name instead of the class name
+
+DATA: none - this component drives its own assertions from on_ready() and
+writes PASS/FAIL results into the DOM + console.
+--%>
+<Define:Unified_Register_Api_Test>
+  <h1>Unified Register API Test</h1>
+  <div $sid="status"></div>
+  <div $sid="results"></div>
+</Define:Unified_Register_Api_Test>

@@ -1,0 +1,33 @@
+<!--
+Contacts_DataGrid - Contact listing datagrid
+
+IMPORTANT: This component has NO .js file.
+It should automatically use DataGrid_Abstract's JS class via extends chain resolution.
+-->
+<Define:Contacts_DataGrid
+    extends="DataGrid_Abstract"
+    class="card DataGrid">
+
+  <Slot:DG_Card_Header>
+    <h5 class="card-title mb-0">All Contacts</h5>
+  </Slot:DG_Card_Header>
+
+  <Slot:DG_Table_Header>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Phone</th>
+    </tr>
+  </Slot:DG_Table_Header>
+
+  <Slot:row>
+    <tr>
+      <td><%= row.id %></td>
+      <td><%= row.name %></td>
+      <td><%= row.email %></td>
+      <td><%= row.phone %></td>
+    </tr>
+  </Slot:row>
+
+</Define:Contacts_DataGrid>

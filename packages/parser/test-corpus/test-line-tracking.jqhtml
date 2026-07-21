@@ -1,0 +1,25 @@
+<Define:TestLineTracking as="div">
+    <div class="container">
+        <h1>Line 3</h1>
+        <p>Line 4</p>
+        <div>
+            <span>Line 6</span>
+
+        </div>
+
+        <%= console.log('Line 10') %>
+
+        <% console.log('Line 12'); %>
+
+        <%-- This is a comment
+             that spans multiple lines
+             and should be replaced with whitespace --%>
+
+        <div>Line 18</div>
+        <%= console.log('Line 19') %>
+        <% console.log('Line 20'); %>
+
+        <p>Line 22</p>
+        <%= console.log('Line 23') %>
+    </div>
+</Define:TestLineTracking>

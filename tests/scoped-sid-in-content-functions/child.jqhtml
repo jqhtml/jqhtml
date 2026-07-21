@@ -1,0 +1,13 @@
+<Define:Child_Component>
+  <% this.data.child_value = 'DATA_FROM_CHILD'; %>
+  <div class="child-component">
+    <h3>Child Component</h3>
+    <p>Child CID: <span id="child-cid"><%= this._cid %></span></p>
+    <p>Child data value: <span id="child-data"><%= this.data.child_value %></span></p>
+
+    <div class="child-content-area">
+      <p><em>Content from parent rendered below:</em></p>
+      <%= content() %>
+    </div>
+  </div>
+</Define:Child_Component>

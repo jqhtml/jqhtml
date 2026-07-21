@@ -1,0 +1,19 @@
+<!--
+Tester - Test component that uses Phone_Text_Input
+-->
+<Define:Tester>
+  <div class="tester-container">
+    <h2>Template Inheritance Test</h2>
+    <p>Phone_Text_Input has no .jqhtml template - inherits from Text_Input via JS prototype chain</p>
+
+    <div class="test-section">
+      <h3>Phone Input (Inherited Template):</h3>
+      <Phone_Text_Input $sid="phone_input" $label="Phone Number" />
+    </div>
+
+    <div class="test-results">
+      <h3>Test Results:</h3>
+      <div $sid="results"></div>
+    </div>
+  </div>
+</Define:Tester>

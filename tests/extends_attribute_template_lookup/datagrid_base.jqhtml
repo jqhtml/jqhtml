@@ -1,0 +1,13 @@
+<!--
+DataGrid_Base - Base template with slots
+-->
+<Define:DataGrid_Base>
+  <table class="table">
+    <thead><tr><%= content('header') %></tr></thead>
+    <tbody>
+      <% for (let row of this.data.rows) { %>
+        <tr><%= content('row', row) %></tr>
+      <% } %>
+    </tbody>
+  </table>
+</Define:DataGrid_Base>

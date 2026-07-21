@@ -1,0 +1,40 @@
+<Define:MainLayout>
+    <div class="main-layout">
+        <header>
+            <div class="container">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h1>JQHTML v2 Demo</h1>
+                    <button 
+                        $id="debug-btn"
+                        style="background: #3498db; color: white; border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; font-size: 0.85rem;"
+                        title="Show Debug Controls">
+                        🐛 Debug
+                    </button>
+                </div>
+            </div>
+        </header>
+        <nav>
+            <div class="container">
+                <ul>
+                    <li><a href="/" data-route="/">Home</a></li>
+                    <li><a href="/components" data-route="/components">Components</a></li>
+                    <li><a href="/blog" data-route="/blog">Blog</a></li>
+                    <li><a href="/about" data-route="/about">About</a></li>
+                    <li><a href="/admin" data-route="/admin">🔒 Admin</a></li>
+                </ul>
+            </div>
+        </nav>
+        <main>
+            <div class="container">
+                <div $id="content">
+                    <!-- Routes render here -->
+                </div>
+            </div>
+        </main>
+        <footer>
+            <div class="container">
+                <p>&copy; 2024 JQHTML Router Demo. Built with JQHTML v2.</p>
+            </div>
+        </footer>
+    </div>
+</Define:MainLayout>

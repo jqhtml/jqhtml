@@ -1,0 +1,6 @@
+<Define:Manual_On_Render_Call>
+  <div class="test-result">
+    <h3>Test 4: Manual on_render() Call</h3>
+    <p>Status: <span $sid="status">Pending...</span></p>
+  </div>
+</Define:Manual_On_Render_Call>

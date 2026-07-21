@@ -1,0 +1,6 @@
+<Define:Test_Dollar_Attributes>
+  <div>
+    <h1>Dollar Attributes: Quoted vs Unquoted Test</h1>
+    <Parent_Component />
+  </div>
+</Define:Test_Dollar_Attributes>

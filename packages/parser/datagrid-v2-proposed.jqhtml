@@ -1,0 +1,84 @@
+<Define:Datagrid>
+  <div class="row middle-xs datagrid-header">
+    <div class="col title">
+      <%= this.args.label %>
+    </div>
+    
+    <div class="nowrap datagrid-filter-block filter-group col">
+      <%= slot('filter') %>
+    </div>
+    
+    <div class="col-xs actions-area text-right">
+      <div $id="status_none" class="nowrap pagnation" style="display:none;">
+        No Results
+      </div>
+      
+      <div $id="status_results" class="nowrap pagnation" style="display:none;">
+        Showing <span $id="records_index_min"></span> - <span $id="records_index_max"></span> of <span $id="records_count"></span>
+      </div>
+      
+      <div class="actions-group">
+        <button $id="previous_button" class="btn btn-disabled btn-thin" disabled="disabled" onclick=this.on_previous_button_clicked>
+          <i class="fas fa-chevron-left" title="Previous"></i>
+        </button>
+        <button $id="next_button" class="btn btn-disabled btn-thin next_button" disabled="disabled" onclick=this.on_next_button_clicked>
+          <i class="fas fa-chevron-right" title="Next"></i>
+        </button>
+      </div>
+      
+      <div class="actions-group">
+        <%= slot('actions') %>
+      </div>
+    </div>
+  </div>
+  
+  <DatagridTable $id="table" $pagnation=this.pagnation $api=this.args.api $filters=this._get_filters()>
+    <#header>
+      <%= slot('header') %>
+    </#header>
+    
+    <#row let:record>
+      <%= slot('row', { record: record }) %>
+    </#row>
+  </DatagridTable>
+</Define:Datagrid>
+
+<!-- Example usage with new syntax -->
+<Define:UserList>
+  <Datagrid label="System Users" api="Settings_Users_Datagrid_Api">
+    <#filter>
+      <input type="text" placeholder="Search users..." />
+    </#filter>
+    
+    <#actions>
+      <a href="#" class="btn btn-primary">
+        <i class="fas fa-plus"></i>
+        Add User
+      </a>
+    </#actions>
+    
+    <#header>
+      <th>ID</th>
+      <th>Name</th>
+      <th>Email</th>
+      <th>Status</th>
+      <th>Actions</th>
+    </#header>
+    
+    <#row let:record>
+      <td><%= record.id %></td>
+      <td><%= record.name %></td>
+      <td><%= record.email %></td>
+      <td>
+        <% if (record.is_admin): %>
+          <span style="color: red; font-weight: bold">Admin</span>
+        <% else: %>
+          User
+        <% endif; %>
+      </td>
+      <td>
+        <a href="#" class="btn btn-xs">View</a>
+      </td>
+    </#row>
+  </Datagrid>
+</Define:UserList>

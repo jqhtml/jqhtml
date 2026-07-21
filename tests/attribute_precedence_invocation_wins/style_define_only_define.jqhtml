@@ -1,0 +1,4 @@
+<!-- Style define only: Define has "text-align: center; font-weight: bold", invocation has no style -->
+<Define:Style_Define_Only_Define style="text-align: center; font-weight: bold;">
+  <%= content() %>
+</Define:Style_Define_Only_Define>

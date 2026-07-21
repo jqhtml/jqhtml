@@ -1,0 +1,22 @@
+<!--
+Multi_Slot_Child - Renders all three forwarded slots
+-->
+
+<Define:Multi_Slot_Child class="multi-slot-child">
+    <div class="card mt-2">
+        <div class="card-header bg-dark text-white">
+            Multi Slot Child (Renders All Slots)
+        </div>
+        <div class="card-body">
+            <%= content('header', this.data.header); %>
+
+            <div class="my-2">
+                <% for(let row of this.data.rows) { %>
+                    <%= content('row', row); %>
+                <% } %>
+            </div>
+
+            <%= content('footer', this.data.footer); %>
+        </div>
+    </div>
+</Define:Multi_Slot_Child>

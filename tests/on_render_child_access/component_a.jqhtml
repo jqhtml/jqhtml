@@ -1,0 +1,13 @@
+<Define:Component_A>
+  <div class="component-a-wrapper">
+    <% if (this.data.loading) { %>
+      <div class="loading">Loading...</div>
+    <% } else { %>
+      <Component_B $sid="component_b">
+        <Component_C $sid="component_c">
+          <Component_D $sid="component_d" />
+        </Component_C>
+      </Component_B>
+    <% } %>
+  </div>
+</Define:Component_A>

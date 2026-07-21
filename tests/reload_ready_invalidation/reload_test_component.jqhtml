@@ -1,0 +1,6 @@
+<Define:Reload_Test_Component class="card p-3">
+  <h4>Reload Ready Invalidation Test</h4>
+  <div $sid="reload_count">Reload count: <%= this.data.reload_count %></div>
+  <div $sid="value">Value: <%= this.data.value %></div>
+  <div $sid="results"></div>
+</Define:Reload_Test_Component>

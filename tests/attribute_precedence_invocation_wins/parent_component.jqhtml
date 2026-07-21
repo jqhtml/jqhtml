@@ -1,0 +1,4 @@
+<!-- Parent component extending Base -->
+<Define:Parent_Component extends="Base_Component" class="parent-class">
+  <%= content() %>
+</Define:Parent_Component>

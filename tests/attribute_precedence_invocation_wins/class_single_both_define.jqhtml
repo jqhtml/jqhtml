@@ -1,0 +1,4 @@
+<!-- Case 5: Single class in both (should not duplicate) -->
+<Define:Class_Single_Both_Define class="same-class">
+  <%= content() %>
+</Define:Class_Single_Both_Define>

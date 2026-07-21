@@ -1,0 +1,14 @@
+<Define:CustomInput>
+  <div class="custom-input">
+    <label><%= this.args.label || 'Custom Input' %></label>
+    <input 
+      $id="input" 
+      type="text" 
+      placeholder="<%= this.args.placeholder || 'Enter text...' %>"
+      style="padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; width: 100%;"
+    />
+    <small style="color: #666; display: block; margin-top: 0.25rem;">
+      Max 10 chars, auto-uppercase
+    </small>
+  </div>
+</Define:CustomInput>

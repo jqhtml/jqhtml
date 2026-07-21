@@ -1,0 +1,8 @@
+<Define:Test_Root>
+  <div class="test-container">
+    <h1>Event Data Parameter Test</h1>
+    <Event_Emitter $sid="emitter" />
+    <Event_Receiver $sid="receiver" />
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Test_Root>

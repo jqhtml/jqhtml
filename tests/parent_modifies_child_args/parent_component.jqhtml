@@ -1,0 +1,12 @@
+<Define:Parent_Component>
+  <div class="parent-component">
+    <h2>Parent Component</h2>
+    <p>This parent will modify the child's args and call reload()</p>
+
+    <Child_Component $sid="child" $filter="initial" />
+
+    <div class="status">
+      <p>Status: <span $sid="status">Waiting...</span></p>
+    </div>
+  </div>
+</Define:Parent_Component>

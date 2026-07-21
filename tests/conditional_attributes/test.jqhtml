@@ -1,0 +1,84 @@
+<Define:Test_Conditional_Attributes>
+  <!-- Test 1: Single conditional attribute (static value) -->
+  <div $sid="test1">
+    <input
+      class="form-control"
+      type="text"
+      <% if (this.args.required) { %>required="required"<% } %> />
+  </div>
+
+  <!-- Test 2: Multiple conditional attributes -->
+  <div $sid="test2">
+    <input
+      class="form-control"
+      type="text"
+      <% if (this.args.required) { %>required="required"<% } %>
+      <% if (this.args.disabled) { %>disabled="disabled"<% } %>
+      <% if (this.args.readonly) { %>readonly="readonly"<% } %> />
+  </div>
+
+  <!-- Test 3: Conditional attribute with interpolated value -->
+  <div $sid="test3">
+    <input
+      class="form-control"
+      type="number"
+      <% if (this.args.min !== undefined) { %>min="<%= this.args.min %>"<% } %>
+      <% if (this.args.max !== undefined) { %>max="<%= this.args.max %>"<% } %> />
+  </div>
+
+  <!-- Test 4: Conditional attribute with composite string -->
+  <div $sid="test4">
+    <div <% if (this.args.active) { %>class="status <%= this.args.status_class %> active"<% } %>>
+      Status indicator
+    </div>
+  </div>
+
+  <!-- Test 5: Various whitespace styles (all should work) -->
+  <div $sid="test5">
+    <input <% if(this.args.test1){ %>data-test1="yes"<% } %> />
+    <input <% if( this.args.test2 ){ %>data-test2="yes"<% } %> />
+    <input <%if(this.args.test3){%>data-test3="yes"<%}%> />
+  </div>
+
+  <!-- Test 6: Mixed regular and conditional attributes -->
+  <div $sid="test6">
+    <input
+      id="my-input"
+      class="form-control"
+      type="text"
+      name="username"
+      <% if (this.args.placeholder) { %>placeholder="<%= this.args.placeholder %>"<% } %>
+      <% if (this.args.required) { %>required="required"<% } %> />
+  </div>
+
+  <!-- Test 7: Complex condition expressions -->
+  <div $sid="test7">
+    <input
+      type="text"
+      <% if (this.args.value && this.args.value.length > 0) { %>value="<%= this.args.value %>"<% } %>
+      <% if (this.args.max_length !== undefined && this.args.max_length > 0) { %>maxlength="<%= this.args.max_length %>"<% } %> />
+  </div>
+
+  <!-- Test 8: Conditional attributes on component tags -->
+  <div $sid="test8">
+    <Undefined_Button
+      $label="Click Me"
+      <% if (this.args.button_disabled) { %>$disabled=true<% } %>
+      <% if (this.args.button_primary) { %>$variant="primary"<% } %>
+      <% if (this.args.button_class) { %>$custom_class=this.args.button_class<% } %> />
+  </div>
+
+  <!-- Test 9: Bare boolean attributes (HTML5 style, no value) -->
+  <div $sid="test9">
+    <input
+      $sid="test9_true"
+      type="text"
+      class="form-control"
+      <% if (true) { %>disabled<% } %> />
+    <input
+      $sid="test9_false"
+      type="text"
+      class="form-control"
+      <% if (false) { %>disabled<% } %> />
+  </div>
+</Define:Test_Conditional_Attributes>

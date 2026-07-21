@@ -1,0 +1,13 @@
+<Define:Counter_Widget class="super_classy">
+
+    <div class="Counter_Widget">
+        <% console.log; console.log("Forks!"); %>
+
+        <% try { foobar1(); } catch (e) { console.log('darn'); } %>
+
+        Groo
+        Groo
+        <%= foobar3(); %>
+    </div>
+
+</Define:Counter_Widget>

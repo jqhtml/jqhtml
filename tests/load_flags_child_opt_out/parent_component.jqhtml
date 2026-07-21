@@ -1,0 +1,7 @@
+<Define:Parent_Component>
+  <div class="parent">
+    <h2>Parent: <%= this.data.value %></h2>
+    <Child_A_Component $sid="child_a" />
+    <Child_B_Component $sid="child_b" $_load_only=false />
+  </div>
+</Define:Parent_Component>

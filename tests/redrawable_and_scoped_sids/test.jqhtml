@@ -1,0 +1,27 @@
+<!--
+Span_Redrawable_Test - Minimal test for $redrawable on span element
+-->
+<Define:Span_Redrawable_Test>
+    <div class="container">
+        <p $sid="test_p">Before span</p>
+        <span $redrawable $sid="test_span" class="badge bg-primary">
+            Counter: 42
+        </span>
+        <p>After span</p>
+
+        <!-- Test 1: Undefined component with $id -->
+        <TestUndefined $sid="test_id">$id only</TestUndefined>
+
+        <!-- Test 2: HTML tag with regular id -->
+        <section id="regular_section_id">Regular id on HTML tag</section>
+
+        <!-- Test 3: Undefined component with regular id -->
+        <AnotherUndefined id="regular_component_id">Regular id on component</AnotherUndefined>
+
+        <!-- Test 4: HTML tag with both id and $id -->
+        <article id="regular_article_id" $sid="scoped_article_id">Both id and $id on HTML tag</article>
+
+        <!-- Test 5: Undefined component with both id and $id -->
+        <YetAnother id="regular_yet_id" $sid="scoped_yet_id">Both id and $id on component</YetAnother>
+    </div>
+</Define:Span_Redrawable_Test>

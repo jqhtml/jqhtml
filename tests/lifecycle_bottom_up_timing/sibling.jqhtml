@@ -1,0 +1,10 @@
+<!--
+Sibling_Component - Middle level in hierarchy with 2 children
+-->
+<Define:Sibling_Component>
+  <div class="sibling-box" style="border: 2px solid green; padding: 10px; margin: 5px;">
+    <strong>Sibling: <%= this.args.id %></strong>
+    <Child_Component $sid="<%= this.args.id %>_child1" />
+    <Child_Component $sid="<%= this.args.id %>_child2" />
+  </div>
+</Define:Sibling_Component>

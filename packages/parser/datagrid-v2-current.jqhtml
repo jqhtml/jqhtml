@@ -1,0 +1,57 @@
+<Define:Datagrid>
+  <div class="row middle-xs datagrid-header">
+    <div class="col title">
+      <%= this.args.label %>
+    </div>
+    
+    <div class="nowrap datagrid-filter-block filter-group col">
+      <!-- Filter content would go here -->
+      <!-- In v2.1: <%= slot('filter') %> -->
+    </div>
+    
+    <div class="col-xs actions-area text-right">
+      <div class="nowrap pagnation" style="display:none;">
+        No Results
+      </div>
+      
+      <div class="nowrap pagnation" style="display:none;">
+        Showing <span class="records-index-min"></span> - <span class="records-index-max"></span> of <span class="records-count"></span>
+      </div>
+      
+      <div class="actions-group">
+        <button class="btn btn-disabled btn-thin" disabled="disabled">
+          <i class="fas fa-chevron-left" title="Previous"></i>
+        </button>
+        <button class="btn btn-disabled btn-thin next_button" disabled="disabled">
+          <i class="fas fa-chevron-right" title="Next"></i>
+        </button>
+      </div>
+      
+      <div class="actions-group">
+        <!-- Actions would go here -->
+        <!-- In v2.1: <%= slot('actions') %> -->
+      </div>
+    </div>
+  </div>
+  
+  <!-- DatagridTable component would be instantiated here -->
+  <!-- For now, just a table structure -->
+  <table class="datagrid-table">
+    <thead>
+      <tr>
+        <!-- Header would go here -->
+        <!-- In v2.1: <%= slot('header') %> -->
+      </tr>
+    </thead>
+    <tbody>
+      <% if (this.data && this.data.records): %>
+        <% for (const record of this.data.records): %>
+          <tr>
+            <!-- Row template would go here -->
+            <!-- In v2.1: <%= slot('row', { record: record }) %> -->
+          </tr>
+        <% endfor; %>
+      <% endif; %>
+    </tbody>
+  </table>
+</Define:Datagrid>

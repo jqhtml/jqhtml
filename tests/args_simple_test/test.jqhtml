@@ -1,0 +1,6 @@
+<Define:Test_Args_Simple>
+  <div>
+    <h1>Simple Args Test</h1>
+    <Simple_Component $myval="hello" />
+  </div>
+</Define:Test_Args_Simple>

@@ -1,0 +1,7 @@
+<Define:Test>
+  <%= "This string has %> in it" %>
+  <%= 'Single quote %> test' %>
+  <%= `Template literal %> test
+  on multiple lines` %>
+  <%= "Escaped quote \" and %> together" %>
+</Define:Test>

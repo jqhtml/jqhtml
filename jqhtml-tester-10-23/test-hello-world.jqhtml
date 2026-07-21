@@ -1,0 +1,9 @@
+<!--
+Hello_World - Simple test component
+-->
+<Define:Hello_World>
+    <div class="hello">
+        <h1>Hello from JQHTML!</h1>
+        <p>This component was compiled and rendered successfully.</p>
+    </div>
+</Define:Hello_World>

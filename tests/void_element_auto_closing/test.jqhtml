@@ -1,0 +1,6 @@
+<Define:Test_Void_Elements>
+  <div>
+    <h1>Void Element Auto-Closing Test</h1>
+    <Void_Elements_Component />
+  </div>
+</Define:Test_Void_Elements>

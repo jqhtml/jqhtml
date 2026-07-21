@@ -1,0 +1,17 @@
+<Define:Deduplication_Frozen_Data_Test>
+  <h1>Deduplication Follower Frozen Data Bug Test</h1>
+  <p>Creating 3 identical Contact_Display components with contact_id=42</p>
+  <p>Expected: All 3 should render with the same data (only 1 on_load call)</p>
+  <p>Bug: Followers fail because their this.data is frozen</p>
+
+  <div class="contacts">
+    <%-- These 3 components have identical args, so deduplication should kick in --%>
+    <Contact_Display $contact_id=42 />
+    <Contact_Display $contact_id=42 />
+    <Contact_Display $contact_id=42 />
+  </div>
+
+  <div class="results" $sid="results">
+    <p>Waiting for components to load...</p>
+  </div>
+</Define:Deduplication_Frozen_Data_Test>

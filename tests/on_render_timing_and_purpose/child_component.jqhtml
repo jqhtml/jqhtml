@@ -1,0 +1,6 @@
+<Define:Child_Component class="child-card">
+  <div class="child-component">
+    <h3>Child Component</h3>
+    <p>This child has a slow on_load()</p>
+  </div>
+</Define:Child_Component>

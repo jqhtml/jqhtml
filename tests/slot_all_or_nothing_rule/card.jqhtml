@@ -1,0 +1,9 @@
+<!--
+Card - Component with named slots
+-->
+<Define:Card>
+  <div class="card">
+    <div class="card-header"><%= content('header') %></div>
+    <div class="card-body"><%= content() %></div>
+  </div>
+</Define:Card>

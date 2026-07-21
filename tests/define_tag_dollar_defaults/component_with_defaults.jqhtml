@@ -1,0 +1,13 @@
+<Define:Component_With_Defaults
+    $per_page=25
+    $sortable=true
+    $endpoint="https://api.example.com/data"
+    $theme="light"
+    class="card">
+  <div class="component-with-defaults">
+    <div $sid="per_page">Per page: <%= this.args.per_page %></div>
+    <div $sid="sortable">Sortable: <%= this.args.sortable %></div>
+    <div $sid="endpoint">Endpoint: <%= this.args.endpoint %></div>
+    <div $sid="theme">Theme: <%= this.args.theme %></div>
+  </div>
+</Define:Component_With_Defaults>

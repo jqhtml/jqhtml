@@ -1,0 +1,135 @@
+{
+  "version": "6.0",
+  "nxVersion": "20.8.2",
+  "pathMappings": {},
+  "nxJsonPlugins": [],
+  "fileMap": {
+    "projectFileMap": {},
+    "nonProjectFiles": [
+      {
+        "file": "API_REFERENCE.md",
+        "hash": "16823993667325482753"
+      },
+      {
+        "file": "CHANGELOG.md",
+        "hash": "11208859212474592291"
+      },
+      {
+        "file": "INTEGRATION_GUIDE.md",
+        "hash": "18155662387992624122"
+      },
+      {
+        "file": "LICENSE",
+        "hash": "6792381918693508067"
+      },
+      {
+        "file": "LLM_REFERENCE.md",
+        "hash": "431370245287628906"
+      },
+      {
+        "file": "README.md",
+        "hash": "11056666927762636353"
+      },
+      {
+        "file": "package-lock.json",
+        "hash": "7488200744382460231"
+      },
+      {
+        "file": "package.json",
+        "hash": "10512769475292777406"
+      },
+      {
+        "file": "src/component-registry.ts",
+        "hash": "14026408779172353129"
+      },
+      {
+        "file": "src/component.d.ts",
+        "hash": "1456132829369041291"
+      },
+      {
+        "file": "src/component.d.ts.map",
+        "hash": "1436328916911074406"
+      },
+      {
+        "file": "src/component.js",
+        "hash": "8339301773130770678"
+      },
+      {
+        "file": "src/component.js.map",
+        "hash": "1000901782560826443"
+      },
+      {
+        "file": "src/component.ts",
+        "hash": "6451322701651050222"
+      },
+      {
+        "file": "src/debug-entry.ts",
+        "hash": "12285403871994928546"
+      },
+      {
+        "file": "src/debug-overlay.ts",
+        "hash": "200950315948503783"
+      },
+      {
+        "file": "src/debug.ts",
+        "hash": "4725402049181399587"
+      },
+      {
+        "file": "src/index.ts",
+        "hash": "3932318701926203779"
+      },
+      {
+        "file": "src/instruction-processor.ts",
+        "hash": "16209899221829670370"
+      },
+      {
+        "file": "src/jquery-plugin.ts",
+        "hash": "6331090986651650674"
+      },
+      {
+        "file": "src/jquery.d.ts",
+        "hash": "9851055120383579624"
+      },
+      {
+        "file": "src/lifecycle-manager.ts",
+        "hash": "392924858592812631"
+      },
+      {
+        "file": "src/template-renderer.ts",
+        "hash": "14804662474748019618"
+      },
+      {
+        "file": "src/types.d.ts",
+        "hash": "12408848940218297148"
+      },
+      {
+        "file": "test/test-debug-overlay.html",
+        "hash": "6461053916792196928"
+      },
+      {
+        "file": "test/test-implementation.js",
+        "hash": "12243367542720579656"
+      },
+      {
+        "file": "test/test-playwright-bundle.js",
+        "hash": "103672396995613196"
+      },
+      {
+        "file": "test/test-playwright.js",
+        "hash": "6439929663377305455"
+      },
+      {
+        "file": "test/test-simple.html",
+        "hash": "3783245443107171890"
+      },
+      {
+        "file": "test/test.html",
+        "hash": "1215003801254654757"
+      },
+      {
+        "file": "tsconfig.json",
+        "hash": "3137621839263122440"
+      }
+    ]
+  }
+}

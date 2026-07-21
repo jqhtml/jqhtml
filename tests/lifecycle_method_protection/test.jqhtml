@@ -1,0 +1,19 @@
+<Define:Test_Lifecycle_Method_Protection>
+  <div>
+    <h1>Lifecycle Method Protection Test</h1>
+    <p>Tests that lifecycle methods cannot be called manually but still execute correctly via framework.</p>
+
+    <h2>Protection Tests (Should Block Manual Calls)</h2>
+    <Manual_On_Create_Call />
+    <Manual_On_Load_Call />
+    <Manual_On_Ready_Call />
+    <Manual_On_Render_Call />
+    <Manual_On_Stop_Call />
+
+    <h2>Lifecycle Execution Tests (Framework Calls Should Work)</h2>
+    <Lifecycle_Executes_Correctly />
+
+    <h2>Parent Calling Child Lifecycle (Should Block)</h2>
+    <Parent_Calls_Child_Lifecycle />
+  </div>
+</Define:Test_Lifecycle_Method_Protection>

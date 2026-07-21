@@ -1,0 +1,6 @@
+<Define:Test_Data_Freeze_Unfreeze>
+  <div>
+    <h1>this.data Freeze/Unfreeze Cycle Test</h1>
+    <Data_Freeze_Test />
+  </div>
+</Define:Test_Data_Freeze_Unfreeze>

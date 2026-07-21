@@ -1,0 +1,6 @@
+<Define:Third_Level_Child>
+  <div class="third-level-child">
+    <h4>Third Level Child</h4>
+    <Fourth_Level_Child $sid="deep_child" />
+  </div>
+</Define:Third_Level_Child>

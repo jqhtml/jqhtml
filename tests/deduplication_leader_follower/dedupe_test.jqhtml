@@ -1,0 +1,18 @@
+<!--
+Dedupe_Test - Creates multiple identical User_Card components to test deduplication
+-->
+<Define:Dedupe_Test>
+  <div>
+    <h1>Load Deduplication Leader/Follower Test</h1>
+
+    <h3>Three components with user_id=42 (should deduplicate)</h3>
+    <div $sid="card1"><User_Card $user_id=42 /></div>
+    <div $sid="card2"><User_Card $user_id=42 /></div>
+    <div $sid="card3"><User_Card $user_id=42 /></div>
+
+    <h3>One component with user_id=99 (separate leader)</h3>
+    <div $sid="card4"><User_Card $user_id=99 /></div>
+
+    <div $sid="results"></div>
+  </div>
+</Define:Dedupe_Test>

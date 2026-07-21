@@ -1,0 +1,17 @@
+<Define:Slot_Forwarding_Test>
+    <div class="container mt-4">
+        <h1>Slot Forwarding Test</h1>
+
+        <!-- Test 1: Basic slot forwarding through 3 levels -->
+        <div class="test-section">
+            <h2>Test 1: Basic Slot Forwarding (3 levels)</h2>
+            <Component_A />
+        </div>
+
+        <!-- Test 2: Multiple slots forwarding -->
+        <div class="test-section mt-4">
+            <h2>Test 2: Multiple Slots Forwarding</h2>
+            <Multi_Slot_Parent />
+        </div>
+    </div>
+</Define:Slot_Forwarding_Test>

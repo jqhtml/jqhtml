@@ -1,0 +1,9 @@
+<Define:Html_Cache_Static_Skip_Test>
+  <div class="test-container">
+    <h1>HTML Cache Static Skip Test</h1>
+    <p>Tests that static components are NOT cached in HTML mode</p>
+    <div $sid="static_mount" class="mount-point"></div>
+    <div $sid="dynamic_mount" class="mount-point"></div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Html_Cache_Static_Skip_Test>

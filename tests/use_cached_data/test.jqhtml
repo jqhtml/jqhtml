@@ -1,0 +1,12 @@
+<Define:Use_Cached_Data_Test>
+  <div class="test-container">
+    <h1>use_cached_data Test</h1>
+    <p>Tests that use_cached_data=true skips on_load() when cache hit occurs</p>
+
+    <div $sid="mount_point" class="mount-point">
+      <!-- Child component will be mounted here -->
+    </div>
+
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Use_Cached_Data_Test>

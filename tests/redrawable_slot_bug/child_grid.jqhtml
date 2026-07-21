@@ -1,0 +1,16 @@
+<!--
+Child_Grid - Extends Parent_Grid and provides slot content
+-->
+<Define:Child_Grid extends="Parent_Grid">
+  <Slot:DG_Table_Header>
+    <tr>
+      <th>ID</th>
+      <th>Name</th>
+    </tr>
+  </Slot:DG_Table_Header>
+
+  <Slot:row>
+    <td><%= row.id %></td>
+    <td><%= row.name %></td>
+  </Slot:row>
+</Define:Child_Grid>

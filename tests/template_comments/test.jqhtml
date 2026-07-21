@@ -1,0 +1,6 @@
+<Define:Test_Template_Comments>
+  <div>
+    <h1>Template Comments Test</h1>
+    <Comment_Component />
+  </div>
+</Define:Test_Template_Comments>

@@ -1,0 +1,14 @@
+<Define:Child_Component class="child-component">
+    <div class="card mt-3">
+        <div class="card-header bg-secondary text-white">
+            Child Component
+        </div>
+        <div class="card-body">
+            <h5>Rendering Header Slot:</h5>
+            <%= content('header') %>
+
+            <h5 class="mt-3">Rendering Body Slot:</h5>
+            <%= content('body') %>
+        </div>
+    </div>
+</Define:Child_Component>

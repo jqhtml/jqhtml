@@ -1,0 +1,6 @@
+<Define:Render_Promise_Test_Main>
+  <div>
+    <h1>render() Returns Promise Test</h1>
+    <Render_Promise_Test />
+  </div>
+</Define:Render_Promise_Test_Main>

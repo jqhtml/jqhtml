@@ -1,0 +1,7 @@
+<Define:Reload_Debounce_Test class="card">
+  <div class="test-component">
+    <h2>reload() Debouncing Test</h2>
+    <div $sid="on_load_count">on_load executions: <%= this.data.load_count || 0 %></div>
+    <div $sid="results"></div>
+  </div>
+</Define:Reload_Debounce_Test>

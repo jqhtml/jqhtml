@@ -1,0 +1,8 @@
+<Define:Contact_Display class="contact-card">
+  <% if (this.data.loaded) { %>
+    <div class="name"><%= this.data.name %></div>
+    <div class="email"><%= this.data.email %></div>
+  <% } else { %>
+    <div class="loading">Loading contact <%= this.args.contact_id %>...</div>
+  <% } %>
+</Define:Contact_Display>

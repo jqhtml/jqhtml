@@ -1,0 +1,10 @@
+<!--
+Component_Tag_Attribute_Test - Test how tag="" attribute works on components
+-->
+<Define:Component_Tag_Attribute_Test>
+    <div class="container">
+        <p>Before component</p>
+        <My_Span_Component>Hello from span component</My_Span_Component>
+        <p>After component</p>
+    </div>
+</Define:Component_Tag_Attribute_Test>

@@ -1,0 +1,10 @@
+<!--
+Pure_Slots - Uses only slots (should work)
+-->
+<Define:Pure_Slots>
+  <div>
+    <Card $sid="pure">
+      <Slot:header>Title</Slot:header>
+    </Card>
+  </div>
+</Define:Pure_Slots>

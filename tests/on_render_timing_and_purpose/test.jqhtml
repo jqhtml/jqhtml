@@ -1,0 +1,6 @@
+<Define:Test_On_Render_Timing>
+  <div>
+    <h1>on_render() Timing and Purpose Test</h1>
+    <Parent_With_Render />
+  </div>
+</Define:Test_On_Render_Timing>

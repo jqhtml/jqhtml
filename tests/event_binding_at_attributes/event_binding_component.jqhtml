@@ -1,0 +1,51 @@
+<Define:Event_Binding_Component>
+  <div class="event-binding-test">
+    <h2>Testing @ Attribute Event Binding</h2>
+
+    <div class="test-section">
+      <h3>Click Event</h3>
+      <button $sid="click_btn" @click=this.handle_click class="btn">
+        Click Me
+      </button>
+      <div $sid="click_count" class="result">Clicks: 0</div>
+    </div>
+
+    <div class="test-section">
+      <h3>Change Event</h3>
+      <input $sid="text_input" @change=this.handle_change type="text" placeholder="Type and blur">
+      <div $sid="change_result" class="result">Change value: (none)</div>
+    </div>
+
+    <div class="test-section">
+      <h3>Multiple Events on Same Element</h3>
+      <div $sid="multi_target" @click=this.handle_multi_click @mouseover=this.handle_mouseover
+           style="padding: 20px; border: 2px solid blue; cursor: pointer;">
+        Hover and Click Me
+      </div>
+      <div $sid="multi_result" class="result">Events: none</div>
+    </div>
+
+    <div class="test-section">
+      <h3>Focus/Blur Events</h3>
+      <input $sid="focus_input" @focus=this.handle_focus @blur=this.handle_blur type="text" placeholder="Focus me">
+      <div $sid="focus_result" class="result">Focus state: none</div>
+    </div>
+
+    <div class="test-section">
+      <h3>Keyboard Events</h3>
+      <input $sid="keyboard_input" @keyup=this.handle_keyup type="text" placeholder="Type something">
+      <div $sid="keyboard_result" class="result">Keys pressed: 0</div>
+    </div>
+
+    <div class="test-section">
+      <h3>Form Submit</h3>
+      <form $sid="test_form" @submit=this.handle_submit>
+        <input type="text" value="test">
+        <button type="submit">Submit</button>
+      </form>
+      <div $sid="submit_result" class="result">Submit count: 0</div>
+    </div>
+
+    <div $sid="test_results" class="test-results"></div>
+  </div>
+</Define:Event_Binding_Component>

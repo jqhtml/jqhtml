@@ -1,0 +1,26 @@
+<Define:TestComponent>
+  <!-- Correct: unquoted values as variable/method references -->
+  <button @click=this.handleClick>Good - Method reference</button>
+  <button @click=handleClick>Good - Simple method name</button>
+  <div $data=this.data.user>Good - Data reference</div>
+  <div $active=isActive>Good - Variable reference</div>
+
+  <!-- Correct: quoted values as string literals -->
+  <button @click="handleClick">String literal "handleClick"</button>
+  <div $foo="bar">String literal "bar"</div>
+
+  <!-- Should throw error: function calls not allowed -->
+  <!-- <button @click=this.handleClick()>BAD - Function call</button> -->
+  <!-- <button @click=doSomething()>BAD - Function call</button> -->
+
+  <!-- Complex member expressions -->
+  <div $config=this.settings.user.preferences>Good - Deep property access</div>
+
+  <!-- Mixed quoted and unquoted -->
+  <Component
+    title="Static String"
+    @onUpdate=this.handleUpdate
+    $data=userData
+    class="css-class"
+  />
+</Define:TestComponent>

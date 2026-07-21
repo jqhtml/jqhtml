@@ -1,0 +1,7 @@
+<Define:Extends_Attribute_Test_Main>
+  <div>
+    <h1>extends Attribute Template Lookup Test</h1>
+    <Users_Grid $sid="grid" />
+    <div $sid="results"></div>
+  </div>
+</Define:Extends_Attribute_Test_Main>

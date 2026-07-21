@@ -1,0 +1,5 @@
+<Define:Fourth_Level_Child>
+  <div class="fourth-level-child">
+    <span class="text-content">Initial Text</span>
+  </div>
+</Define:Fourth_Level_Child>

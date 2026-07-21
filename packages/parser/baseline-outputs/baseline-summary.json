@@ -1,0 +1,357 @@
+{
+  "timestamp": "2025-09-22T11:52:32.164Z",
+  "version": "2.2.63",
+  "totalFiles": 48,
+  "successful": 39,
+  "failed": 9,
+  "files": {
+    "AboutRoute.jqhtml": {
+      "success": true,
+      "codeHash": "a66ed6462852229ec8c49beaf023914f",
+      "sourceHash": "fae74255313d4bcc3ef3dad82ca34894",
+      "components": [
+        "AboutRoute"
+      ]
+    },
+    "AdminLayout.jqhtml": {
+      "success": true,
+      "codeHash": "44c525061326c0ad44fbc1630858d33c",
+      "sourceHash": "3151be6a4cad79ef5f952b0e3f4e0735",
+      "components": [
+        "AdminLayout"
+      ]
+    },
+    "AdminRoute.jqhtml": {
+      "success": true,
+      "codeHash": "98fe5de7d175c7c10a0bcb189a110ec4",
+      "sourceHash": "087e65a2c58959304a05acd7a8fe3097",
+      "components": [
+        "AdminRoute"
+      ]
+    },
+    "AttributeTest.jqhtml": {
+      "success": true,
+      "codeHash": "400a915a3b5835539eee91e8cab352c3",
+      "sourceHash": "fb8f8c25ffe542503f2230c64ea037a8",
+      "components": [
+        "AttributeTest"
+      ]
+    },
+    "BlogPostRoute.jqhtml": {
+      "success": true,
+      "codeHash": "31ba5934ecf5eedf3fb7a27e677cc3a4",
+      "sourceHash": "09c155235eef0bf065bf71682c8aeddc",
+      "components": [
+        "BlogPostRoute"
+      ]
+    },
+    "BlogRoute.jqhtml": {
+      "success": true,
+      "codeHash": "ed87a109c8bed8250193f827c4758caf",
+      "sourceHash": "9ce99d6b745b394947475246861efcb6",
+      "components": [
+        "BlogRoute"
+      ]
+    },
+    "Card.jqhtml": {
+      "success": true,
+      "codeHash": "1bc3e58a18dadef6565dadbd055656f4",
+      "sourceHash": "9b6bc4aabafe81bab9e0ca43477240a4",
+      "components": [
+        "Card"
+      ]
+    },
+    "ComponentsRoute.jqhtml": {
+      "success": false,
+      "error": "Syntax error: <style> tags are not allowed in JQHTML templates. Use external files or inline styles via attributes instead.\n  at ComponentsRoute.jqhtml:287:9\n\n    284 |     </div>\n    285 |   </div>\n    286 | \n>   287 |   <style>\n                 ^\n    288 |     .feature-section {\n    289 |       margin: 2rem 0;\n    290 |       padding: 2rem;\n"
+    },
+    "CustomInput.jqhtml": {
+      "success": true,
+      "codeHash": "a9f1804ad44adef8021d8996452ebf55",
+      "sourceHash": "48830fec622f54dfcbd2a6ae230503c1",
+      "components": [
+        "CustomInput"
+      ]
+    },
+    "DemoApp.jqhtml": {
+      "success": true,
+      "codeHash": "c13d041de37b241758578479878e84ac",
+      "sourceHash": "d77aac41c5d8d3b0505223a86ba5141b",
+      "components": [
+        "DemoApp"
+      ]
+    },
+    "ExampleBlock.jqhtml": {
+      "success": true,
+      "codeHash": "9bd5a73887c5cd63677642ff86cd03bc",
+      "sourceHash": "1507f0a033dbd9a9b2def0778417cfc9",
+      "components": [
+        "ExampleBlock"
+      ]
+    },
+    "HomeRoute.jqhtml": {
+      "success": true,
+      "codeHash": "020c8341718c9292119a944eadd4d2fe",
+      "sourceHash": "3ddefae33d787e92d0b8802e1cf32e8c",
+      "components": [
+        "HomeRoute"
+      ]
+    },
+    "MainLayout.jqhtml": {
+      "success": true,
+      "codeHash": "39209f2011b1ddf22318a9d89d02506e",
+      "sourceHash": "1547d24ec06c87a2625d08d11d596916",
+      "components": [
+        "MainLayout"
+      ]
+    },
+    "StatusBadge.jqhtml": {
+      "success": true,
+      "codeHash": "d7cd0d6e184727e2f5b57650a1c8d322",
+      "sourceHash": "365aa9cf52177fb0761f96ffac1f1661",
+      "components": [
+        "StatusBadge"
+      ]
+    },
+    "TestCard.jqhtml": {
+      "success": true,
+      "codeHash": "bf4c2f77b9113c21871cb9d031108821",
+      "sourceHash": "6b328607ab37259ce89806cc735fcdf5",
+      "components": [
+        "TestCard"
+      ]
+    },
+    "UserRoute.jqhtml": {
+      "success": true,
+      "codeHash": "3903f2964639f203d5b808dbdf358aa6",
+      "sourceHash": "7311ba37649b855d7eee732eeb59f410",
+      "components": [
+        "UserRoute"
+      ]
+    },
+    "demo-templates.jqhtml": {
+      "success": false,
+      "error": "Syntax error: JQHTML files must have exactly one top-level <Define:ComponentName> tag. Found additional content after the component definition.\n  at demo-templates.jqhtml:43:9\n\n     40 |   </div>\n     41 | </Define:MainLayout>\n     42 | \n>    43 | <Define:HomeRoute>\n                 ^^^^^^^^^^\n     44 |   <div class=\"route-content\">\n     45 |     <h2>Welcome to JQHTML Router Demo</h2>\n     46 |     <p>This is a full-featured Single Page Application built with JQHTML Router v2.</p>\n"
+    },
+    "test-1to1-complex.jqhtml": {
+      "success": true,
+      "codeHash": "bd5a9b63c3d76facc653f36abfb8eaaf",
+      "sourceHash": "9ed927a26f6821fc3e005232ba101d11",
+      "components": [
+        "ComplexComponent"
+      ]
+    },
+    "test-1to1-final.jqhtml": {
+      "success": true,
+      "codeHash": "2c8520d12e6cb52e76bc9807156a85a5",
+      "sourceHash": "9e8dd13174c2a02ec4ac21b5b53d0f3f",
+      "components": [
+        "FinalTest"
+      ]
+    },
+    "test-1to1-nested.jqhtml": {
+      "success": true,
+      "codeHash": "295715f6eb68d38950ebf2f0e3f8d6ad",
+      "sourceHash": "4505ec7def53b5bfd4990acef180e033",
+      "components": [
+        "ComplexComponent"
+      ]
+    },
+    "test-1to1.jqhtml": {
+      "success": true,
+      "codeHash": "3adb2321726f1effef8f35d808a8a06a",
+      "sourceHash": "9aabe8da31db62c147803b3d4d27261d",
+      "components": [
+        "TestComponent"
+      ]
+    },
+    "test-attribute-parsing.jqhtml": {
+      "success": false,
+      "error": "Event attributes (@) must have unquoted values to pass function references.\n  Attribute: @click==\n  at line 9, column 18\n\n      6 |   <div $active=isActive>Good - Variable reference</div>\n      7 | \n      8 |   <!-- Correct: quoted values as string literals -->\n>     9 |   <button @click=\"handleClick\">String literal \"handleClick\"</button>\n                          ^^^^^^^^^^^^^^^^^^^^\n     10 |   <div $foo=\"bar\">String literal \"bar\"</div>\n     11 | \n     12 |   <!-- Should throw error: function calls not allowed -->\n"
+    },
+    "test-baseline.jqhtml": {
+      "success": true,
+      "codeHash": "228d58ae6b1741edf45d476ad6b09545",
+      "sourceHash": "569cb8dd9d1d44867ef485b10513c584",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-clean.jqhtml": {
+      "success": true,
+      "codeHash": "d882993844a56e611fe32f6a945a8cef",
+      "sourceHash": "676d3903f7d6e6ce6033dbd1ce40bf56",
+      "components": [
+        "TestComponent"
+      ]
+    },
+    "test-comma-bug.jqhtml": {
+      "success": true,
+      "codeHash": "7d98e9814e6262451b16edcf92b384e0",
+      "sourceHash": "484a387308112b744fc8c9fca09041d7",
+      "components": [
+        "TestComma"
+      ]
+    },
+    "test-comment.jqhtml": {
+      "success": true,
+      "codeHash": "5c19a4a09a831fdf1467a2e3fc0b0e64",
+      "sourceHash": "d7f502eae3f0c5a6e3fa8e50383e080c",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-comments-all.jqhtml": {
+      "success": true,
+      "codeHash": "7e3d60b7c3be5ab7edb292a168e0feca",
+      "sourceHash": "eea49ee64a8076ed075f53f40ff3a122",
+      "components": [
+        "Test_Comments"
+      ]
+    },
+    "test-component.jqhtml": {
+      "success": false,
+      "error": "Event attributes (@) must have unquoted values to pass function references.\n  Attribute: @click==\n  at line 5, column 24\n\n      2 |     <div class=\"demo-component\">\n      3 |         <h1><%= this.data.title %></h1>\n      4 |         <p>This is a test JQHTML component.</p>\n>     5 |         <button @click=\"handleClick\">Click me!</button>\n                                ^^^^^^^^^^^^^^^^^^^^\n      6 |     </div>\n      7 | </Define:DemoComponent>\n"
+    },
+    "test-comprehensive.jqhtml": {
+      "success": true,
+      "codeHash": "e5441ab74de33a1480dbe32a1e043240",
+      "sourceHash": "c617e17d617e58dd5fbccdde99479f3d",
+      "components": [
+        "TestComponent"
+      ]
+    },
+    "test-counter.jqhtml": {
+      "success": true,
+      "codeHash": "24fdfea81045e7fb782fbab75bebea8f",
+      "sourceHash": "bc3c2f8a3a1e21c95dbd5611485b802e",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-error.jqhtml": {
+      "success": false,
+      "error": "JQHTML compilation failed for component \"TestError\".\nJavaScript syntax error: Unexpected token ':'\n\nThis usually indicates an issue in your template expressions or code blocks.\nCheck for unclosed brackets, missing quotes, or invalid JavaScript syntax.\n\nGenerated code preview:\n_output.push({tag: [\"div\", {\"class\": \"test\"}, false]});\n\n_output.push({tag: [\"p\", {}, false]}); (() => { const result = this.data.message || 'default'; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })(); _output.push(\"</p>\");\n if (this.data.show:\n_output.push({tag: [\"span\", {}, false]}); _output.push(\"Show this\"); _output.push(\"</span>\");\n }\n _output.push(\"</div>\");\n"
+    },
+    "test-exact-issue.jqhtml": {
+      "success": true,
+      "codeHash": "c6c440de303ea6179f5871fb8f1cfe7a",
+      "sourceHash": "4fbe0f927f10dc2d126da92b2b1562b3",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-highlighting.jqhtml": {
+      "success": false,
+      "error": "Event attributes (@) must have unquoted values to pass function references.\n  Attribute: @click==\n  at line 8, column 20\n\n      5 |     <button @click=obj.method>Object Method</button>\n      6 | \n      7 |     <!-- Test quoted values - should be highlighted as errors/warnings for events -->\n>     8 |     <button @click=\"this.handle_view\">Wrong - String Not Function</button>\n                            ^^^^^^^^^^^^^^^^^^^^\n      9 |     <button @click='handleClick'>Wrong - String Not Function</button>\n     10 | \n     11 |     <!-- Test $ attributes with unquoted values -->\n"
+    },
+    "test-line-tracking.jqhtml": {
+      "success": true,
+      "codeHash": "eeb988f0a69dc35d7560ab5e091e4811",
+      "sourceHash": "68af72e9ec90548af4dd22a30b4a19e9",
+      "components": [
+        "TestLineTracking"
+      ]
+    },
+    "test-line10.jqhtml": {
+      "success": true,
+      "codeHash": "eaa7c22b06c52d040fb3e27b6176df26",
+      "sourceHash": "134c9e2a5f705734fdece1a27cec199e",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-moved.jqhtml": {
+      "success": true,
+      "codeHash": "311fea64ca3255182448f02307d19764",
+      "sourceHash": "964efac0cec91baa767b8e11a3c3b16d",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-newline-issue.jqhtml": {
+      "success": true,
+      "codeHash": "92d98b6573e188f67e301f34301b153a",
+      "sourceHash": "ab46fa27ca69fac702c47f71f1d2caf4",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-no-slots.jqhtml": {
+      "success": true,
+      "codeHash": "6a03cd2e005ad692f481b2ce0ac8dee5",
+      "sourceHash": "c641abbd9a7a2b9caa542fd80309baa8",
+      "components": [
+        "Container"
+      ]
+    },
+    "test-offset.jqhtml": {
+      "success": true,
+      "codeHash": "0ce4f60b4e2de652cdb60aedf590579c",
+      "sourceHash": "727109a63e03f2c6d3fd2597fe3a389c",
+      "components": [
+        "TestOffset"
+      ]
+    },
+    "test-simple.jqhtml": {
+      "success": true,
+      "codeHash": "840f48ebdec9313336eeab2c8f9f10b1",
+      "sourceHash": "34fdd103f39116548eaa9ab8ba836e20",
+      "components": [
+        "SimpleTest"
+      ]
+    },
+    "test-single-line-issue.jqhtml": {
+      "success": true,
+      "codeHash": "86c1abb1b8457862c5818b15d7e17f23",
+      "sourceHash": "bfcc10fc28f34d133fa22dc7d3823d5f",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-source.jqhtml": {
+      "success": true,
+      "codeHash": "5ba4eebad87b7b04be3ab3c130e58eae",
+      "sourceHash": "4bd903246f03c0adfc95eed4edf3bdf8",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-source2.jqhtml": {
+      "success": true,
+      "codeHash": "4e0b6200c0e62409d9077acfd0f21a86",
+      "sourceHash": "443198cbffe3b681b94381324bf02877",
+      "components": [
+        "Counter_Widget"
+      ]
+    },
+    "test-sourcemap-no-comment.jqhtml": {
+      "success": false,
+      "error": "Syntax error: <script> tags are not allowed in JQHTML templates. Use external files or inline styles via attributes instead.\n  at test-sourcemap-no-comment.jqhtml:15:12\n\n     12 |       Click Me (Line 12)\n     13 |     </button>\n     14 | \n>    15 |     <script>\n                    ^\n     16 |       // Line 16\n     17 |       function handleClick() {\n     18 |         console.log('Button clicked at line 18');\n"
+    },
+    "test-sourcemap.jqhtml": {
+      "success": false,
+      "error": "Syntax error: <script> tags are not allowed in JQHTML templates. Use external files or inline styles via attributes instead.\n  at test-sourcemap.jqhtml:21:12\n\n     18 |       Click Me (Line 17)\n     19 |     </button>\n     20 | \n>    21 |     <script>\n                    ^\n     22 |       // Line 21\n     23 |       function handleClick() {\n     24 |         console.log('Button clicked at line 23');\n"
+    },
+    "test-string.jqhtml": {
+      "success": true,
+      "codeHash": "21ce5422677764695185f5054c650219",
+      "sourceHash": "a03d8b694be03183d4bda7143b110405",
+      "components": [
+        "Test"
+      ]
+    },
+    "test-template.jqhtml": {
+      "success": true,
+      "codeHash": "4ea235fe81fdf6bed4bbe5a08233c8f6",
+      "sourceHash": "103bb572bf7dbcdbea1a59c2fb7d7f51",
+      "components": [
+        "TestComponent"
+      ]
+    },
+    "test-that-alias.jqhtml": {
+      "success": false,
+      "error": "Event attributes (@) must have unquoted values to pass function references.\n  Attribute: @click==\n  at line 12, column 20\n\n      9 |     <p>Using that.data.name: <%= that.data.name || 'No name' %></p>\n     10 | \n     11 |     <!-- Both should access same component -->\n>    12 |     <button @click=\"this.emit('test-this')\">Emit with 'this'</button>\n                            ^^^^^^^^^^^^^^^^^^^^\n     13 |     <button @click=\"that.emit('test-that')\">Emit with 'that'</button>\n     14 | \n     15 |     <!-- Testing in loops -->\n"
+    }
+  }
+}

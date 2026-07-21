@@ -1,0 +1,12 @@
+<Define:BlogPostRoute>
+    <div class="route-content">
+        <% if (this.data.post): %>
+            <h2><%= this.data.post.title %></h2>
+            <div class="meta">Published on <%= this.data.post.date %></div>
+            <p><%!= this.data.post.content %></p>
+            <p><a href="/blog">← Back to blog</a></p>
+        <% else: %>
+            <div class="loading">Loading post...</div>
+        <% endif; %>
+    </div>
+</Define:BlogPostRoute>

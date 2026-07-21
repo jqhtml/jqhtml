@@ -1,0 +1,21 @@
+<Define:TestComponent>
+    <!-- Test unquoted function references - should be highlighted as variables/functions -->
+    <button @click=this.handle_view>Method Reference</button>
+    <button @click=handleClick>Function Reference</button>
+    <button @click=obj.method>Object Method</button>
+
+    <!-- Test quoted values - should be highlighted as errors/warnings for events -->
+    <button @click="this.handle_view">Wrong - String Not Function</button>
+    <button @click='handleClick'>Wrong - String Not Function</button>
+
+    <!-- Test $ attributes with unquoted values -->
+    <div $id="view_btn">Normal quoted $id</div>
+    <div $data=this.userData>Unquoted property access</div>
+    <div $value=currentValue>Unquoted variable</div>
+    <div $expr=(someExpression)>Expression syntax</div>
+
+    <!-- Test standard attributes -->
+    <input type="text" value="quoted string">
+    <input type=text value=unquotedValue>
+    <div data-value=this.property>Property on standard attr</div>
+</Define:TestComponent>

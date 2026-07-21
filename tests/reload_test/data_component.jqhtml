@@ -1,0 +1,11 @@
+<Define:Data_Component class="border p-3 mb-2">
+  <% if (Object.keys(this.data).length === 0) { %>
+    <div class="text-muted">Loading data_id: <%= this.args.data_id %>...</div>
+  <% } else { %>
+    <div>
+      <strong>Data ID:</strong> <%= this.data.data_id %><br>
+      <strong>Value:</strong> <%= this.data.value %><br>
+      <strong>Timestamp:</strong> <%= this.data.timestamp %>
+    </div>
+  <% } %>
+</Define:Data_Component>

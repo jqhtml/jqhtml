@@ -1,0 +1,15 @@
+<Define:Outer_Component>
+    <div class="outer-layout">
+        <header class="mb-3">
+            <h1>Outer Component</h1>
+        </header>
+
+        <main $sid="content">
+            <!-- Inner component renders here -->
+        </main>
+
+        <footer class="mt-3">
+            <p>Footer</p>
+        </footer>
+    </div>
+</Define:Outer_Component>

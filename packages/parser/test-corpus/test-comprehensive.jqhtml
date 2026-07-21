@@ -1,0 +1,65 @@
+<Define:TestComponent>
+  <div class="container">
+    <h1>Comprehensive Test</h1>
+
+    <%-- Single line comment with braces { } --%>
+
+    <%
+      // Multi-line code block
+      const items = ['apple', 'banana', 'cherry'];
+      const doubled = items.map(x => x.toUpperCase());
+    %>
+
+    <% const items2 = ['apple', 'banana', 'cherry'];
+      const doubled2 = items.map(x => x.toUpperCase());
+    %>  <%-- another variation of comments --%>
+
+
+    Inline <% single_method_called_for_some_reason(); %> after the same line
+    <%
+	// Hello
+
+      // Multi-line code block with 2 blank lines after a single opening tag on its own line 
+      const items3 = ['apple', 'banana', 'cherry'];
+      const doubled3 = items.map(x => x.toUpperCase());
+    %>
+
+    More stuffff<%=
+             /* Doing some weird stuff with calculations and comments here */
+            (3 +
+   5 + 10) %>rightafter
+newlineafter
+    Blah!? <p>Expression: <%= items.length %> items</p>
+
+    <%-- Multi-line comment with component
+         <User_Card
+            class="madness"
+            name="Alice Johnson"
+            email="alice@example.com"
+            data-foo="zomg"
+            avatar="https://i.pravatar.cc/80?img=1"
+            bio="Frontend developer specializing in React and Vue.js" />
+    --%>
+
+    <Component_Invocation>Hello</Component_Invocation>
+
+
+
+	foo
+    <Self_Closing />
+
+    <Multi_Line_Component
+      prop1="value1"
+      prop2="value2"
+      prop3="value3">
+      <div>Child content</div>
+    </Multi_Line_Component>
+What happens to this line
+    <% foo(); %>
+    <% function testFunction() { %>
+      <p>Inside function</p>
+    <% } %>
+
+    <% testFunction(); %>
+  </div>
+</Define:TestComponent>

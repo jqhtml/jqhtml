@@ -1,0 +1,8 @@
+<Define:Data_Cache_Test>
+  <div class="test-container">
+    <h1>Data Cache Mode 2 Test</h1>
+    <p>Testing ES6 class instance restoration from cache</p>
+    <div $sid="mount_point" class="mount-point"></div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Data_Cache_Test>

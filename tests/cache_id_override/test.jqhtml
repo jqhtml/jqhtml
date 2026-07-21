@@ -1,0 +1,6 @@
+<Define:Cache_Id_Override_Test_Main>
+  <div>
+    <h1>cache_id() Override Test</h1>
+    <Cache_Id_Override_Test />
+  </div>
+</Define:Cache_Id_Override_Test_Main>

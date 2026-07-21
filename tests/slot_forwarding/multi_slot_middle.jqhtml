@@ -1,0 +1,24 @@
+<!--
+Multi_Slot_Middle - Forwards all three slots to child
+-->
+
+<Define:Multi_Slot_Middle class="multi-slot-middle">
+    <div class="card mt-2">
+        <div class="card-header bg-success text-white">
+            Multi Slot Middle (Forwards All Slots)
+        </div>
+        <div class="card-body">
+            <Multi_Slot_Child>
+                <Slot:header>
+                    <%= content('header', header); %>
+                </Slot:header>
+                <Slot:row>
+                    <%= content('row', row); %>
+                </Slot:row>
+                <Slot:footer>
+                    <%= content('footer', footer); %>
+                </Slot:footer>
+            </Multi_Slot_Child>
+        </div>
+    </div>
+</Define:Multi_Slot_Middle>

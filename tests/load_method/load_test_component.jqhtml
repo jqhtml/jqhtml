@@ -1,0 +1,11 @@
+<Define:Load_Test_Component>
+  <div class="load-test">
+    <h2>Testing load() Method</h2>
+    <div $sid="value" class="value-display">
+      Value: <%= this.data.value %>
+    </div>
+    <div $sid="render_count" class="render-count">
+      Render count: <%= this.data.render_count %>
+    </div>
+  </div>
+</Define:Load_Test_Component>

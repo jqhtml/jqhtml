@@ -1,0 +1,144 @@
+<Define:MainLayout>
+  <div class="main-layout">
+    <header>
+      <div class="container">
+        <h1>JQHTML SPA Demo</h1>
+      </div>
+    </header>
+    
+    <nav>
+      <div class="container">
+        <ul>
+          <% const links = [
+            {href: "/", text: "Home"},
+            {href: "/about", text: "About"},
+            {href: "/blog", text: "Blog"},
+            {href: "/blog/123", text: "Blog Post #123"},
+            {href: "/user/john", text: "User: John"},
+            {href: "/user/jane", text: "User: Jane"}
+          ]; %>
+          <% for (let link of links): %>
+            <li><a href="<%= link.href %>" data-route="<%= link.href %>"><%= link.text %></a></li>
+          <% endfor; %>
+        </ul>
+      </div>
+    </nav>
+    
+    <main>
+      <div class="container">
+        <div $id="content">
+          <!-- Routes render here -->
+        </div>
+      </div>
+    </main>
+    
+    <footer>
+      <div class="container">
+        <p>© 2024 JQHTML Router Demo. Built with JQHTML v2.</p>
+      </div>
+    </footer>
+  </div>
+</Define:MainLayout>
+
+<Define:HomeRoute>
+  <div class="route-content">
+    <h2>Welcome to JQHTML Router Demo</h2>
+    <p>This is a full-featured Single Page Application built with JQHTML Router v2.</p>
+    <p>Features demonstrated:</p>
+    <ul>
+      <% const features = [
+        "✓ Client-side routing with browser history",
+        "✓ Layout persistence across route changes",
+        "✓ Dynamic route parameters",
+        "✓ Lifecycle hooks (pre/post dispatch)",
+        "✓ Active navigation state",
+        "✓ Component-based architecture"
+      ]; %>
+      <% for (let feature of features): %>
+        <li><%= feature %></li>
+      <% endfor; %>
+    </ul>
+    <p>Click the navigation links above to explore!</p>
+  </div>
+</Define:HomeRoute>
+
+<Define:AboutRoute>
+  <div class="route-content">
+    <% if (this.data.content): %>
+      <h2><%= this.data.content.title %></h2>
+      <p><%= this.data.content.description %></p>
+      <p>JQHTML Router provides:</p>
+      <ul>
+        <% const features = [
+          "Laravel-style route patterns",
+          "Nested layouts",
+          "Route parameters",
+          "Navigation guards",
+          "And much more!"
+        ]; %>
+        <% for (let feature of features): %>
+          <li><%= feature %></li>
+        <% endfor; %>
+      </ul>
+    <% else: %>
+      <div class="loading">Loading about page...</div>
+    <% endif; %>
+  </div>
+</Define:AboutRoute>
+
+<Define:BlogRoute>
+  <div class="route-content">
+    <h2>Blog</h2>
+    <% for (let post of this.data.posts || []): %>
+      <div class="blog-post">
+        <h3><%= post.title %></h3>
+        <div class="meta">Published on <%= post.date %></div>
+        <p><%= post.excerpt %></p>
+        <a href="/blog/<%= post.id %>">Read more →</a>
+      </div>
+    <% endfor; %>
+  </div>
+</Define:BlogRoute>
+
+<Define:BlogPostRoute>
+  <div class="route-content">
+    <% if (this.data.post): %>
+      <h2><%= this.data.post.title %></h2>
+      <div class="meta">Published on <%= this.data.post.date %></div>
+      <p><%= this.data.post.content %></p>
+      <p><a href="/blog">← Back to blog</a></p>
+    <% else: %>
+      <div class="loading">Loading post...</div>
+    <% endif; %>
+  </div>
+</Define:BlogPostRoute>
+
+<Define:UserRoute>
+  <div class="route-content">
+    <h2>User Profile</h2>
+    <% if (this.data.user): %>
+      <div class="user-profile">
+        <div class="user-avatar">
+          <%= this.data.user.avatar %>
+        </div>
+        <div class="user-info">
+          <h3><%= this.data.user.name %></h3>
+          <p>@<%= this.data.user.username %> · <StatusBadge $status="this.data.user.status || 'offline'" /></p>
+          <p><%= this.data.user.bio %></p>
+        </div>
+      </div>
+    <% else: %>
+      <div class="loading">Loading user profile...</div>
+    <% endif; %>
+  </div>
+</Define:UserRoute>
+
+<Define:StatusBadge as="span">
+  <% if (this.data.status === 'online'): %>
+    <span class="status-indicator online">●</span> Online
+  <% else if (this.data.status === 'busy'): %>
+    <span class="status-indicator busy">●</span> Busy
+  <% else: %>
+    <span class="status-indicator offline">●</span> Offline
+  <% endif; %>
+</Define:StatusBadge>

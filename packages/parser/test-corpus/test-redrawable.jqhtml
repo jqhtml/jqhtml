@@ -1,0 +1,26 @@
+<Define:Test_Redrawable>
+  <div class="container">
+    <!-- Basic redrawable element -->
+    <div $redrawable $id="counter" class="card">
+      Counter: <%= this.data.count %>
+    </div>
+
+    <!-- Redrawable with attributes -->
+    <section $redrawable $id="status" class="alert alert-info" role="alert">
+      Status: <%= this.data.status %>
+    </section>
+
+    <!-- Redrawable span -->
+    <span $redrawable $id="label" class="badge badge-primary">
+      <%= this.data.label %>
+    </span>
+
+    <!-- Nested content with redrawable -->
+    <div class="wrapper">
+      <article $redrawable $id="content" class="content-area">
+        <h2><%= this.data.title %></h2>
+        <p><%= this.data.body %></p>
+      </article>
+    </div>
+  </div>
+</Define:Test_Redrawable>

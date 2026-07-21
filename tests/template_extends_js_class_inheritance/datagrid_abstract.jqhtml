@@ -1,0 +1,45 @@
+<!--
+DataGrid_Abstract - Base datagrid component with data loading simulation
+
+This is the parent template that defines the base structure and has a JS class
+with lifecycle logic for data loading.
+-->
+<Define:DataGrid_Abstract class="card DataGrid">
+  <div class="card-header">
+    <%= content('DG_Card_Header') %>
+  </div>
+
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead>
+          <%= content('DG_Table_Header') %>
+        </thead>
+        <tbody class="<%= this.data.loading ? 'is-loading' : (this.data.rows.length === 0 ? 'is-empty' : '') %>">
+          <% if (this.data.loading) { %>
+            <tr class="loading-row">
+              <td colspan="999" class="text-center py-4">
+                <div class="spinner-border text-primary" role="status"></div>
+                <p class="text-muted mt-2">Loading data...</p>
+              </td>
+            </tr>
+          <% } else if (this.data.rows.length === 0) { %>
+            <tr class="empty-row">
+              <td colspan="999" class="text-center py-4">
+                <p class="text-muted">No data available</p>
+              </td>
+            </tr>
+          <% } else { %>
+            <% for (let row of this.data.rows) { %>
+              <%= content('row', row) %>
+            <% } %>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card-footer text-muted">
+    Showing <%= this.data.rows.length %> records
+  </div>
+</Define:DataGrid_Abstract>

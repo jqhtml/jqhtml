@@ -1,0 +1,5 @@
+<Define:Test_Define_Tag_Dollar_Defaults>
+  <div>
+    <Test_Container />
+  </div>
+</Define:Test_Define_Tag_Dollar_Defaults>

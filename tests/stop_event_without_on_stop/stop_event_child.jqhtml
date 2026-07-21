@@ -1,0 +1,12 @@
+<%--
+Stop_Event_Child - deliberately has NO on_stop() override and NO JS class.
+
+Regression target: _stop()'s fast path used to check listener registration for
+the dead 'destroy' event name, so .on('stop', ...) listeners on components
+without a custom on_stop() silently never fired.
+--%>
+<Define:Stop_Event_Child>
+  <div class="card">
+    <p>Child with no on_stop()</p>
+  </div>
+</Define:Stop_Event_Child>

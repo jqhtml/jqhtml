@@ -1,0 +1,8 @@
+<%--
+No_Load_Gated_Component - Calls gate_load() in on_create() but has NO custom
+on_load(). Gates must be ignored: the component must boot to ready without ever
+awaiting the (never-resolved) gate, and gate_load() must not throw.
+--%>
+<Define:No_Load_Gated_Component>
+  <div $sid="content">no-load</div>
+</Define:No_Load_Gated_Component>

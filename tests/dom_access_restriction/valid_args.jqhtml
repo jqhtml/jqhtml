@@ -1,0 +1,6 @@
+<Define:Valid_Args>
+  <div class="test-result">
+    <h3>Test 6: Valid - Access this.args</h3>
+    <p>Status: <span $sid="status">Pending...</span></p>
+  </div>
+</Define:Valid_Args>

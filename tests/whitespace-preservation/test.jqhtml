@@ -1,0 +1,54 @@
+<Define:Whitespace_Test>
+    <!-- Test 1: Space between expressions -->
+    <div id="test1">
+        <strong><%= "Jane" %> <%= "Smith" %></strong>
+    </div>
+
+    <!-- Test 2: Space between inline elements -->
+    <div id="test2">
+        <span>Foo</span> <span>Bar</span>
+    </div>
+
+    <!-- Test 3: No space (minified) -->
+    <div id="test3">
+        <span>Foo</span><span>Bar</span>
+    </div>
+
+    <!-- Test 4: Text with leading/trailing spaces -->
+    <div id="test4">
+        <span> hello </span>
+    </div>
+
+    <!-- Test 5: Multiple spaces collapse to one -->
+    <div id="test5">
+        <span>A</span>     <span>B</span>
+    </div>
+
+    <!-- Test 6: Newlines collapse to single space -->
+    <div id="test6">
+        <span>Line1</span>
+        <span>Line2</span>
+    </div>
+
+    <!-- Test 7: Mixed expressions and elements -->
+    <div id="test7">
+        <%= "Hello" %> <strong>world</strong> <%= "!" %>
+    </div>
+
+    <!-- Test 8: Whitespace around block-style elements (should preserve) -->
+    <div id="test8">
+        <div>Block1</div> <div>Block2</div>
+    </div>
+
+    <!-- Test 9: br tag -->
+    <div id="test9">
+        Line1<br />Line2
+    </div>
+
+    <!-- Test 10: Complex nesting -->
+    <div id="test10">
+        <a href="/contacts/view/3">
+            <strong><%= "Contact" %>: </strong><%= "John Doe" %>
+        </a>
+    </div>
+</Define:Whitespace_Test>

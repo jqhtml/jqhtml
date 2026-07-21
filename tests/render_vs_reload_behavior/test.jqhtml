@@ -1,0 +1,6 @@
+<Define:Test_Render_Vs_Reload>
+  <div>
+    <h1>render() vs reload() Behavior Test</h1>
+    <Render_Reload_Test />
+  </div>
+</Define:Test_Render_Vs_Reload>

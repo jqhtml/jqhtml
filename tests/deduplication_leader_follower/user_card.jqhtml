@@ -1,0 +1,12 @@
+<!--
+User_Card - Simple component for testing load deduplication
+-->
+<Define:User_Card>
+  <div class="user-card">
+    <% if (!this.data.loaded) { %>
+      <span class="loading">Loading...</span>
+    <% } else { %>
+      <span class="user-name"><%= this.data.name %></span>
+    <% } %>
+  </div>
+</Define:User_Card>

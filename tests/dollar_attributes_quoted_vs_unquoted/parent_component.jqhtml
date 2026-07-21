@@ -1,0 +1,21 @@
+<Define:Parent_Component>
+  <div class="parent-component">
+    <h2>Parent Component</h2>
+
+    <h3>Passing Various Data Types to Child:</h3>
+
+    <Child_Component
+      $string_quoted="123"
+      $number_unquoted=456
+      $bool_true=true
+      $bool_false=false
+      $bool_string_true="true"
+      $bool_string_false="false"
+      $object_ref=this.data.test_object
+      $array_ref=this.data.test_array
+      $callback=this.parent_callback
+      $null_value=null
+      $undefined_value=undefined
+    />
+  </div>
+</Define:Parent_Component>

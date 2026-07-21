@@ -1,0 +1,7 @@
+<Define:Data_Persistence_Test>
+  <div>
+    <h1>Data Persistence Test</h1>
+    <p>Testing that this.data set in on_create() persists to render</p>
+    <Component_With_Create_Data />
+  </div>
+</Define:Data_Persistence_Test>

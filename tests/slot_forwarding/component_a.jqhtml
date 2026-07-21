@@ -1,0 +1,23 @@
+<!--
+Component_A - Top level component that defines slot content
+
+This component passes a slot to Component_B, which will forward it to Component_C.
+The slot defines how each row should be rendered.
+-->
+
+<Define:Component_A class="component-a">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            Component A (Defines Slot)
+        </div>
+        <div class="card-body">
+            <Component_B>
+                <Slot:row>
+                    <div class="alert alert-success">
+                        Row from Component_A's slot: <strong><%= row.name %></strong> (ID: <%= row.id %>)
+                    </div>
+                </Slot:row>
+            </Component_B>
+        </div>
+    </div>
+</Define:Component_A>

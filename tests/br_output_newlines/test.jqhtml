@@ -1,0 +1,6 @@
+<Define:Test_Br_Output>
+  <div>
+    <h1>BR Output Test</h1>
+    <Br_Output_Component />
+  </div>
+</Define:Test_Br_Output>

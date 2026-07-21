@@ -1,0 +1,6 @@
+<Define:Data_Storage_Component>
+  <div class="data-storage-test">
+    <h2>Testing $ Attribute Storage</h2>
+    <div $sid="results"></div>
+  </div>
+</Define:Data_Storage_Component>

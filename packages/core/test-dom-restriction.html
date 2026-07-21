@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>DOM Access Restriction Test</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+  <h1>DOM Access Restriction Test</h1>
+  <div id="test-container"></div>
+
+  <script type="module">
+    import jqhtml from './dist/jqhtml-core.esm.js';
+    const { Jqhtml_Component, register_component } = jqhtml;
+
+    // Test 1: Component that correctly uses only this.data in on_load()
+    class Valid_Component extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 1] ✅ Valid component - only modifying this.data');
+        this.data = { message: 'Success!' };
+      }
+
+      on_ready() {
+        this.$.html(`<p>Valid Component: ${this.data.message}</p>`);
+        console.log('[Test 1] ✅ Component rendered successfully');
+      }
+    }
+
+    // Test 2: Component that tries to access this.$ during on_load()
+    class Invalid_Access_Dollar extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 2] ❌ Attempting to access this.$...');
+        try {
+          this.$.addClass('test'); // Should throw error
+          console.log('[Test 2] ❌ ERROR: Should have thrown but did not!');
+        } catch (error) {
+          console.log('[Test 2] ✅ Correctly threw error:', error.message);
+        }
+        this.data = { message: 'Caught error correctly' };
+      }
+    }
+
+    // Test 3: Component that tries to access this.$id during on_load()
+    class Invalid_Access_DollarId extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 3] ❌ Attempting to access this.$id()...');
+        try {
+          this.$id('btn'); // Should throw error
+          console.log('[Test 3] ❌ ERROR: Should have thrown but did not!');
+        } catch (error) {
+          console.log('[Test 3] ✅ Correctly threw error:', error.message);
+        }
+        this.data = { message: 'Caught error correctly' };
+      }
+    }
+
+    // Test 4: Component that tries to access this.id during on_load()
+    class Invalid_Access_Id extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 4] ❌ Attempting to access this.id()...');
+        try {
+          this.id('child'); // Should throw error
+          console.log('[Test 4] ❌ ERROR: Should have thrown but did not!');
+        } catch (error) {
+          console.log('[Test 4] ✅ Correctly threw error:', error.message);
+        }
+        this.data = { message: 'Caught error correctly' };
+      }
+    }
+
+    // Test 5: Component that tries to set other properties during on_load()
+    class Invalid_Set_Property extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 5] ❌ Attempting to set this.custom_prop...');
+        try {
+          this.custom_prop = 'value'; // Should throw error
+          console.log('[Test 5] ❌ ERROR: Should have thrown but did not!');
+        } catch (error) {
+          console.log('[Test 5] ✅ Correctly threw error:', error.message);
+        }
+        this.data = { message: 'Caught error correctly' };
+      }
+    }
+
+    // Test 6: Component that can still access this.args during on_load()
+    class Valid_Access_Args extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 6] ✅ Accessing this.args in on_load()');
+        console.log('[Test 6] this.args.user_id =', this.args.user_id);
+        this.data = { user_id: this.args.user_id };
+      }
+    }
+
+    // Test 7: Component that can call component methods during on_load()
+    class Valid_Call_Methods extends Jqhtml_Component {
+      async on_load() {
+        console.log('[Test 7] ✅ Calling this.component_name() in on_load()');
+        const name = this.component_name();
+        console.log('[Test 7] Component name:', name);
+        this.data = { name };
+      }
+    }
+
+    // Register components
+    register_component('Valid_Component', Valid_Component);
+    register_component('Invalid_Access_Dollar', Invalid_Access_Dollar);
+    register_component('Invalid_Access_DollarId', Invalid_Access_DollarId);
+    register_component('Invalid_Access_Id', Invalid_Access_Id);
+    register_component('Invalid_Set_Property', Invalid_Set_Property);
+    register_component('Valid_Access_Args', Valid_Access_Args);
+    register_component('Valid_Call_Methods', Valid_Call_Methods);
+
+    // Run tests
+    async function runTests() {
+      console.log('\n========================================');
+      console.log('DOM Access Restriction Tests');
+      console.log('========================================\n');
+
+      const container = $('#test-container');
+
+      // Test 1
+      await $('<div>').appendTo(container).component('Valid_Component', {});
+
+      // Test 2
+      await $('<div>').appendTo(container).component('Invalid_Access_Dollar', {});
+
+      // Test 3
+      await $('<div>').appendTo(container).component('Invalid_Access_DollarId', {});
+
+      // Test 4
+      await $('<div>').appendTo(container).component('Invalid_Access_Id', {});
+
+      // Test 5
+      await $('<div>').appendTo(container).component('Invalid_Set_Property', {});
+
+      // Test 6
+      await $('<div>').appendTo(container).component('Valid_Access_Args', { user_id: 42 });
+
+      // Test 7
+      await $('<div>').appendTo(container).component('Valid_Call_Methods', {});
+
+      console.log('\n========================================');
+      console.log('All tests completed!');
+      console.log('========================================\n');
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

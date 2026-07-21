@@ -1,0 +1,5 @@
+<Define:Child_B>
+  <div class="child-b">
+    <span>Child B - Load count: <%= this.data.load_count || 0 %></span>
+  </div>
+</Define:Child_B>

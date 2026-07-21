@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>JQHTML v2 Core Runtime Test (Simple)</title>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .test { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+    .pass { background: #e7ffe7; }
+    .fail { background: #ffe7e7; }
+    .Jqhtml_Component { border: 2px solid #333; padding: 10px; margin: 10px 0; }
+    .TestComponent { background: #f0f0f0; }
+    pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+  </style>
+</head>
+<body>
+  <h1>JQHTML v2 Core Runtime Test</h1>
+  <p>This test loads the compiled JavaScript files directly to avoid ES module issues.</p>
+  
+  <div id="results"></div>
+  <div id="app"></div>
+
+  <!-- Load the compiled files in dependency order -->
+  <script src="./dist/lifecycle-manager.js"></script>
+  <script src="./dist/component.js"></script>
+  <script src="./dist/component-registry.js"></script>
+  <script src="./dist/instruction-processor.js"></script>
+  <script src="./dist/jquery-plugin.js"></script>
+  <script src="./dist/index.js"></script>
+
+  <script>
+    // Check if modules loaded
+    if (typeof window.LifecycleManager === 'undefined') {
+      document.getElementById('results').innerHTML = `
+        <div class="test fail">
+          <h3>❌ Failed to load modules</h3>
+          <p>The JavaScript files could not be loaded. This might be because:</p>
+          <ul>
+            <li>The files use ES modules and need to be loaded differently</li>
+            <li>The dist/ directory doesn't exist or files aren't built</li>
+            <li>Path issues when accessing through your domain</li>
+          </ul>
+          <p>Try running: <code>cd packages/core && npm run build</code></p>
+        </div>
+      `;
+    } else {
+      document.getElementById('results').innerHTML = `
+        <div class="test pass">
+          <h3>✅ Modules loaded successfully!</h3>
+          <p>The JQHTML v2 runtime is available. You can now test it in the console:</p>
+          <pre>
+// Create a component
+class MyComponent extends Jqhtml_Component {
+  async on_render() {
+    this.$.html('&lt;h2&gt;Hello from MyComponent!&lt;/h2&gt;');
+  }
+}
+
+const comp = new MyComponent();
+$('#app').append(comp.$);
+          </pre>
+        </div>
+      `;
+    }
+  </script>
+</body>
+</html>

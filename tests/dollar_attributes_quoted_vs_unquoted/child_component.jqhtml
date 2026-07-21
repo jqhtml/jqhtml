@@ -1,0 +1,8 @@
+<Define:Child_Component>
+  <div class="child-component">
+    <h3>Child Component - Received Args:</h3>
+    <div $sid="output" style="font-family: monospace; white-space: pre;">
+      (Results will be displayed here)
+    </div>
+  </div>
+</Define:Child_Component>

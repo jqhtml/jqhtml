@@ -1,0 +1,6 @@
+<Define:Class_Merging_Test_Main>
+  <div>
+    <Test_Container />
+    <div $sid="results"></div>
+  </div>
+</Define:Class_Merging_Test_Main>

@@ -1,0 +1,6 @@
+<Define:Cache_Entry_Size_Cap_Test_Main>
+  <div>
+    <h1>Cache Entry Size Cap Test</h1>
+    <Cache_Entry_Size_Cap_Test />
+  </div>
+</Define:Cache_Entry_Size_Cap_Test_Main>

@@ -1,0 +1,8 @@
+<!--
+JS_Class_Template_Inheritance_Test - Main entry point for template inheritance test
+-->
+<Define:JS_Class_Template_Inheritance_Test>
+  <% console.log('[TEST] Starting JS Class Template Inheritance test'); %>
+  <Tester />
+  <% console.log('[TEST] Tester component rendered'); %>
+</Define:JS_Class_Template_Inheritance_Test>

@@ -1,0 +1,6 @@
+<Define:Base_Component>
+  <div class="base-container">
+    <h2>Base Component (In DOM)</h2>
+    <div $sid="off_dom_target" class="off-dom-target"></div>
+  </div>
+</Define:Base_Component>

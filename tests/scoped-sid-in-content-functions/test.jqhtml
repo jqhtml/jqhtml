@@ -1,0 +1,25 @@
+<Define:Parent_Component>
+  <div class="parent-component">
+    <h2>Parent Component</h2>
+    <p>Parent CID: <span id="parent-cid"><%= this._cid %></span></p>
+
+    <Child_Component>
+      <div $sid="element_defined_in_parent" class="content-element">
+        <p><strong>This element was defined in Parent's render function</strong></p>
+        <p>It should have scoped ID: element_defined_in_parent:<span class="expected-parent-cid"><%= this._cid %></span></p>
+      </div>
+    </Child_Component>
+  </div>
+</Define:Parent_Component>
+
+<Define:Child_Component>
+  <div class="child-component">
+    <h3>Child Component</h3>
+    <p>Child CID: <span id="child-cid"><%= this._cid %></span></p>
+
+    <div class="child-content-area">
+      <p><em>Content from parent rendered below:</em></p>
+      <%= content() %>
+    </div>
+  </div>
+</Define:Child_Component>

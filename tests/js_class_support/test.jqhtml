@@ -1,0 +1,8 @@
+<!--
+Hello_Test - Simple test proving paired JS files work
+-->
+<Define:Hello_Test>
+  <div class="hello-container">
+    <p>Hello Test Component</p>
+  </div>
+</Define:Hello_Test>

@@ -1,0 +1,11 @@
+<Define:Cached_Component class="cached-component">
+  <% if (this.data.loading) { %>
+    <div class="loading-state">Loading...</div>
+  <% } else { %>
+    <div class="loaded-state">
+      <h2 class="title"><%= this.data.title %></h2>
+      <p class="content"><%= this.data.content %></p>
+      <span class="timestamp">Loaded at: <%= this.data.loaded_at %></span>
+    </div>
+  <% } %>
+</Define:Cached_Component>

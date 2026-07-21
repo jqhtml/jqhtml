@@ -1,0 +1,17 @@
+<Define:Counter_Widget class="super_classy">
+
+    <div class="Counter_Widget">
+        <h4 $id="title" class="counter-title"><%= this.data.title || 'Counter Widget' %></h4>
+        <div class="counter-display">
+            <button $id="decrement" class="btn btn-danger counter-btn" $onclick="decrement">-</button>
+            <button $id="increment" class="btn btn-success counter-btn" $onclick="increment">+</button>
+        </div>
+        <!-- barfoo on line 10 -->
+        <div><%= barfoo() && "test" || "nothing" %></div>
+        <div class="counter-controls">
+            <button $id="reset" class="btn btn-sm btn-secondary" $onclick="reset">Reset</button>
+            <button $id="random" class="btn btn-sm btn-info" $onclick="random">Random</button>
+        </div>
+    </div>
+
+</Define:Counter_Widget>

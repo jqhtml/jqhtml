@@ -1,0 +1,8 @@
+<!--
+Off_DOM_Test - Main entry point for off-DOM component creation test
+-->
+<Define:Off_DOM_Test>
+  <% console.log('[OFF_DOM_TEST] Starting test - rendering Base_Component'); %>
+  <Base_Component />
+  <% console.log('[OFF_DOM_TEST] Base_Component rendered'); %>
+</Define:Off_DOM_Test>

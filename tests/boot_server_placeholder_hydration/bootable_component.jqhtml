@@ -1,0 +1,7 @@
+<Define:Bootable_Component class="bootable">
+  <div class="bootable-inner">
+    <h4>Bootable Component</h4>
+    <p>Message: <span $sid="message"><%= this.args.message || 'No message' %></span></p>
+    <p>Count: <span $sid="count"><%= this.args.count || 0 %></span></p>
+  </div>
+</Define:Bootable_Component>

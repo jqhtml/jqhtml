@@ -1,0 +1,4 @@
+<Define:Static_Component>
+  <% window.__render_log.push('Static_Component'); %>
+  <div $sid="content">static content</div>
+</Define:Static_Component>

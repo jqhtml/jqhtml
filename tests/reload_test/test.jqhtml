@@ -1,0 +1,21 @@
+<Define:Reload_Test>
+  <h1>Reload Test</h1>
+
+  <div>
+    <h2>Test 1: Basic reload() - same args</h2>
+    <div id="test1-container"></div>
+    <button id="test1-reload">Reload Test 1</button>
+  </div>
+
+  <div>
+    <h2>Test 2: reload() with args change (should use cache)</h2>
+    <div id="test2-container"></div>
+    <button id="test2-change-args">Change Args & Reload</button>
+  </div>
+
+  <div>
+    <h2>Test 3: reload() with args change (no cache - new data)</h2>
+    <div id="test3-container"></div>
+    <button id="test3-change-args">Change Args & Reload (uncached)</button>
+  </div>
+</Define:Reload_Test>

@@ -1,0 +1,7 @@
+<Define:Html_Cache_Test>
+  <div class="test-container">
+    <h1>HTML Cache Mode 1 Test</h1>
+    <div $sid="mount_point" class="mount-point"></div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Html_Cache_Test>

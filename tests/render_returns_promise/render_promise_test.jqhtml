@@ -1,0 +1,14 @@
+<%--
+Render_Promise_Test - Regression test: render() must return the lifecycle promise
+
+Verifies the fix for the bug where render() enqueued the render lifecycle but
+discarded the queue promise, making `await this.render()` resolve immediately
+instead of after DOM update + children ready + on_ready.
+--%>
+<Define:Render_Promise_Test>
+  <div class="card">
+    <h3>render() promise test</h3>
+    <p $sid="label">Label: <%= this.args.label %></p>
+    <p id="results"></p>
+  </div>
+</Define:Render_Promise_Test>

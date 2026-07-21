@@ -1,0 +1,8 @@
+<!--
+User_Card - Simple component for testing jQuery plugin syntax
+-->
+<Define:User_Card>
+  <div class="card">
+    <p>User ID: <%= this.args.user_id %></p>
+  </div>
+</Define:User_Card>

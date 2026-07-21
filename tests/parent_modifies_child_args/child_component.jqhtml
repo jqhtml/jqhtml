@@ -1,0 +1,8 @@
+<Define:Child_Component>
+  <div class="child-component">
+    <h3>Child Component</h3>
+    <p>Filter: <%= this.args.filter %></p>
+    <p>Count: <%= this.data.count %></p>
+    <p>Timestamp: <%= this.data.timestamp %></p>
+  </div>
+</Define:Child_Component>

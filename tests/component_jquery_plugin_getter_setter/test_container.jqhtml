@@ -1,0 +1,7 @@
+<Define:Test_Container>
+  <div>
+    <h1>jQuery Plugin Getter/Setter Test</h1>
+    <div $sid="container"></div>
+    <div $sid="results"></div>
+  </div>
+</Define:Test_Container>

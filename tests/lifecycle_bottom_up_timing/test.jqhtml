@@ -1,0 +1,8 @@
+<!--
+Lifecycle_Test - Main entry point for lifecycle timing test
+-->
+<Define:Lifecycle_Test>
+  <% console.log('[LIFECYCLE_TEST TEMPLATE] About to render Root_Component'); %>
+  <Root_Component />
+  <% console.log('[LIFECYCLE_TEST TEMPLATE] Finished rendering Root_Component'); %>
+</Define:Lifecycle_Test>

@@ -1,0 +1,6 @@
+<!--
+Redrawable - Simple wrapper component that just renders its content
+-->
+<Define:Redrawable>
+  <%= content() %>
+</Define:Redrawable>

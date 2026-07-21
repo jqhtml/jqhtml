@@ -1,0 +1,4 @@
+<Define:Cache_Entry_Size_Cap_Test>
+  <div $sid="mount_point"></div>
+  <div $sid="results"></div>
+</Define:Cache_Entry_Size_Cap_Test>

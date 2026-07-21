@@ -1,0 +1,14 @@
+<%--
+Debug_Diagnostic_Apis_Test - Regression test for window.jqhtml debug/diagnostic APIs
+
+Verifies the diagnostic surface attached to the default jqhtml export
+(packages/core/src/index.ts): list_components, get_component_names,
+get_registered_templates, _version, enableDebugMode, setDebugSettings,
+and clearDebugSettings.
+--%>
+<Define:Debug_Diagnostic_Apis_Test>
+  <div class="card">
+    <h3>Debug diagnostic APIs test</h3>
+    <p id="results"></p>
+  </div>
+</Define:Debug_Diagnostic_Apis_Test>

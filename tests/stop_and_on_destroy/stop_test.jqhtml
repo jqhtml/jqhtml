@@ -1,0 +1,14 @@
+<!--
+Stop_Test - Component that starts interval in on_ready, cleans up in on_destroy
+
+LIFECYCLE:
+  on_ready()   - Start interval
+  on_destroy() - Clear interval
+-->
+<Define:Stop_Test>
+  <div class="card">
+    <h3>stop() and on_destroy() Test</h3>
+    <p>Component is running. Check console for interval messages.</p>
+    <p id="results"></p>
+  </div>
+</Define:Stop_Test>

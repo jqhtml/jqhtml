@@ -1,0 +1,6 @@
+<Define:Simple_Component>
+  <div class="simple-test">
+    <h3>Simple Component</h3>
+    <p>Value from args: <%= this.data.myval %></p>
+  </div>
+</Define:Simple_Component>

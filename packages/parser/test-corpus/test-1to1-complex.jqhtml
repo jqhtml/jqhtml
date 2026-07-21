@@ -1,0 +1,14 @@
+<Define:ComplexComponent as="div" class="my-component">
+  <h1><%= this.title %></h1>
+  <div class="content">
+    <% if (this.showDetails) { %>
+      <p>Details here</p>
+      <ul>
+        <% for (let item of this.items) { %>
+          <li><%= item %></li>
+        <% } %>
+      </ul>
+    <% } %>
+  </div>
+  <footer>End of component</footer>
+</Define:ComplexComponent>

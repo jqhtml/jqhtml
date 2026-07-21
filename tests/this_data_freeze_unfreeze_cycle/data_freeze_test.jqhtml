@@ -1,0 +1,6 @@
+<Define:Data_Freeze_Test class="card">
+  <div class="freeze-test">
+    <h2>this.data Freeze/Unfreeze Cycle Test</h2>
+    <div $sid="results"></div>
+  </div>
+</Define:Data_Freeze_Test>

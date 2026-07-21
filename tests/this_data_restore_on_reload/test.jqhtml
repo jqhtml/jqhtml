@@ -1,0 +1,6 @@
+<Define:Test_Data_Restore_On_Reload>
+  <div>
+    <h1>this.data Restore on reload() Test</h1>
+    <Data_Restore_Test />
+  </div>
+</Define:Test_Data_Restore_On_Reload>

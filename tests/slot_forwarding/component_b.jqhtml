@@ -1,0 +1,21 @@
+<!--
+Component_B - Middle component that forwards slots
+
+This component receives a slot from Component_A and forwards it to Component_C
+by defining a new slot that calls the parent's content('row', row).
+-->
+
+<Define:Component_B class="component-b">
+    <div class="card mt-2">
+        <div class="card-header bg-info text-white">
+            Component B (Forwards Slot)
+        </div>
+        <div class="card-body">
+            <Component_C>
+                <Slot:row>
+                    <%= content('row', row); %>
+                </Slot:row>
+            </Component_C>
+        </div>
+    </div>
+</Define:Component_B>

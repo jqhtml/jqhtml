@@ -1,0 +1,4 @@
+<!-- Grandparent component -->
+<Define:Base_Component class="base-class">
+  <%= content() %>
+</Define:Base_Component>

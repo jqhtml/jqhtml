@@ -1,0 +1,19 @@
+<Define:TestComponent>
+  <div class="container">
+    <h1>Clean Test Component</h1>
+
+    <% function testFunction() { %>
+      <p>Inside test function</p>
+    <% } %>
+
+    <% testFunction(); %>
+
+    <button $onclick="handleClick">
+      Click Me
+    </button>
+
+    <div class="status">
+      Status: Ready
+    </div>
+  </div>
+</Define:TestComponent>

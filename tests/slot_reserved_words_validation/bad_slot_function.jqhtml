@@ -1,0 +1,8 @@
+<!--
+Bad_Slot_Function - Should fail compilation (function is reserved word)
+-->
+<Define:Bad_Slot_Function>
+  <Slot:function>
+    This should cause parser error
+  </Slot:function>
+</Define:Bad_Slot_Function>
