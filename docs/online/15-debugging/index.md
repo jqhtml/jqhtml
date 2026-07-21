@@ -311,7 +311,7 @@ on_ready() {
 
 If you're stuck after trying these tools:
 
-- **GitHub Issues:** [github.com/HansonXyz/jqhtml/issues](https://github.com/HansonXyz/jqhtml/issues) - Report bugs, ask questions, request features
+- **GitHub Issues:** [github.com/jqhtml/jqhtml/issues](https://github.com/jqhtml/jqhtml/issues) - Report bugs, ask questions, request features
 - **JQHTML Website:** [jqhtml.org](https://jqhtml.org/) - Documentation and contact information
 
 Every bug report and question helps improve JQHTML. Don't hesitate to reach out.
@@ -337,4 +337,4 @@ Every bug report and question helps improve JQHTML. Don't hesitate to reach out.
 - Added "Getting Help" section with GitHub and jqhtml.org links per user request
 - Removed RSpade-specific tools (rsx:debug, console_debug) - not relevant to general users
 - **Removed Debug Overlay (2025-11-26):** Previous implementation removed, fresh design planned (see TODO.md)
-- **2026-07-21 accuracy pass:** Removed `breakOnError`, `sequentialProcessing`, and `traceDataFlow` from all examples and the Quick Reference table - these settings are read by dead code with no call sites in `packages/core/src` and currently have no effect. Split "Verbose Logging" into two sections: `jqhtml.debug.verbose` (gates cache/dedup/SSR logging only, corrected example output and log prefix) and a new "Lifecycle Logging" section documenting `logFullLifecycle`/`logCreationReady` (which produce the per-phase `→ starting...` / `✓ complete` output that was previously misattributed to `verbose`). Fixed GitHub Issues link to `github.com/HansonXyz/jqhtml`. Fixed `JqhtmlComponent` references to `Jqhtml_Component`.
+- **2026-07-21 accuracy pass:** Removed `breakOnError`, `sequentialProcessing`, and `traceDataFlow` from all examples and the Quick Reference table - these settings are read by dead code with no call sites in `packages/core/src` and currently have no effect. Split "Verbose Logging" into two sections: `jqhtml.debug.verbose` (gates cache/dedup/SSR logging only, corrected example output and log prefix) and a new "Lifecycle Logging" section documenting `logFullLifecycle`/`logCreationReady` (which produce the per-phase `→ starting...` / `✓ complete` output that was previously misattributed to `verbose`). Fixed GitHub Issues link to `github.com/jqhtml/jqhtml`. Fixed `JqhtmlComponent` references to `Jqhtml_Component`.

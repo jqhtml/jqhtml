@@ -1,6 +1,6 @@
 # JQHTML v2 Laravel Blade Integration
 
-> ⚠️ **WORK IN PROGRESS** - This feature is incomplete and under active development. RSpade has implemented a custom variant of this integration for internal use. This documentation serves as a baseline specification and requires review, testing, and further development before public release. Known issues include incorrect use of `data-props` patterns that need updating to proper JQHTML $ attribute semantics.
+> ⚠️ **WORK IN PROGRESS** - This document is a design specification, parts of which are superseded. The actual Laravel integration is developed at **[github.com/jqhtml/jqhtml-laravel](https://github.com/jqhtml/jqhtml-laravel)** (`composer require jqhtml/laravel:dev-main`) — consult that repo for current installation and usage. This spec requires review, testing, and further development. Known issues include incorrect use of `data-props` patterns that need updating to proper JQHTML $ attribute semantics.
 
 ## Overview
 

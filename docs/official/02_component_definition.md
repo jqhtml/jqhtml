@@ -563,11 +563,13 @@ This is the only way to invoke a top-level component with the core library.
 
 ### Framework Integration
 
-Server-side framework integration (writing component tags like
-`<UserCard $user_id="123" />` directly in Blade or other server templates) is
-work-in-progress — no installable framework package ships yet. See
-`docs/integration/LARAVEL_INTEGRATION.md` for the planned design, and
-`@jqhtml/ssr` for the server-side rendering path that exists today.
+Build-tool and framework integrations live in the [jqhtml GitHub organization](https://github.com/jqhtml):
+
+- **Vite**: [`@jqhtml/vite-plugin`](https://github.com/jqhtml/jqhtml-vite) — import `.jqhtml` files directly in Vite builds
+- **esbuild**: [`@jqhtml/esbuild-plugin`](https://github.com/jqhtml/jqhtml-esbuild) — same for esbuild
+- **Laravel/Blade**: [`jqhtml/laravel`](https://github.com/jqhtml/jqhtml-laravel) composer package — a Blade precompiler for component syntax like `<UserCard $user_id="123" />` in server templates (in development; installs via `dev-main`)
+
+For server-side rendering, `@jqhtml/ssr` provides the SEO/hydration path.
 
 ## Component Properties
 

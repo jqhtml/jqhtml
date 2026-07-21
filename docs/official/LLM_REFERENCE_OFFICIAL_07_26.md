@@ -8,7 +8,7 @@
 
 JQHTML is a component templating system built on jQuery. Components are jQuery objects with structured lifecycles. The DOM is the state—no virtual DOM, no state abstraction. Update elements directly via jQuery.
 
-Packages: `@jqhtml/core` (runtime), `@jqhtml/parser` (compiler, ships the `jqhtml-compile` CLI), `@jqhtml/ssr` (server rendering), plus a VS Code extension (github.com/HansonXyz/jqhtml-vscode). Repo: github.com/HansonXyz/jqhtml.
+Packages: `@jqhtml/core` (runtime), `@jqhtml/parser` (compiler, ships the `jqhtml-compile` CLI), `@jqhtml/ssr` (server rendering), plus a VS Code extension (github.com/jqhtml/jqhtml-vscode). Repo: github.com/jqhtml/jqhtml.
 
 ## Components
 
@@ -47,6 +47,11 @@ Templates compile at build time — there is no runtime template parsing.
 
 ```bash
 npx jqhtml-compile user_card.jqhtml --format esm   # formats: iife|esm|cjs|umd (default: iife)
+```
+
+Bundler users: `@jqhtml/vite-plugin` and `@jqhtml/esbuild-plugin` compile `.jqhtml` imports automatically (github.com/jqhtml/jqhtml-vite, github.com/jqhtml/jqhtml-esbuild).
+
+```bash
 ```
 
 - `iife` — self-executing, registers with `window.jqhtml` automatically
