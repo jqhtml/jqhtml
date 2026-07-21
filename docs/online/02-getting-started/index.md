@@ -234,7 +234,7 @@ JQHTML templates compile to JavaScript. Use the `jqhtml-compile` CLI (installed 
 npx jqhtml-compile input.jqhtml -o output.js
 ```
 
-There is currently no first-party build tool plugin (webpack loader, Vite plugin, etc.) - invoke `jqhtml-compile` as a build step, or wire it into a custom loader/plugin for your bundler.
+First-party bundler plugins are available for Vite and esbuild — [`@jqhtml/vite-plugin`](https://github.com/jqhtml/jqhtml-vite) and [`@jqhtml/esbuild-plugin`](https://github.com/jqhtml/jqhtml-esbuild) — which let you import `.jqhtml` files directly. For other pipelines, invoke `jqhtml-compile` as a build step.
 
 ## Next Steps
 

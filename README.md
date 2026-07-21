@@ -29,19 +29,24 @@ That's a complete component. Undefined components render immediately as placehol
 
 1. **Components ARE jQuery.** `this.$` is a genuine jQuery object, not a wrapper — every jQuery method works directly: `this.$.addClass()`, `this.$.fadeIn()`, `this.$.find()`.
 
-2. **The `<Define:Name>` tag IS the root element** — it becomes the DOM node (default `<div>`, override with `tag="button"` etc.) and automatically gets two classes: the component name and `Component`.
+2. **Every `.jqhtml` template IS a JavaScript function.** A template compiles to a single function that runs top to bottom, inserting the rendered elements exactly as they appear. `<% %>` drops you into raw JavaScript mid-markup, so variables, conditionals, and loops are just JavaScript in document order:
+   ```jqhtml
+   <% var foo = 3; %>
+   <p>foo is <%= foo %></p>
+   <% if (foo > 2) { %><span>big</span><% } %>
+   ```
 
-3. **The lifecycle is deterministic and has 5 stages:** `create → render → on_render → load → ready`. Children boot in parallel; `ready` resolves bottom-up (all children ready before the parent's `on_ready()` runs). No race conditions.
+3. **The `<Define:Name>` tag IS the root element** — it becomes the DOM node (default `<div>`, override with `tag="button"` etc.) and automatically gets two classes: the component name and `Component`.
 
-4. **`$` attributes are component parameters** (`this.args`), and quoting matters: `$count="5"` passes the string `"5"`, `$count=5` passes the number `5`, `$user=this.data.user` passes an object reference, `$on_save=this.handle_save` passes a callback.
+4. **The lifecycle is deterministic and has 5 stages:** `create → render → on_render → load → ready`. Children boot in parallel; `ready` resolves bottom-up (all children ready before the parent's `on_ready()` runs). No race conditions.
 
-5. **`this.data` is frozen except inside `on_load()`** — the only place to load API data. Any change to `this.data` triggers an automatic re-render (the double-render pattern: first render shows the loading state, second shows data). Never call `this.render()` manually inside `on_load()`.
+5. **`$` attributes are component parameters** (`this.args`), and quoting matters: `$count="5"` passes the string `"5"`, `$count=5` passes the number `5`, `$user=this.data.user` passes an object reference, `$on_save=this.handle_save` passes a callback.
 
-6. **Three state containers with distinct jobs:** `this.args` (configuration — change it, then `this.reload()`), `this.data` (API data, cached and frozen), `this.state` (free-form component-local values: timers, flags, connections).
+6. **`this.data` is frozen except inside `on_load()`** — the only place to load API data. Any change to `this.data` triggers an automatic re-render (the double-render pattern: first render shows the loading state, second shows data). Never call `this.render()` manually inside `on_load()`.
 
-7. **`$sid` gives you collision-free scoped IDs:** `<button $sid="save">` → `this.$sid('save')` returns the jQuery element; `this.sid('child')` returns a child component instance.
+7. **Three state containers with distinct jobs:** `this.args` (configuration — change it, then `this.reload()`), `this.data` (API data, cached and frozen), `this.state` (free-form component-local values: timers, flags, connections).
 
-8. **`@` attributes bind events in templates:** `<button @click=this.handle_click>` — no manual listener wiring for common cases.
+8. **`$sid` gives you collision-free scoped IDs** (and `@` attributes bind events): `<button $sid="save" @click=this.save>` → `this.$sid('save')` returns the jQuery element; `this.sid('child')` returns a child component instance.
 
 9. **Composition is built in:** `<%= content() %>` renders inner content, `<Slot:name>` provides named slots, and templates inherit via `extends=""`, the JS prototype chain, or automatically when a template contains only slots.
 
@@ -51,12 +56,24 @@ That's a complete component. Undefined components render immediately as placehol
 
 ## Packages
 
+All packages are published on npm under the **[@jqhtml organization](https://www.npmjs.com/org/jqhtml)**; source lives in the **[jqhtml GitHub organization](https://github.com/jqhtml)**.
+
+This repository (the core monorepo):
+
 | Package | Purpose |
 |---|---|
 | [`@jqhtml/core`](./packages/core) | Runtime: component system, lifecycle, jQuery integration (peer dep: jQuery ^3.7) |
 | [`@jqhtml/parser`](./packages/parser) | Compiler: `.jqhtml` → JavaScript, with sourcemaps; ships the `jqhtml-compile` CLI |
 | [`@jqhtml/ssr`](./packages/ssr) | Server-side rendering for SEO and hydration |
-| [VS Code extension](https://github.com/HansonXyz/jqhtml-vscode) | Syntax highlighting & language support for `.jqhtml` files (separate repo) |
+| [VS Code extension](https://github.com/jqhtml/jqhtml-vscode) | Syntax highlighting & language support for `.jqhtml` files (separate repo) |
+
+Companion repos in the organization:
+
+| Repo | Purpose |
+|---|---|
+| [`jqhtml-vite`](https://github.com/jqhtml/jqhtml-vite) | [`@jqhtml/vite-plugin`](https://www.npmjs.com/package/@jqhtml/vite-plugin) — compile `.jqhtml` templates in Vite builds |
+| [`jqhtml-esbuild`](https://github.com/jqhtml/jqhtml-esbuild) | [`@jqhtml/esbuild-plugin`](https://www.npmjs.com/package/@jqhtml/esbuild-plugin) — compile `.jqhtml` templates in esbuild builds |
+| [`jqhtml-laravel`](https://github.com/jqhtml/jqhtml-laravel) | `jqhtml/laravel` composer package — Blade precompiler for jqhtml component syntax in Laravel (in development, installs via `dev-main`) |
 
 ## Using JQHTML in Your Project
 
@@ -64,7 +81,9 @@ That's a complete component. Undefined components render immediately as placehol
 npm install @jqhtml/core @jqhtml/parser
 ```
 
-Compile templates with the CLI (or wire it into your bundler as a build step):
+**With a bundler**, use the first-party plugin for your tool — [`@jqhtml/vite-plugin`](https://github.com/jqhtml/jqhtml-vite) or [`@jqhtml/esbuild-plugin`](https://github.com/jqhtml/jqhtml-esbuild) — and `.jqhtml` imports just work.
+
+**Without a bundler** (or in any other pipeline), compile templates with the CLI:
 
 ```bash
 # Compile a template to an ES module
@@ -98,7 +117,7 @@ jqhtml.register(User_Card);
 ## Building From Source
 
 ```bash
-git clone https://github.com/HansonXyz/jqhtml.git
+git clone https://github.com/jqhtml/jqhtml.git
 cd jqhtml
 npm install
 npm run build        # builds parser, then core (see build.sh)
@@ -109,7 +128,7 @@ Build output lands in `packages/*/dist/`.
 ## Running the Tests
 
 ```bash
-cd tests && ./run-all-tests.sh  # full behavioral suite (78 scenarios × 3 cache modes)
+cd tests && ./run-all-tests.sh  # full behavioral suite (89 scenarios × 3 cache modes)
 
 npm run test:parser             # parser unit tests
 npm run test:core               # core unit tests

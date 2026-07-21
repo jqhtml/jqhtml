@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/ssr",
-  "version": "2.3.49",
+  "version": "2.3.50",
   "description": "Server-Side Rendering for JQHTML components - renders components to HTML for SEO",
   "main": "src/index.js",
   "bin": {
@@ -26,7 +26,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/HansonXyz/jqhtml.git"
+    "url": "git+https://github.com/jqhtml/jqhtml.git"
   },
   "engines": {
     "node": ">=16.0.0"
@@ -47,7 +47,7 @@
   },
   "devDependencies": null,
   "bugs": {
-    "url": "https://github.com/HansonXyz/jqhtml/issues"
+    "url": "https://github.com/jqhtml/jqhtml/issues"
   },
-  "homepage": "https://github.com/HansonXyz/jqhtml#readme"
+  "homepage": "https://github.com/jqhtml/jqhtml#readme"
 }
