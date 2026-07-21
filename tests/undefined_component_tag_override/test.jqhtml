@@ -1,0 +1,17 @@
+<%--
+Undefined_Component_Tag_Override_Main - test harness for an UNREGISTERED
+component's tag resolution and default CSS classes.
+
+Never_Defined_Component has no register_component()/register_template() call
+anywhere in this test directory - it is deliberately left unknown to the
+registry so DEFAULT_TEMPLATE (component-registry.ts) and the tag precedence
+logic in instruction-processor.ts (~line 294) are exercised.
+--%>
+<Define:Undefined_Component_Tag_Override_Main>
+  <div>
+    <h1>Undefined Component Tag Override Test</h1>
+    <Never_Defined_Component tag="nav" $sid="with_tag" />
+    <Never_Defined_Component $sid="without_tag" />
+    <p id="results"></p>
+  </div>
+</Define:Undefined_Component_Tag_Override_Main>

@@ -1,0 +1,3 @@
+<Define:Cache_Id_Control>
+  <div>Cache_Id_Control seed=<%= this.args.seed %> value=<%= this.data.value %></div>
+</Define:Cache_Id_Control>

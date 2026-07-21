@@ -1,0 +1,4 @@
+<!-- Case 4: Define only has classes (Invocation has none) -->
+<Define:Class_Define_Only_Define class="default-class another-default">
+  <%= content() %>
+</Define:Class_Define_Only_Define>

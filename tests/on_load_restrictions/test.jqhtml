@@ -1,0 +1,7 @@
+<Define:Test_Page>
+  <div class="container">
+    <h1>on_load() Restrictions Test</h1>
+    <p>Testing that on_load() can only access this.args and this.data</p>
+    <Test_Component $user_id=123 />
+  </div>
+</Define:Test_Page>

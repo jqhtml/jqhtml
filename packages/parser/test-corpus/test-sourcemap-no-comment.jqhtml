@@ -1,0 +1,23 @@
+<Define:TestComponent>
+  <div class="container">
+    <h1>Test Component</h1>
+
+    <% function testFunction() { %>
+      <p>Line 6: Inside test function</p>
+    <% } %>
+
+    <% testFunction(); %>
+
+    <button $onclick="handleClick">
+      Click Me (Line 12)
+    </button>
+
+    <script>
+      // Line 16
+      function handleClick() {
+        console.log('Button clicked at line 18');
+        barfoo(); // Line 19 - this should error
+      }
+    </script>
+  </div>
+</Define:TestComponent>

@@ -1,0 +1,4 @@
+<!-- Style invocation only: Define has no style, invocation has "background: yellow" -->
+<Define:Style_Invocation_Only_Define>
+  <%= content() %>
+</Define:Style_Invocation_Only_Define>

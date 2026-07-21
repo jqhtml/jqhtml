@@ -1,0 +1,14 @@
+<!--
+Refresh_Test - Tests refresh() conditional rendering behavior
+-->
+<Define:Refresh_Test>
+  <div>
+    <h1>refresh() Conditional Rendering Test</h1>
+
+    <div $sid="counter_container">
+      <Counter />
+    </div>
+
+    <div $sid="results"></div>
+  </div>
+</Define:Refresh_Test>

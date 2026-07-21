@@ -1,0 +1,12 @@
+<Define:Component_With_Create_Data>
+  <div $sid="result">
+    <h2>Result:</h2>
+    <p $sid="status">
+      <% if (this.data.foo) { %>
+        ✅ PASS - this.data.foo = <%= this.data.foo %>
+      <% } else { %>
+        ❌ FAIL - this.data.foo is <%= typeof this.data.foo %> (<%= JSON.stringify(this.data.foo) %>)
+      <% } %>
+    </p>
+  </div>
+</Define:Component_With_Create_Data>

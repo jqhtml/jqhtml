@@ -1,0 +1,28 @@
+<Define:ExampleBlock>
+  <div class="example-block">
+    <% if (args.title): %>
+      <h4 class="example-title"><%= args.title %></h4>
+    <% endif; %>
+    
+    <% if (args.description): %>
+      <p class="example-description"><%= args.description %></p>
+    <% endif; %>
+    
+    <div class="example-demo">
+      <%= content() %>
+    </div>
+    
+    <% if (args.code): %>
+      <details class="example-code">
+        <summary>View Code</summary>
+        <pre><code class="language-<%= args.language || 'javascript' %>"><%= args.code %></code></pre>
+      </details>
+    <% endif; %>
+    
+    <% if (args.notes): %>
+      <div class="example-notes">
+        <strong>Note:</strong> <%= args.notes %>
+      </div>
+    <% endif; %>
+  </div>
+</Define:ExampleBlock>

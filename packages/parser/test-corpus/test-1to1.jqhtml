@@ -1,0 +1,7 @@
+<Define:TestComponent>
+  <foo>
+    <% if (bar) { %>
+      blah
+    <% } %>
+  </foo>
+</Define:TestComponent>

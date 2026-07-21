@@ -1,0 +1,4 @@
+<!-- Case 3: Invocation only has classes (Define has none) -->
+<Define:Class_Invocation_Only_Define>
+  <%= content() %>
+</Define:Class_Invocation_Only_Define>

@@ -1,0 +1,81 @@
+<!--
+Test_Container - Invokes Button_With_Defaults with overriding attributes
+-->
+<Define:Test_Container>
+  <div>
+    <h1>Attribute Precedence Test</h1>
+
+    <h2>Basic Override Test</h2>
+    <Button_With_Defaults
+      $sid="override"
+      style="color: blue;"
+      data-theme="dark"
+      class="btn-primary"
+      tag="span">
+      Click Me
+    </Button_With_Defaults>
+
+    <h2>Class Merging Tests</h2>
+
+    <!-- Test 1: Overlapping classes (foo bar + foo baz = foo bar baz) -->
+    <Class_Overlap_Define $sid="overlap" class="foo bar">
+      Overlap Test
+    </Class_Overlap_Define>
+
+    <!-- Test 2: No overlap (alpha beta + gamma delta = alpha beta gamma delta) -->
+    <Class_No_Overlap_Define $sid="no_overlap" class="alpha beta">
+      No Overlap Test
+    </Class_No_Overlap_Define>
+
+    <!-- Test 3: Invocation only (none + xyz = xyz) -->
+    <Class_Invocation_Only_Define $sid="invocation_only" class="xyz">
+      Invocation Only
+    </Class_Invocation_Only_Define>
+
+    <!-- Test 4: Define only (default-class another-default + none = default-class another-default) -->
+    <Class_Define_Only_Define $sid="define_only">
+      Define Only
+    </Class_Define_Only_Define>
+
+    <!-- Test 5: Same class in both (same-class + same-class = same-class, no duplicate) -->
+    <Class_Single_Both_Define $sid="single_both" class="same-class">
+      Single Both
+    </Class_Single_Both_Define>
+
+    <h2>Programmatic Creation Test</h2>
+    <!-- This will be populated by JavaScript using $(selector).component() -->
+    <div $sid="programmatic_target" class="existing-class-1 existing-class-2">
+      This element will have a component attached programmatically
+    </div>
+
+    <h2>Template Inheritance Class Merging</h2>
+
+    <!-- Test: Invoke child component with invocation classes -->
+    <!-- Expected: base-class + parent-class + child-class + invocation-class (all merged) -->
+    <Child_Component $sid="inheritance_test" class="invocation-class">
+      Inheritance Test
+    </Child_Component>
+
+    <h2>Style Merging Tests</h2>
+
+    <!-- Test 1: Overlapping styles (color defined in both, invocation wins) -->
+    <Style_Overlap_Define $sid="style_overlap" style="color: blue; margin: 10px;">
+      Style Overlap
+    </Style_Overlap_Define>
+
+    <!-- Test 2: No overlapping styles (all properties merged) -->
+    <Style_No_Overlap_Define $sid="style_no_overlap" style="color: green; margin: 20px;">
+      Style No Overlap
+    </Style_No_Overlap_Define>
+
+    <!-- Test 3: Invocation only has style -->
+    <Style_Invocation_Only_Define $sid="style_invocation_only" style="background: yellow;">
+      Style Invocation Only
+    </Style_Invocation_Only_Define>
+
+    <!-- Test 4: Define only has style -->
+    <Style_Define_Only_Define $sid="style_define_only">
+      Style Define Only
+    </Style_Define_Only_Define>
+  </div>
+</Define:Test_Container>

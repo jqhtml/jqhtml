@@ -1,0 +1,6 @@
+<Define:Target_Component>
+  <div class="target">
+    <h2>Target: <%= this.data.value %></h2>
+    <Child_Component />
+  </div>
+</Define:Target_Component>

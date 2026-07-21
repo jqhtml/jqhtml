@@ -1,0 +1,8 @@
+<!--
+Good_Slot - Should compile successfully (header is not a reserved word)
+-->
+<Define:Good_Slot>
+  <Slot:header>
+    This should work fine
+  </Slot:header>
+</Define:Good_Slot>

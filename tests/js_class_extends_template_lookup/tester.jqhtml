@@ -1,0 +1,19 @@
+<!--
+Tester - Instantiates My_Form (child class with no template)
+-->
+<Define:Tester>
+  <div class="tester-container">
+    <h2>JS Class Template Lookup Test</h2>
+    <p>My_Form class has NO template. Should use Form_Base template (parent class).</p>
+
+    <div class="test-section mt-4">
+      <h3>Instantiating My_Form (no template):</h3>
+      <My_Form $sid="form_instance" />
+    </div>
+
+    <div class="test-results mt-4">
+      <h3>Test Results:</h3>
+      <div $sid="results"></div>
+    </div>
+  </div>
+</Define:Tester>

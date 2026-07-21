@@ -1,0 +1,5 @@
+<Define:Component_B>
+  <div class="component-b-inner">
+    <%= content() %>
+  </div>
+</Define:Component_B>

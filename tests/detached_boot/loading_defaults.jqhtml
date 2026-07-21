@@ -1,0 +1,4 @@
+<Define:Loading_Defaults>
+  <% window.__render_log.push('Loading_Defaults'); %>
+  <div $sid="content"><%= this.data.message || 'no data' %></div>
+</Define:Loading_Defaults>

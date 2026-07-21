@@ -1,0 +1,124 @@
+<!--
+Raw Content Tags Test - Validates exact whitespace preservation in textarea and pre tags
+
+Tests:
+1. Textarea with code formatting (preserves indentation)
+2. Pre tag with ASCII art (preserves exact whitespace)
+3. Textarea with leading/trailing newlines
+4. Pre with mixed spaces and tabs
+5. Textarea with HTML entities
+6. Pre with code block (multiple lines)
+7. Empty textarea and pre tags
+8. Nested structure with raw tags
+9. Attributes on raw tags
+10. Whitespace-only content
+-->
+
+<Define:Raw_Content_Test>
+  <div class="container">
+    <h1>Raw Content Tags Test</h1>
+
+    <!-- Test 1: Textarea with code formatting -->
+    <section>
+      <h2>Test 1: Textarea with Code</h2>
+      <textarea id="code-textarea" rows="5" cols="50">function hello() {
+    console.log("Hello World");
+    return true;
+}</textarea>
+    </section>
+
+    <!-- Test 2: Pre with ASCII art -->
+    <section>
+      <h2>Test 2: Pre with ASCII Art</h2>
+      <pre id="ascii-pre">   _____
+  /     \
+ | () () |
+  \  ^  /
+   |||||
+   |||||</pre>
+    </section>
+
+    <!-- Test 3: Textarea with leading/trailing newlines -->
+    <section>
+      <h2>Test 3: Leading/Trailing Newlines</h2>
+      <textarea id="newlines-textarea" rows="5">
+
+Content with newlines before and after
+
+</textarea>
+    </section>
+
+    <!-- Test 4: Pre with mixed spaces and tabs -->
+    <section>
+      <h2>Test 4: Mixed Whitespace</h2>
+      <pre id="mixed-pre">Line1		with		tabs
+    Line2 with    spaces
+	Line3 with tab start</pre>
+    </section>
+
+    <!-- Test 5: Textarea with HTML entities -->
+    <section>
+      <h2>Test 5: HTML Entities</h2>
+      <textarea id="entities-textarea" rows="3">&lt;div class="test"&gt;
+  &lt;span&gt;Content &amp; more&lt;/span&gt;
+&lt;/div&gt;</textarea>
+    </section>
+
+    <!-- Test 6: Pre with code block -->
+    <section>
+      <h2>Test 6: Multi-line Code</h2>
+      <pre id="code-pre">class Example {
+  constructor(name) {
+    this.name = name;
+  }
+
+  greet() {
+    return `Hello, ${this.name}`;
+  }
+}</pre>
+    </section>
+
+    <!-- Test 7: Empty tags -->
+    <section>
+      <h2>Test 7: Empty Tags</h2>
+      <textarea id="empty-textarea"></textarea>
+      <pre id="empty-pre"></pre>
+    </section>
+
+    <!-- Test 8: Nested structure -->
+    <section>
+      <h2>Test 8: Nested Structure</h2>
+      <div class="code-sample">
+        <label for="nested-textarea">Code Input:</label>
+        <textarea id="nested-textarea" rows="4">if (condition) {
+  doSomething();
+}</textarea>
+        <pre id="nested-pre">Expected output:
+  Result: true</pre>
+      </div>
+    </section>
+
+    <!-- Test 9: Attributes on raw tags -->
+    <section>
+      <h2>Test 9: Attributes</h2>
+      <textarea
+        id="attrs-textarea"
+        class="form-control"
+        placeholder="Enter code here"
+        disabled
+        rows="3">Disabled textarea</textarea>
+      <pre id="attrs-pre" class="highlight" data-language="javascript">const x = 42;</pre>
+    </section>
+
+    <!-- Test 10: Whitespace-only content -->
+    <section>
+      <h2>Test 10: Whitespace-Only Content</h2>
+      <textarea id="whitespace-textarea">
+
+  </textarea>
+      <pre id="whitespace-pre">
+
+  </pre>
+    </section>
+  </div>
+</Define:Raw_Content_Test>

@@ -1,0 +1,15 @@
+<!--
+JS_Class_Template_Lookup_Test - Main entry point
+
+This test validates that when a component is instantiated and:
+1. The component's class exists (Form_Base extends Jqhtml_Component)
+2. The component's class HAS NO template registered
+3. A child class extends the component's class and HAS a template (Text_Form extends Form_Base)
+
+Then the framework should walk the JS prototype chain and use the child's template.
+-->
+<Define:JS_Class_Template_Lookup_Test>
+  <% console.log('[TEST] Starting JS class template lookup test'); %>
+  <Tester />
+  <% console.log('[TEST] Tester component rendered'); %>
+</Define:JS_Class_Template_Lookup_Test>

@@ -1,0 +1,37 @@
+<Define:Test_Interpolated_Attributes>
+  <% const isActive = true; %>
+  <% const className = 'my-class'; %>
+  <% const currentPage = 2; %>
+  <% const pages = [1, 2, 3]; %>
+
+  <!-- Test 1: Simple string interpolation -->
+  <div class="<%= className %>">Test 1: Simple interpolation</div>
+
+  <!-- Test 2: Conditional expression (ternary operator) -->
+  <div class="<%= isActive ? 'active' : '' %>">Test 2: Conditional</div>
+
+  <!-- Test 3: Mixed static and interpolated -->
+  <div class="static <%= isActive ? 'active' : '' %>">Test 3: Mixed</div>
+
+  <!-- Test 4: Loop with simple interpolation -->
+  <% const items = [1, 2, 3]; %>
+  <% for (let num of items) { %>
+    <div class="item-<%= num %>">Item <%= num %></div>
+  <% } %>
+
+  <!-- Test 5: Loop with conditional in attribute (REGRESSION TEST) -->
+  <ul class="pagination">
+    <% for (let pageNum of pages) { %>
+      <li class="page-item <%= pageNum === currentPage ? 'active' : '' %>">
+        Page <%= pageNum %>
+      </li>
+    <% } %>
+  </ul>
+
+  <!-- Test 6: Logical operators in attributes -->
+  <div class="<%= isActive && 'visible' %>">Test 6: Logical AND</div>
+  <div class="<%= !isActive || 'hidden' %>">Test 7: Logical OR</div>
+
+  <!-- Test 8: Comparison operators -->
+  <div class="<%= currentPage > 1 ? 'not-first' : 'first' %>">Test 8: Comparison</div>
+</Define:Test_Interpolated_Attributes>

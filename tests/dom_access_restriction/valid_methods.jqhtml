@@ -1,0 +1,6 @@
+<Define:Valid_Methods>
+  <div class="test-result">
+    <h3>Test 7: Valid - Call this.component_name()</h3>
+    <p>Status: <span $sid="status">Pending...</span></p>
+  </div>
+</Define:Valid_Methods>

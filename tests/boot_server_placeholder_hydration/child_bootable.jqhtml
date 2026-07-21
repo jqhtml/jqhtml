@@ -1,0 +1,5 @@
+<Define:Child_Bootable class="child-bootable" style="border: 2px solid green; padding: 10px; margin: 5px;">
+  <div>
+    <h5>Child: <%= this.args.label || 'No label' %></h5>
+  </div>
+</Define:Child_Bootable>

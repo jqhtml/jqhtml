@@ -1,0 +1,14 @@
+<Define:Test_Page>
+  <div class="container">
+    <h1>Redrawable Slot Bug Test</h1>
+
+    <h2>Test: thead with $redrawable should render slot content</h2>
+    <Child_Grid />
+
+    <div class="expected-output">
+      <h3>Expected Output:</h3>
+      <p>Table should have header row with "ID" and "Name" columns</p>
+      <p>Table should have 3 data rows: John, Jane, Bob</p>
+    </div>
+  </div>
+</Define:Test_Page>

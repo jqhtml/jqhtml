@@ -1,0 +1,25 @@
+<!--
+Tester - Validates that Contacts_DataGrid uses DataGrid_Abstract JS class
+Tests both declarative (<Contacts_DataGrid />) and programmatic ($().component()) instantiation
+-->
+<Define:Tester>
+  <div class="tester-container">
+    <h2>Template Extends JS Class Inheritance Test</h2>
+    <p>Contacts_DataGrid has NO .js file - it should use DataGrid_Abstract's class via extends chain.</p>
+
+    <div class="test-section mt-4">
+      <h3>Declarative Instantiation:</h3>
+      <Contacts_DataGrid $sid="contacts_grid_declarative" />
+    </div>
+
+    <div class="test-section mt-4">
+      <h3>Programmatic Instantiation:</h3>
+      <div $sid="contacts_grid_target"></div>
+    </div>
+
+    <div class="test-results mt-4">
+      <h3>Test Results:</h3>
+      <div $sid="results"></div>
+    </div>
+  </div>
+</Define:Tester>

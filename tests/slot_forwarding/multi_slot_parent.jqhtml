@@ -1,0 +1,30 @@
+<!--
+Multi_Slot_Parent - Tests forwarding multiple slots simultaneously
+-->
+
+<Define:Multi_Slot_Parent class="multi-slot-parent">
+    <div class="card">
+        <div class="card-header bg-warning">
+            Multi Slot Parent (Defines Multiple Slots)
+        </div>
+        <div class="card-body">
+            <Multi_Slot_Middle>
+                <Slot:header>
+                    <div class="alert alert-primary">
+                        Header Slot: <%= header.title %>
+                    </div>
+                </Slot:header>
+                <Slot:row>
+                    <div class="badge badge-info">
+                        Row Slot: <%= row.name %>
+                    </div>
+                </Slot:row>
+                <Slot:footer>
+                    <div class="alert alert-secondary">
+                        Footer Slot: <%= footer.text %>
+                    </div>
+                </Slot:footer>
+            </Multi_Slot_Middle>
+        </div>
+    </div>
+</Define:Multi_Slot_Parent>

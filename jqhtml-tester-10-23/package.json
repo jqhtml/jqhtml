@@ -1,0 +1,14 @@
+{
+  "name": "jqhtml-tester-10-23",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "CLI test runner for JQHTML templates",
+  "scripts": {
+    "test": "node test-runner.js"
+  },
+  "dependencies": {
+    "playwright": "^1.53.2",
+    "webpack": "^5.96.1",
+    "webpack-cli": "^6.0.1"
+  }
+}

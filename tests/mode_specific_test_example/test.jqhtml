@@ -1,0 +1,5 @@
+<Define:Mode_Specific_Test>
+  <h1>Mode-Specific Test Example</h1>
+  <div $sid="status"></div>
+  <div $sid="results"></div>
+</Define:Mode_Specific_Test>

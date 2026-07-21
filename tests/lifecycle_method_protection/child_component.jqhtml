@@ -1,0 +1,5 @@
+<Define:Child_Component>
+  <div class="child">
+    <small>Child component (data: <%= JSON.stringify(this.data) %>)</small>
+  </div>
+</Define:Child_Component>

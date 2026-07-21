@@ -1,0 +1,26 @@
+<!--
+Test_Dom_Relocation - Test component lifecycle during DOM relocation
+
+This component:
+1. Starts with "Step 1: Loading..." message
+2. Has a 1 second async load in on_load()
+3. Re-renders with "Step 2: Loaded!" after load completes
+4. Gets relocated from #source-container to #target-container at 0.5 seconds
+
+Expected behavior:
+- Component should complete full lifecycle even though it was moved
+- Final render should show "Step 2: Loaded!"
+- on_ready() should fire after load completes
+-->
+<Define:Test_Dom_Relocation>
+    <div class="relocation-test" style="padding: 20px; border: 2px solid blue; margin: 10px;">
+        <% if (!this.data.loaded) { %>
+            <h2 style="color: orange;">Step 1: Loading...</h2>
+            <p>Component is loading data (1 second delay)</p>
+        <% } else { %>
+            <h2 style="color: green;">Step 2: Loaded!</h2>
+            <p>Data loaded successfully: <%= this.data.message %></p>
+            <p>Ready state: <%= this.data.ready_fired ? 'Ready fired!' : 'Waiting for ready...' %></p>
+        <% } %>
+    </div>
+</Define:Test_Dom_Relocation>

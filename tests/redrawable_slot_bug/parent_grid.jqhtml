@@ -1,0 +1,19 @@
+<!--
+Parent_Grid - Parent component with redrawable thead that takes slot content
+-->
+<Define:Parent_Grid>
+  <div class="table-container">
+    <table class="table">
+      <thead $redrawable $sid="table_header">
+        <%= content('DG_Table_Header') %>
+      </thead>
+      <tbody>
+        <% for (let row of this.data.rows) { %>
+          <tr>
+            <%= content('row', row) %>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</Define:Parent_Grid>

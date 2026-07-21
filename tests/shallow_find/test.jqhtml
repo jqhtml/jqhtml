@@ -1,0 +1,70 @@
+<Define:Test_ShallowFind>
+  <div class="test-container">
+    <!-- Test 1: Basic nested widgets -->
+    <div class="test-case" data-test="1">
+      <h3>Test 1: Basic Nested Widgets</h3>
+      <div class="Widget" data-sid="1">
+        Widget 1 (should match)
+        <div class="Widget" data-sid="1a">
+          Widget 1a (should NOT match - nested inside Widget 1)
+        </div>
+      </div>
+      <div class="Widget" data-sid="2">
+        Widget 2 (should match)
+      </div>
+    </div>
+
+    <!-- Test 2: Multiple levels of nesting -->
+    <div class="test-case" data-test="2">
+      <h3>Test 2: Deep Nesting</h3>
+      <div class="container">
+        <div class="wrapper">
+          <div class="Widget" data-sid="3">
+            Widget 3 (should match)
+            <div class="inner">
+              <div class="Widget" data-sid="3a">
+                Widget 3a (should NOT match)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 3: No matches -->
+    <div class="test-case" data-test="3">
+      <h3>Test 3: No Matches</h3>
+      <div class="container">
+        <div class="wrapper">
+          <div class="item">No widgets here</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Test 4: Adjacent siblings -->
+    <div class="test-case" data-test="4">
+      <h3>Test 4: Adjacent Siblings</h3>
+      <div class="Widget" data-sid="4">Widget 4 (should match)</div>
+      <div class="Widget" data-sid="5">Widget 5 (should match)</div>
+      <div class="Widget" data-sid="6">Widget 6 (should match)</div>
+    </div>
+
+    <!-- Test 5: Mixed hierarchy -->
+    <div class="test-case" data-test="5">
+      <h3>Test 5: Mixed Hierarchy</h3>
+      <div class="Widget" data-sid="7">
+        Widget 7 (should match)
+        <div class="other">
+          <div class="Widget" data-sid="7a">
+            Widget 7a (should NOT match)
+          </div>
+        </div>
+      </div>
+      <div class="other">
+        <div class="Widget" data-sid="8">
+          Widget 8 (should match)
+        </div>
+      </div>
+    </div>
+  </div>
+</Define:Test_ShallowFind>

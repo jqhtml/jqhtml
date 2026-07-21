@@ -1,0 +1,4 @@
+<Define:Slow_Noop_Defaults>
+  <% window.__render_log.push('Slow_Noop_Defaults'); %>
+  <div $sid="content"><%= this.data.message || 'no data' %></div>
+</Define:Slow_Noop_Defaults>

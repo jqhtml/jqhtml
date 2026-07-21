@@ -1,0 +1,4 @@
+<Define:Test_Detached_Boot>
+  <h2>Detached Boot Optimization Test</h2>
+  <div $sid="results"></div>
+</Define:Test_Detached_Boot>

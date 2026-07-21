@@ -1,0 +1,35 @@
+<Define:AdminLayout>
+  <div class="admin-layout">
+    <header class="admin-header">
+      <div class="container">
+        <h1>🔒 Super Secret Control Panel</h1>
+        <nav>
+          <a href="/">← Back to Public Site</a>
+        </nav>
+      </div>
+    </header>
+    
+    <div class="admin-content">
+      <aside class="admin-sidebar">
+        <h3>Admin Menu</h3>
+        <ul>
+          <li><a href="/admin">Dashboard</a></li>
+          <li><a href="/admin/users">Users</a></li>
+          <li><a href="/admin/settings">Settings</a></li>
+        </ul>
+      </aside>
+      
+      <main class="admin-main">
+        <div $id="content">
+          <!-- Admin routes render here -->
+        </div>
+      </main>
+    </div>
+    
+    <footer class="admin-footer">
+      <div class="container">
+        <p>Admin Panel v2.0 - Top Secret!</p>
+      </div>
+    </footer>
+  </div>
+</Define:AdminLayout>

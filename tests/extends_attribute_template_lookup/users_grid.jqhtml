@@ -1,0 +1,14 @@
+<!--
+Users_Grid - Extends DataGrid_Base using extends attribute
+-->
+<Define:Users_Grid extends="DataGrid_Base">
+  <Slot:header>
+    <th>ID</th>
+    <th>Name</th>
+  </Slot:header>
+
+  <Slot:row>
+    <td><%= row.id %></td>
+    <td><%= row.name %></td>
+  </Slot:row>
+</Define:Users_Grid>

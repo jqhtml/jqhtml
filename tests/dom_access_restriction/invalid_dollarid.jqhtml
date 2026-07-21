@@ -1,0 +1,6 @@
+<Define:Invalid_DollarId>
+  <div class="test-result">
+    <h3>Test 3: Invalid - Access this.$sid()</h3>
+    <p>Status: <span $sid="status">Pending...</span></p>
+  </div>
+</Define:Invalid_DollarId>

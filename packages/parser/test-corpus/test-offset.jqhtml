@@ -1,0 +1,5 @@
+<Define:TestOffset as="div">
+  <div>Line 2 in source</div>
+  <% console.log('Line 3 code'); %>
+  <p>Line 4 in source</p>
+</Define:TestOffset>

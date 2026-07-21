@@ -1,0 +1,6 @@
+<Define:Invalid_Id>
+  <div class="test-result">
+    <h3>Test 4: Invalid - Access this.sid()</h3>
+    <p>Status: <span $sid="status">Pending...</span></p>
+  </div>
+</Define:Invalid_Id>

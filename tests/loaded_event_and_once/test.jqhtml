@@ -1,0 +1,5 @@
+<Define:Test_Loaded_Event_And_Once>
+  <h2>Loaded Event and .once() Test</h2>
+  <Test_Child $sid="child" />
+  <div $sid="results"></div>
+</Define:Test_Loaded_Event_And_Once>

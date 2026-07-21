@@ -1,0 +1,21 @@
+<%--
+Rendered_Event_Test - Behavioral test for component.rendered() / 'rendered' event
+
+Targets:
+  - packages/core/src/component.ts ~1283-1288 (rendered(callback?) mirror of ready())
+  - packages/core/src/lifecycle-manager.ts ~146-171 (where 'rendered' is triggered,
+    and where the _load_render_only path returns BEFORE the 'rendered' trigger)
+
+Verifies:
+  1. await component.rendered() resolves
+  2. 'rendered' is sticky - .on('rendered', cb) registered after the fact fires immediately
+  3. Ordering: 'rendered' fires BEFORE 'ready'
+  4. A component booted with _load_render_only does NOT fire 'rendered'
+--%>
+<Define:Rendered_Event_Test>
+  <div class="card">
+    <h3>rendered() event/method test</h3>
+    <div $sid="results"></div>
+    <p id="results_status" $sid="results_status"></p>
+  </div>
+</Define:Rendered_Event_Test>

@@ -1,0 +1,5 @@
+<Define:Test>
+  <div class="test-container">
+    <Parent_A $sid="parent" />
+  </div>
+</Define:Test>

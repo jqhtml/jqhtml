@@ -1,0 +1,11 @@
+<!--
+Mixed_Content - Mixes slots and non-slotted content (should fail at runtime)
+-->
+<Define:Mixed_Content>
+  <div>
+    <Card>
+      <Slot:header>Title</Slot:header>
+      <p>This non-slotted content should cause runtime error</p>
+    </Card>
+  </div>
+</Define:Mixed_Content>

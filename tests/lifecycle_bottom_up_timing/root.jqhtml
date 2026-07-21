@@ -1,0 +1,17 @@
+<!--
+Root_Component - Top level with 3 sibling children
+-->
+<Define:Root_Component>
+  <% console.log('[ROOT TEMPLATE] Rendering Root_Component - CID:', this._cid); %>
+  <div class="root-box" style="border: 3px solid red; padding: 15px; margin: 10px;">
+    <h2>Lifecycle Bottom-Up Timing Test</h2>
+    <p>Root component with 3 siblings, each having 2 children (10 total components)</p>
+    <% console.log('[ROOT TEMPLATE] About to render Sibling_Component A'); %>
+    <Sibling_Component $sid="A" />
+    <% console.log('[ROOT TEMPLATE] About to render Sibling_Component B'); %>
+    <Sibling_Component $sid="B" />
+    <% console.log('[ROOT TEMPLATE] About to render Sibling_Component C'); %>
+    <Sibling_Component $sid="C" />
+    <% console.log('[ROOT TEMPLATE] Finished rendering all siblings'); %>
+  </div>
+</Define:Root_Component>

@@ -1,0 +1,10 @@
+<!--
+Tag_Attribute_Inline_Test - Test tag attribute on component invocation
+-->
+<Define:Tag_Attribute_Inline_Test>
+    <div class="container">
+        <p>Before component</p>
+        <MyTest tag="span">hello</MyTest>
+        <p>After component</p>
+    </div>
+</Define:Tag_Attribute_Inline_Test>

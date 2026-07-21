@@ -1,0 +1,5 @@
+<Define:Test_Container class="container p-4">
+  <h2>Reload Ready Invalidation Tests</h2>
+  <Reload_Test_Component $sid="test_component" />
+  <div $sid="results" class="mt-4"></div>
+</Define:Test_Container>

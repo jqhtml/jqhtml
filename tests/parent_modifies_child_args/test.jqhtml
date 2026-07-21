@@ -1,0 +1,12 @@
+<Define:Test_Page>
+  <div class="container">
+    <h1>Parent Modifies Child Args Test</h1>
+    <p>Expected: Child's on_load() should be called TWICE</p>
+    <ul>
+      <li>First time: with filter="initial"</li>
+      <li>Second time: with filter="modified_by_parent" (after 500ms)</li>
+    </ul>
+
+    <Parent_Component />
+  </div>
+</Define:Test_Page>

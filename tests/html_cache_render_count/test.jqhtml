@@ -1,0 +1,8 @@
+<Define:Html_Cache_Render_Count_Test>
+  <div class="test-container">
+    <h1>HTML Cache Render Count Test</h1>
+    <p>Tests template and on_render execution counts with HTML caching</p>
+    <div $sid="mount_point" class="mount-point"></div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Html_Cache_Render_Count_Test>

@@ -1,0 +1,50 @@
+{
+  "name": "@jqhtml/monorepo",
+  "version": "2.3.49",
+  "description": "JQHTML - A jQuery-first Component Framework",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "lerna": "lerna",
+    "version": "lerna version",
+    "publish:lerna": "lerna publish from-package",
+    "publish:npm": "lerna publish from-package --registry https://registry.npmjs.org",
+    "build": "./build.sh",
+    "build:clean": "./build.sh --clean",
+    "build:verbose": "./build.sh --verbose",
+    "build:core": "cd packages/core && npm run build",
+    "build:parser": "cd packages/parser && npm run build",
+    "build:router": "cd packages/router && npm run build",
+    "watch": "npm run watch:core",
+    "watch:core": "cd packages/core && npm run watch",
+    "test": "cd tests && ./run-all-tests.sh",
+    "test:core": "cd packages/core && npm test",
+    "test:parser": "cd packages/parser && npm test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/jest": "^30.0.0",
+    "@types/jquery": "^3.5.32",
+    "@types/node": "^20.10.0",
+    "express": "^4.21.2",
+    "lerna": "^8.2.3",
+    "source-map": "^0.7.6",
+    "typescript": "^5.8.3",
+    "webpack": "^5.101.3",
+    "webpack-cli": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "chalk": "^5.6.2",
+    "concat-with-sourcemaps": "^1.1.0",
+    "jsdom": "^27.0.0",
+    "playwright": "^1.55.0",
+    "puppeteer": "^24.10.2"
+  }
+}

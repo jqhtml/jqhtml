@@ -1,0 +1,23 @@
+<!--
+Test case: Multiline attribute values should be trimmed
+-->
+<Define:Test_Multiline_Trim>
+  <div class="test-container">
+    <!-- This should have newlines trimmed from data-options -->
+    <Select_Input $options="<%= JSON.stringify([
+      {value: 3, label: 'Member'},
+      {value: 2, label: 'Admin'},
+      {value: 1, label: 'Owner'},
+      {value: 4, label: 'Viewer'}
+    ]) %>" />
+
+    <!-- Test regular attribute with multiline interpolation -->
+    <div title="<%= 'This is a\nmultiline\nvalue' %>"></div>
+
+    <!-- Test data- attribute with multiline -->
+    <div data-config="<%= JSON.stringify({
+      foo: 'bar',
+      baz: 'qux'
+    }) %>"></div>
+  </div>
+</Define:Test_Multiline_Trim>

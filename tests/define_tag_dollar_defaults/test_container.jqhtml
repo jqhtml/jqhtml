@@ -1,0 +1,32 @@
+<Define:Test_Container>
+  <div class="test-container">
+    <h1>Define Tag $ Defaults Test</h1>
+
+    <div $sid="test_section_1">
+      <h2>Test 1: Using Defaults (No Override)</h2>
+      <Component_With_Defaults $sid="default_instance" />
+    </div>
+
+    <div $sid="test_section_2">
+      <h2>Test 2: Full Override</h2>
+      <Component_With_Defaults
+        $sid="override_instance"
+        $per_page=50
+        $sortable=false
+        $endpoint="https://override.com/api"
+        $theme="dark"
+      />
+    </div>
+
+    <div $sid="test_section_3">
+      <h2>Test 3: Partial Override</h2>
+      <Component_With_Defaults
+        $sid="partial_instance"
+        $per_page=100
+        $theme="blue"
+      />
+    </div>
+
+    <div $sid="results"></div>
+  </div>
+</Define:Test_Container>

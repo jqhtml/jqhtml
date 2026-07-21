@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JQHTML Session Storage Test</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <h1>JQHTML Session Storage Test</h1>
+    <div id="results"></div>
+
+    <script type="module">
+        import jqhtml from '../../packages/core/dist/jqhtml-core.esm.js';
+
+        const results = [];
+
+        function log(message, status = 'info') {
+            console.log(`[${status.toUpperCase()}] ${message}`);
+            results.push({ message, status });
+            updateDisplay();
+        }
+
+        function updateDisplay() {
+            const html = results.map(r => {
+                const color = r.status === 'pass' ? 'green' : r.status === 'fail' ? 'red' : 'blue';
+                return `<div style="color: ${color}; margin: 5px 0;">[${r.status.toUpperCase()}] ${r.message}</div>`;
+            }).join('');
+            document.getElementById('results').innerHTML = html;
+        }
+
+        // Test 1: Verify set/get return null before cache key is set
+        log('Test 1: Before cache key is set', 'info');
+        jqhtml.Jqhtml_Session_Storage.set('test_key', 'test_value');
+        const value1 = jqhtml.Jqhtml_Session_Storage.get('test_key');
+        if (value1 === null) {
+            log('✓ get() returns null before cache key set', 'pass');
+        } else {
+            log('✗ get() should return null before cache key set, got: ' + value1, 'fail');
+        }
+
+        // Test 2: Set cache key via window.jqhtml
+        log('Test 2: Setting cache key via window.jqhtml.set_cache_key()', 'info');
+        window.jqhtml.set_cache_key('test_session_123');
+        log('✓ Cache key set successfully', 'pass');
+
+        // Test 3: Store and retrieve value
+        log('Test 3: Store and retrieve value', 'info');
+        jqhtml.Jqhtml_Session_Storage.set('user_data', { name: 'John', id: 42 });
+        const value2 = jqhtml.Jqhtml_Session_Storage.get('user_data');
+        if (value2 && value2.name === 'John' && value2.id === 42) {
+            log('✓ Stored and retrieved object correctly', 'pass');
+        } else {
+            log('✗ Failed to retrieve stored object', 'fail');
+        }
+
+        // Test 4: Verify key format in sessionStorage
+        log('Test 4: Check key format in sessionStorage', 'info');
+        const keys = Object.keys(sessionStorage).filter(k => k.startsWith('jqhtml::'));
+        log(`Found ${keys.length} JQHTML keys in sessionStorage`, 'info');
+        const expectedKey = 'jqhtml::user_data::test_session_123';
+        if (keys.includes(expectedKey)) {
+            log(`✓ Key has correct format: ${expectedKey}`, 'pass');
+        } else {
+            log(`✗ Expected key not found. Keys: ${keys.join(', ')}`, 'fail');
+        }
+
+        // Test 5: Remove value
+        log('Test 5: Remove value', 'info');
+        jqhtml.Jqhtml_Session_Storage.remove('user_data');
+        const value3 = jqhtml.Jqhtml_Session_Storage.get('user_data');
+        if (value3 === null) {
+            log('✓ Value removed successfully', 'pass');
+        } else {
+            log('✗ Value should be null after removal', 'fail');
+        }
+
+        // Test 6: Scope invalidation
+        log('Test 6: Scope invalidation when cache key changes', 'info');
+        jqhtml.Jqhtml_Session_Storage.set('scoped_data', 'first_scope');
+        const before = jqhtml.Jqhtml_Session_Storage.get('scoped_data');
+
+        // Change cache key
+        window.jqhtml.set_cache_key('new_session_456');
+
+        const after = jqhtml.Jqhtml_Session_Storage.get('scoped_data');
+        if (before === 'first_scope' && after === null) {
+            log('✓ Old data cleared when cache key changed', 'pass');
+        } else {
+            log(`✗ Scope invalidation failed. Before: ${before}, After: ${after}`, 'fail');
+        }
+
+        // Test 7: New scope works
+        log('Test 7: New scope works after cache key change', 'info');
+        jqhtml.Jqhtml_Session_Storage.set('scoped_data', 'second_scope');
+        const newValue = jqhtml.Jqhtml_Session_Storage.get('scoped_data');
+        if (newValue === 'second_scope') {
+            log('✓ New scope stores data correctly', 'pass');
+        } else {
+            log('✗ New scope storage failed', 'fail');
+        }
+
+        log('All tests complete!', 'info');
+    </script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+<Define:Bem_Class_Replacement_Survival_Main>
+  <div>
+    <h1>BEM Class Replacement Survival Test</h1>
+    <Bem_Class_Replacement_Survival_Test />
+  </div>
+</Define:Bem_Class_Replacement_Survival_Main>

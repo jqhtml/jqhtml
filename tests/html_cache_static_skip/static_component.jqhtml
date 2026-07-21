@@ -1,0 +1,7 @@
+<Define:Static_Component>
+  <div class="static-component">
+    <h3>Static Component</h3>
+    <p>This component does NOT modify this.data in on_load()</p>
+    <span class="default-value"><%= this.data.label %></span>
+  </div>
+</Define:Static_Component>

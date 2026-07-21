@@ -1,0 +1,12 @@
+<Define:Test_Component>
+  <div class="test-component">
+    <% if (this.data.contact) { %>
+      <div class="contact-info">
+        <span class="name"><%= this.data.contact.name %></span>
+        <span class="email"><%= this.data.contact.email %></span>
+      </div>
+    <% } else { %>
+      <div class="loading">Loading...</div>
+    <% } %>
+  </div>
+</Define:Test_Component>

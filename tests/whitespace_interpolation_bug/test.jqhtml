@@ -1,0 +1,17 @@
+<Define:Test_Whitespace_Interpolation>
+  <div>
+    <h1>Whitespace Interpolation Bug Test</h1>
+
+    <!-- Bug reproduction: space before (PLACEHOLDER) should be preserved -->
+    <Card_Widget_Header $title="<%= this.args.title %> (PLACEHOLDER)" />
+
+    <!-- Control test: static string with space -->
+    <Card_Widget_Header $title="Static Title (PLACEHOLDER)" />
+
+    <!-- Another control: space after interpolation -->
+    <Card_Widget_Header $title="Prefix <%= this.args.title %>" />
+
+    <!-- Multiple spaces -->
+    <Card_Widget_Header $title="<%= this.args.title %>    (MULTIPLE SPACES)" />
+  </div>
+</Define:Test_Whitespace_Interpolation>

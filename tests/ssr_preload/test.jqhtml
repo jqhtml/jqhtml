@@ -1,0 +1,4 @@
+<Define:Test_SSR_Preload>
+  <h2>SSR Preload API Test</h2>
+  <div $sid="results"></div>
+</Define:Test_SSR_Preload>

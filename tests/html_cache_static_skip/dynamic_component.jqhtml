@@ -1,0 +1,11 @@
+<Define:Dynamic_Component>
+  <div class="dynamic-component">
+    <h3>Dynamic Component</h3>
+    <p>This component DOES modify this.data in on_load()</p>
+    <% if (this.data.message) { %>
+      <span class="message"><%= this.data.message %></span>
+    <% } else { %>
+      <span class="loading">Loading...</span>
+    <% } %>
+  </div>
+</Define:Dynamic_Component>

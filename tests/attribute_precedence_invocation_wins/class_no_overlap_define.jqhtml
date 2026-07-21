@@ -1,0 +1,4 @@
+<!-- Case 2: No overlap (A has "alpha beta", B has "gamma delta" -> "alpha beta gamma delta") -->
+<Define:Class_No_Overlap_Define class="gamma delta">
+  <%= content() %>
+</Define:Class_No_Overlap_Define>

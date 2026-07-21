@@ -1,0 +1,37 @@
+<Define:Br_Output_Component>
+  <div class="br-output-test">
+    <h2>Testing BR Output Syntax (Escaped + Newline to BR)</h2>
+
+    <div class="test-section">
+      <h3>1. Standard Escaped Output</h3>
+      <div $sid="escaped" class="test-box" style="border: 2px solid blue; padding: 10px; margin: 10px 0; white-space: pre-wrap;">
+        <%= this.data.multiline_text %>
+      </div>
+      <p class="explanation">Newlines preserved as literal \n characters (no visual line breaks)</p>
+    </div>
+
+    <div class="test-section">
+      <h3>2. BR Output</h3>
+      <div $sid="br_escaped" class="test-box" style="border: 2px solid green; padding: 10px; margin: 10px 0;">
+        <%br= this.data.multiline_text %>
+      </div>
+      <p class="explanation">Newlines converted to &lt;br /&gt; tags (visual line breaks)</p>
+    </div>
+
+    <div class="test-section">
+      <h3>3. BR Output with HTML Characters</h3>
+      <div $sid="br_with_html" class="test-box" style="border: 2px solid orange; padding: 10px; margin: 10px 0;">
+        <%br= this.data.html_multiline %>
+      </div>
+      <p class="explanation">HTML should be escaped, but newlines become &lt;br /&gt;</p>
+    </div>
+
+    <div class="test-section">
+      <h3>4. Unescaped Output for Comparison</h3>
+      <div $sid="unescaped" class="test-box" style="border: 2px solid red; padding: 10px; margin: 10px 0;">
+        <%!= this.data.multiline_text %>
+      </div>
+      <p class="explanation">Unescaped - newlines as-is (no BR conversion)</p>
+    </div>
+  </div>
+</Define:Br_Output_Component>

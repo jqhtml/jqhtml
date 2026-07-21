@@ -1,0 +1,9 @@
+<Define:TestError>
+  <div class="test">
+    <%-- Missing closing bracket in expression --%>
+    <p><%= this.data.message || 'default' %></p>
+    <% if (this.data.show: %>
+      <span>Show this</span>
+    <% endif; %>
+  </div>
+</Define:TestError>

@@ -1,0 +1,20 @@
+<Define:Caching_Test>
+  <div>
+    <h1>Caching Test</h1>
+
+    <h2>Test 1: First Load (Cache Miss)</h2>
+    <div id="test1-container">
+      <User_Card $user_id=123 />
+    </div>
+
+    <h2>Test 2: Second Load (Cache Hit - should be instant)</h2>
+    <div id="test2-container">
+      <!-- Will be added after 2 seconds -->
+    </div>
+
+    <h2>Test 3: Different Args (Cache Miss)</h2>
+    <div id="test3-container">
+      <!-- Will be added after 4 seconds -->
+    </div>
+  </div>
+</Define:Caching_Test>

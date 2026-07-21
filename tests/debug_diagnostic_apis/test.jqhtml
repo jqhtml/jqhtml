@@ -1,0 +1,6 @@
+<Define:Debug_Diagnostic_Apis_Main>
+  <div>
+    <h1>Debug Diagnostic APIs Test</h1>
+    <Debug_Diagnostic_Apis_Test />
+  </div>
+</Define:Debug_Diagnostic_Apis_Main>

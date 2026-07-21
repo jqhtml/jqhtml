@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JQHTML Debug Overlay Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            padding: 2rem;
+            background: #f5f5f5;
+        }
+        .test-section {
+            background: white;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 0.25rem;
+        }
+        .test-button:hover {
+            background: #2980b9;
+        }
+        .test-button.success {
+            background: #27ae60;
+        }
+        .test-button.danger {
+            background: #e74c3c;
+        }
+    </style>
+</head>
+<body>
+    <h1>🐛 JQHTML Debug Overlay Test</h1>
+    
+    <div class="test-section">
+        <h2>Debug Overlay Static Methods</h2>
+        <p>Test the new static method approach for debug overlay controls.</p>
+        
+        <button class="test-button success" onclick="testShowOverlay()">
+            Show Debug Overlay
+        </button>
+        <button class="test-button" onclick="testHideOverlay()">
+            Hide Debug Overlay
+        </button>
+        <button class="test-button danger" onclick="testDestroyOverlay()">
+            Destroy Debug Overlay
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Debug Settings</h2>
+        <p>Test the debug settings functionality.</p>
+        
+        <button class="test-button" onclick="testBasicDebug()">
+            Enable Basic Debug
+        </button>
+        <button class="test-button" onclick="testFullDebug()">
+            Enable Full Debug
+        </button>
+        <button class="test-button" onclick="testCustomSettings()">
+            Custom Settings
+        </button>
+        <button class="test-button danger" onclick="testClearSettings()">
+            Clear All Settings
+        </button>
+    </div>
+    
+    <div class="test-section">
+        <h2>Test Component</h2>
+        <p>Create a simple component to test debugging features.</p>
+        
+        <button class="test-button" onclick="createTestComponent()">
+            Create Test Component
+        </button>
+        <div id="test-component-container" style="margin-top: 1rem;"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>Console Output</h2>
+        <p>Check the browser console for debug output. All debug functions should log their actions.</p>
+        <div id="console-output" style="background: #f8f9fa; padding: 1rem; border-radius: 4px; font-family: monospace; font-size: 0.85rem;">
+            Console output will appear here...
+        </div>
+    </div>
+
+    <!-- Load Dependencies -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="dist/jqhtml-bundle.js"></script>
+    
+    <script>
+        // Initialize JQHTML
+        jqhtml.init(jQuery);
+        
+        // Override console.log to show output in page
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            const output = document.getElementById('console-output');
+            const message = args.map(arg => 
+                typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
+            ).join(' ');
+            output.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+            output.scrollTop = output.scrollHeight;
+        };
+        
+        // Test functions
+        function testShowOverlay() {
+            console.log('🧪 Testing jqhtml.showDebugOverlay()');
+            try {
+                const overlay = jqhtml.showDebugOverlay();
+                console.log('✅ Debug overlay shown successfully', overlay);
+            } catch (error) {
+                console.error('❌ Error showing debug overlay:', error);
+            }
+        }
+        
+        function testHideOverlay() {
+            console.log('🧪 Testing jqhtml.hideDebugOverlay()');
+            try {
+                jqhtml.hideDebugOverlay();
+                console.log('✅ Debug overlay hidden successfully');
+            } catch (error) {
+                console.error('❌ Error hiding debug overlay:', error);
+            }
+        }
+        
+        function testDestroyOverlay() {
+            console.log('🧪 Testing DebugOverlay.destroy()');
+            try {
+                jqhtml.DebugOverlay.destroy();
+                console.log('✅ Debug overlay destroyed successfully');
+            } catch (error) {
+                console.error('❌ Error destroying debug overlay:', error);
+            }
+        }
+        
+        function testBasicDebug() {
+            console.log('🧪 Testing jqhtml.enableDebugMode("basic")');
+            try {
+                jqhtml.enableDebugMode('basic');
+                console.log('✅ Basic debug mode enabled');
+                console.log('Current settings:', jqhtml.debug);
+            } catch (error) {
+                console.error('❌ Error enabling basic debug:', error);
+            }
+        }
+        
+        function testFullDebug() {
+            console.log('🧪 Testing jqhtml.enableDebugMode("full")');
+            try {
+                jqhtml.enableDebugMode('full');
+                console.log('✅ Full debug mode enabled');
+                console.log('Current settings:', jqhtml.debug);
+            } catch (error) {
+                console.error('❌ Error enabling full debug:', error);
+            }
+        }
+        
+        function testCustomSettings() {
+            console.log('🧪 Testing jqhtml.setDebugSettings()');
+            try {
+                jqhtml.setDebugSettings({
+                    logFullLifecycle: true,
+                    flashComponents: true,
+                    flashDuration: 1000,
+                    flashColors: {
+                        create: '#ff6b6b',
+                        render: '#4ecdc4',
+                        ready: '#45b7d1'
+                    },
+                    profilePerformance: true
+                });
+                console.log('✅ Custom debug settings applied');
+                console.log('Current settings:', jqhtml.debug);
+            } catch (error) {
+                console.error('❌ Error setting custom debug settings:', error);
+            }
+        }
+        
+        function testClearSettings() {
+            console.log('🧪 Testing jqhtml.clearDebugSettings()');
+            try {
+                jqhtml.clearDebugSettings();
+                console.log('✅ Debug settings cleared');
+                console.log('Current settings:', jqhtml.debug);
+            } catch (error) {
+                console.error('❌ Error clearing debug settings:', error);
+            }
+        }
+        
+        function createTestComponent() {
+            console.log('🧪 Creating test component');
+            try {
+                class TestComponent extends jqhtml.Component {
+                    async render() {
+                        this.$.html(`
+                            <div style="background: #e8f5e9; padding: 1rem; border-radius: 4px; border: 1px solid #4caf50;">
+                                <h4>Test Component #${this._cid}</h4>
+                                <p>This component was created for debug testing.</p>
+                                <p>Created at: ${new Date().toLocaleTimeString()}</p>
+                            </div>
+                        `);
+                    }
+                    
+                    async on_load() {
+                        // Simulate loading delay
+                        await new Promise(resolve => setTimeout(resolve, 200));
+                        this.data.loadedAt = new Date().toISOString();
+                    }
+                }
+                
+                jqhtml.register_component('TestComponent', TestComponent);
+                $('#test-component-container').component(TestComponent);
+                console.log('✅ Test component created successfully');
+            } catch (error) {
+                console.error('❌ Error creating test component:', error);
+            }
+        }
+        
+        // Initialize
+        $(document).ready(() => {
+            console.log('🚀 JQHTML Debug Overlay Test Page Loaded');
+            console.log('jQuery version:', $.fn.jquery);
+            console.log('JQHTML version:', jqhtml.version);
+            console.log('Debug overlay available:', typeof jqhtml.showDebugOverlay === 'function');
+            console.log('');
+            console.log('📋 Test the debug overlay by clicking the buttons above.');
+            console.log('🔍 Watch for visual feedback and console logging.');
+        });
+    </script>
+</body>
+</html>

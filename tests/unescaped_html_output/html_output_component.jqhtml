@@ -1,0 +1,29 @@
+<Define:Html_Output_Component>
+  <div class="html-output-test">
+    <h2>Testing Escaped vs Unescaped HTML</h2>
+
+    <div class="test-section">
+      <h3>Escaped Output (Default - Safe)</h3>
+      <div $sid="escaped" class="escaped-box" style="border: 2px solid blue; padding: 10px; margin: 10px 0;">
+        <%= this.data.html_string %>
+      </div>
+      <p class="explanation">Should show literal text: &lt;strong&gt;Bold Text&lt;/strong&gt;</p>
+    </div>
+
+    <div class="test-section">
+      <h3>Unescaped Output (Raw HTML - Use with Caution)</h3>
+      <div $sid="unescaped" class="unescaped-box" style="border: 2px solid red; padding: 10px; margin: 10px 0;">
+        <%!= this.data.html_string %>
+      </div>
+      <p class="explanation">Should show bold text (actual HTML rendering)</p>
+    </div>
+
+    <div class="test-section">
+      <h3>XSS Attack Test</h3>
+      <div $sid="xss_escaped" class="xss-box" style="border: 2px solid green; padding: 10px; margin: 10px 0;">
+        <%= this.data.xss_string %>
+      </div>
+      <p class="explanation">Should show literal script tag (NOT execute)</p>
+    </div>
+  </div>
+</Define:Html_Output_Component>

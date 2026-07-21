@@ -1,0 +1,23 @@
+<%--
+Cache_Shared_Reference_Serialization_Test
+
+Regression test for the shared (non-circular) reference fix in
+local-storage.ts process_for_serialization (commit 91f1bc59).
+
+A component sets this.data.a and this.data.b to the SAME array reference
+in on_load(). Before the fix, the `seen` WeakSet tracked every object ever
+visited (not just the current ancestor DFS path), so the second occurrence
+of the shared array (this.data.b) would be misdetected as a circular
+reference and dropped/omitted from serialization. After the fix, `seen`
+only tracks the current ancestor path (added on the way down, removed in
+a `finally` on the way back up), so a shared reference in a DAG is
+serialized independently at each occurrence instead of being treated as
+a cycle.
+--%>
+<Define:Cache_Shared_Reference_Serialization_Test>
+  <div class="test-container">
+    <h1>Cache Shared Reference Serialization Test</h1>
+    <div $sid="mount_point" class="mount-point"></div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Cache_Shared_Reference_Serialization_Test>

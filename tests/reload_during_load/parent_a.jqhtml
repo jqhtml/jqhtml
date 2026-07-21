@@ -1,0 +1,6 @@
+<Define:Parent_A>
+  <div class="parent-a">
+    <h3>Parent A</h3>
+    <Child_B $sid="child_component" />
+  </div>
+</Define:Parent_A>

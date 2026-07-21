@@ -1,0 +1,6 @@
+<Define:Test_After_Load>
+  <div>
+    <h1>on_loaded() Lifecycle Hook Test</h1>
+    <After_Load_Test_Component />
+  </div>
+</Define:Test_After_Load>

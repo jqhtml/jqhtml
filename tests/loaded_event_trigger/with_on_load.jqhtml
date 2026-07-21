@@ -1,0 +1,7 @@
+<%--
+With_On_Load - Component that has a custom on_load function
+Tests that 'loaded' event fires after on_load completes
+--%>
+<Define:With_On_Load class="test-component">
+  <p>Has on_load: <%= this.data.message || 'loading...' %></p>
+</Define:With_On_Load>

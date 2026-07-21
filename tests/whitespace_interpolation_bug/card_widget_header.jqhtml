@@ -1,0 +1,5 @@
+<Define:Card_Widget_Header tag="div" class="card-widget__header">
+    <div class="card-widget__title-row">
+        <h3 class="card-widget__title"><%= this.args.title %></h3>
+    </div>
+</Define:Card_Widget_Header>

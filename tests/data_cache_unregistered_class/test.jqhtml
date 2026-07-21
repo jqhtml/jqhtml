@@ -1,0 +1,8 @@
+<Define:Unregistered_Class_Test>
+  <div class="test-container">
+    <h1>Data Cache Unregistered Class Test</h1>
+    <p>Tests that unregistered ES6 classes are normalized to plain objects</p>
+    <div $sid="mount_point" class="mount-point"></div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Unregistered_Class_Test>

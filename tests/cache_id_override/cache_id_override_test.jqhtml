@@ -1,0 +1,18 @@
+<%--
+Cache_Id_Override_Test - Verifies cache_id() custom cache-key override
+
+Target: cache_id() override in packages/core/src/component.ts (~751-754, ~954-960)
+and packages/core/src/component-cache.ts (generate_cache_key).
+
+A component that defines cache_id() should compute its cache key from that
+return value alone - NOT from this.args. Two instances of such a component
+with DIFFERENT args but the SAME cache_id() return value must resolve to the
+SAME cache entry. A control component (no cache_id()) must resolve to
+DIFFERENT cache entries when args differ, as usual.
+--%>
+<Define:Cache_Id_Override_Test>
+  <div>
+    <div $sid="mount"></div>
+    <div id="results"></div>
+  </div>
+</Define:Cache_Id_Override_Test>

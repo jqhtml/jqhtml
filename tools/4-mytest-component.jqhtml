@@ -1,0 +1,6 @@
+<!--
+MyTest - Simple test component with default div tag
+-->
+<Define:MyTest>
+    <%= content() %>
+</Define:MyTest>

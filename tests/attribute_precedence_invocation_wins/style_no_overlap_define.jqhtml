@@ -1,0 +1,5 @@
+<!-- Style no overlap: Define has "padding: 5px; border: 1px solid black", invocation has "color: green; margin: 20px" -->
+<!-- Expected: all 4 properties merged -->
+<Define:Style_No_Overlap_Define style="padding: 5px; border: 1px solid black;">
+  <%= content() %>
+</Define:Style_No_Overlap_Define>

@@ -1,0 +1,11 @@
+<!--
+Base_Card - Base component with card-base class
+
+CLASSES:
+  card-base (from Define)
+  Base_Card (component name, auto-added)
+  Jqhtml_Component (framework marker, auto-added)
+-->
+<Define:Base_Card class="card-base">
+  <div><%= content() %></div>
+</Define:Base_Card>

@@ -1,0 +1,9 @@
+<!--
+Text_Input - Base text input component with get/set value methods
+-->
+<Define:Text_Input>
+  <div class="text-input-wrapper">
+    <label><%= this.args.label || 'Input' %>:</label>
+    <input type="text" $sid="input" class="form-control" />
+  </div>
+</Define:Text_Input>

@@ -1,0 +1,18 @@
+<!--
+Component_C - Bottom component that renders the slot
+
+This component iterates over data and calls the forwarded slot for each row.
+-->
+
+<Define:Component_C class="component-c">
+    <div class="card mt-2">
+        <div class="card-header bg-secondary text-white">
+            Component C (Renders Slot)
+        </div>
+        <div class="card-body">
+            <% for(let row of this.data.rows) { %>
+                <%= content('row', row); %>
+            <% } %>
+        </div>
+    </div>
+</Define:Component_C>

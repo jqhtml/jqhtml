@@ -1,0 +1,8 @@
+<Define:After_Load_Test_Component>
+  <div class="after-load-test">
+    <h2>Testing on_loaded() Hook</h2>
+    <div $sid="value" class="value-display">
+      Value: <%= this.data.value %>
+    </div>
+  </div>
+</Define:After_Load_Test_Component>

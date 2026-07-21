@@ -1,0 +1,8 @@
+<!--
+Child_Component - Leaf node in lifecycle timing test
+-->
+<Define:Child_Component>
+  <div class="child-box" style="border: 2px solid blue; padding: 10px; margin: 5px;">
+    Child: <%= this.args.id %>
+  </div>
+</Define:Child_Component>

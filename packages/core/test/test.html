@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>JQHTML v2 Core Runtime Test</title>
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .test { margin: 20px 0; padding: 10px; border: 1px solid #ccc; }
+    .pass { background: #e7ffe7; }
+    .fail { background: #ffe7e7; }
+    .Component { border: 2px solid #333; padding: 10px; margin: 10px 0; }
+    .TestComponent { background: #f0f0f0; }
+  </style>
+</head>
+<body>
+  <h1>JQHTML v2 Core Runtime Test</h1>
+  <div id="results"></div>
+  <div id="app"></div>
+
+  <script type="module">
+    import { 
+      Component, 
+      register_component,
+      LifecycleManager 
+    } from './dist/index.js';
+    
+    const results = $('#results');
+    let testCount = 0;
+    let passCount = 0;
+    
+    function test(name, fn) {
+      testCount++;
+      const testDiv = $('<div class="test">');
+      try {
+        fn();
+        testDiv.addClass('pass').text(`✓ ${name}`);
+        passCount++;
+      } catch (e) {
+        testDiv.addClass('fail').html(`✗ ${name}<br>Error: ${e.message}`);
+        console.error(e);
+      }
+      results.append(testDiv);
+    }
+    
+    // Test 1: Component Creation
+    test('Component can be created', () => {
+      class TestComponent extends Jqhtml_Component {
+        async on_render() {
+          this.$.html('<h3>Test Component</h3>');
+        }
+      }
+      
+      const comp = new TestComponent({ test: true });
+      $('#app').append(comp.$);
+      
+      if (!comp._cid) throw new Error('No _cid generated');
+      if (!comp.$.hasClass('Component')) throw new Error('Missing Component class');
+      if (!comp.$.hasClass('TestComponent')) throw new Error('Missing TestComponent class');
+    });
+    
+    // Test 2: Component Registry
+    test('Components can be registered and created', () => {
+      class RegisteredComponent extends Jqhtml_Component {
+        async on_render() {
+          this.$.html(`<p>Args: ${JSON.stringify(this.args)}</p>`);
+        }
+      }
+      
+      register_component('RegisteredComponent', RegisteredComponent);
+      const comp = $.jqhtml.create('RegisteredComponent', { foo: 'bar' });
+      $('#app').append(comp.$);
+      
+      if (comp.args.foo !== 'bar') throw new Error('Args not passed correctly');
+    });
+    
+    // Test 3: jQuery Plugin
+    test('jQuery plugin works', () => {
+      class PluginComponent extends Jqhtml_Component {
+        async on_render() {
+          this.$.html('<div>Plugin Component</div>');
+        }
+      }
+      
+      register_component('PluginComponent', PluginComponent);
+      
+      const container = $('<div>').appendTo('#app');
+      const comp = container.component('PluginComponent', { plugin: true });
+      
+      if (!comp) throw new Error('Component not created');
+      if (comp.args.plugin !== true) throw new Error('Args not passed');
+      
+      // Test getter
+      const retrieved = container.component();
+      if (retrieved !== comp) throw new Error('Component not retrieved');
+    });
+    
+    // Test 4: Lifecycle Phases
+    test('Lifecycle phases execute in order', async () => {
+      const phases = [];
+      
+      class LifecycleComponent extends Jqhtml_Component {
+        async on_render() {
+          phases.push('render');
+          this.$.html('<div>Lifecycle Test</div>');
+        }
+        
+        async on_init() {
+          phases.push('init');
+        }
+        
+        async on_load() {
+          phases.push('load');
+          this.data.loaded = true;
+        }
+        
+        async on_ready() {
+          phases.push('ready');
+        }
+      }
+      
+      const comp = new LifecycleComponent();
+      $('#app').append(comp.$);
+      
+      // Wait for lifecycle
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Check phases executed
+      if (phases.length !== 4) throw new Error(`Expected 4 phases, got ${phases.length}`);
+      if (phases.join(',') !== 'render,init,load,ready') {
+        throw new Error(`Wrong phase order: ${phases.join(',')}`);
+      }
+      if (comp._ready_state !== 4) throw new Error(`Wrong ready state: ${comp._ready_state}`);
+    });
+    
+    // Test 5: Parent-Child Relationships
+    test('Parent-child relationships work', async () => {
+      class ParentComponent extends Jqhtml_Component {
+        async on_render() {
+          this.$.html('<div><h4>Parent</h4><div class="children"></div></div>');
+        }
+      }
+      
+      class ChildComponent extends Jqhtml_Component {
+        async on_render() {
+          this.$.html('<div>Child</div>');
+        }
+      }
+      
+      const parent = new ParentComponent();
+      $('#app').append(parent.$);
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const child1 = new ChildComponent();
+      const child2 = new ChildComponent();
+      parent.$.find('.children').append(child1.$).append(child2.$);
+      
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      if (parent.children().length !== 2) {
+        throw new Error(`Expected 2 children, got ${parent.children().length}`);
+      }
+      if (child1.parent() !== parent) {
+        throw new Error('Child parent not set correctly');
+      }
+    });
+    
+    // Test 6: Scoped IDs
+    test('Scoped IDs work correctly', () => {
+      class ScopedComponent extends Jqhtml_Component {
+        async on_render() {
+          this.$.html(`<button id="btn:${this._cid}">Click Me</button>`);
+        }
+      }
+      
+      const comp1 = new ScopedComponent();
+      const comp2 = new ScopedComponent();
+      $('#app').append(comp1.$).append(comp2.$);
+      
+      const btn1 = comp1.$id('btn');
+      const btn2 = comp2.$id('btn');
+      
+      if (btn1.length !== 1) throw new Error('Button 1 not found');
+      if (btn2.length !== 1) throw new Error('Button 2 not found');
+      if (btn1.attr('id') === btn2.attr('id')) {
+        throw new Error('Button IDs are not unique');
+      }
+    });
+    
+    // Show results
+    setTimeout(() => {
+      results.prepend(`<h2>Tests: ${passCount}/${testCount} passed</h2>`);
+    }, 500);
+  </script>
+</body>
+</html>

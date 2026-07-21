@@ -1,0 +1,5 @@
+<Define:Slot_All_Or_Nothing_Test_Main>
+  <div>
+    <Pure_Slots />
+  </div>
+</Define:Slot_All_Or_Nothing_Test_Main>

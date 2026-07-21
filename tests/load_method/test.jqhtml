@@ -1,0 +1,6 @@
+<Define:Test_Load_Method>
+  <div>
+    <h1>load() Method Test</h1>
+    <Load_Test_Component />
+  </div>
+</Define:Test_Load_Method>

@@ -1,0 +1,6 @@
+<!--
+Inner - Simple component to verify component instances created
+-->
+<Define:Inner>
+  <span class="inner">Inner Component</span>
+</Define:Inner>

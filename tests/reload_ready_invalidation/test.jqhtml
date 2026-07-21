@@ -1,0 +1,6 @@
+<Define:Reload_Ready_Invalidation_Test>
+  <h1>Reload Ready Invalidation Test</h1>
+  <p>Tests that .on('ready') handlers added during reload wait for completion</p>
+
+  <Test_Container $sid="test_container" />
+</Define:Reload_Ready_Invalidation_Test>

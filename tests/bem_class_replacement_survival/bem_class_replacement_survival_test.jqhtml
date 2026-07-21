@@ -1,0 +1,15 @@
+<%--
+Bem_Class_Replacement_Survival_Test - Regression test for jquery-plugin.ts:173-185
+
+During $(el).component('New_Component') replacement of an existing component,
+classes starting with a capital letter are stripped (they're treated as
+component-identity classes), EXCEPT classes containing '__' (BEM-style
+classes), which persist across reinitialization. Plain lowercase classes
+also always persist.
+--%>
+<Define:Bem_Class_Replacement_Survival_Test>
+  <div class="test-wrap">
+    <div $sid="target">Initial Content</div>
+    <div id="results"></div>
+  </div>
+</Define:Bem_Class_Replacement_Survival_Test>

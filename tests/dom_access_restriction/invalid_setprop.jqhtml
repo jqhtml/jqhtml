@@ -1,0 +1,6 @@
+<Define:Invalid_SetProp>
+  <div class="test-result">
+    <h3>Test 5: Invalid - Set this.custom_prop</h3>
+    <p>Status: <span $sid="status">Pending...</span></p>
+  </div>
+</Define:Invalid_SetProp>

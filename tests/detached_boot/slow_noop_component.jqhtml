@@ -1,0 +1,4 @@
+<Define:Slow_Noop_Component>
+  <% window.__render_log.push('Slow_Noop_Component'); %>
+  <div $sid="content">slow noop content</div>
+</Define:Slow_Noop_Component>

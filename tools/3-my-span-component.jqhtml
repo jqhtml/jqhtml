@@ -1,0 +1,6 @@
+<!--
+My_Span_Component - A component with tag="span" attribute
+-->
+<Define:My_Span_Component tag="span" class="badge bg-primary">
+    <%= content() %>
+</Define:My_Span_Component>

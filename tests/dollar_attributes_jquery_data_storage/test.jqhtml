@@ -1,0 +1,6 @@
+<Define:Test_Data_Storage>
+  <div>
+    <h1>$ Attributes jQuery Data Storage Test</h1>
+    <Data_Storage_Component $product_id="ABC123" $category="electronics" $price=99.99 $in_stock=true />
+  </div>
+</Define:Test_Data_Storage>

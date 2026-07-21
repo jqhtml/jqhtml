@@ -1,0 +1,26 @@
+<Define:Test_Boot>
+  <div>
+    <h1>Boot Server Placeholder Hydration Test</h1>
+
+    <!-- Test 1: Basic boot with args -->
+    <h2>Test 1: Basic Component Boot</h2>
+    <div $sid="test1"></div>
+
+    <!-- Test 2: Nested components -->
+    <h2>Test 2: Nested Component Boot</h2>
+    <div $sid="test2"></div>
+
+    <!-- Test 3: Content passing -->
+    <h2>Test 3: Content Passing via innerHTML</h2>
+    <div $sid="test3"></div>
+
+    <!-- Test 4: Await boot completion -->
+    <h2>Test 4: Boot Promise Resolution</h2>
+    <div $sid="test4"></div>
+    <p $sid="test4_status">Waiting...</p>
+
+    <!-- Results -->
+    <h2>Results</h2>
+    <div $sid="results" style="padding: 10px; border: 2px solid #ccc;"></div>
+  </div>
+</Define:Test_Boot>

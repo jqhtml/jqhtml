@@ -1,0 +1,16 @@
+<!--
+Button_With_Defaults - Component with default attributes
+
+DEFAULT ATTRIBUTES:
+  tag="button"
+  style="color: red;"
+  data-theme="light"
+  class="btn"
+-->
+<Define:Button_With_Defaults
+    style="color: red;"
+    data-theme="light"
+    class="btn"
+    tag="button">
+  <%= content() %>
+</Define:Button_With_Defaults>

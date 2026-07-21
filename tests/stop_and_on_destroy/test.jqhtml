@@ -1,0 +1,6 @@
+<Define:Stop_And_Destroy_Test_Main>
+  <div>
+    <h1>stop() and on_destroy() Test</h1>
+    <Stop_Test />
+  </div>
+</Define:Stop_And_Destroy_Test_Main>

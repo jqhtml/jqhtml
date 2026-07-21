@@ -1,0 +1,10 @@
+<Define:TestCard>
+    <div class="test-card">
+        <h3>Card with slots test</h3>
+        <div class="card-content">
+            <% if (content): %>
+                <%= content() %>
+            <% endif; %>
+        </div>
+    </div>
+</Define:TestCard>

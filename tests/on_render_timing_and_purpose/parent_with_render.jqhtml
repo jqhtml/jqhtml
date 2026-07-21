@@ -1,0 +1,8 @@
+<Define:Parent_With_Render class="card">
+  <div class="parent-component">
+    <h2>Parent Component</h2>
+    <div $sid="status">Initializing...</div>
+    <Child_Component $sid="child" />
+    <div $sid="results"></div>
+  </div>
+</Define:Parent_With_Render>

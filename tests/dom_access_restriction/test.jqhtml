@@ -1,0 +1,12 @@
+<Define:Test_DOM_Access_Restriction>
+  <div>
+    <h1>DOM Access Restriction Test</h1>
+    <Valid_Component />
+    <Invalid_Dollar />
+    <Invalid_DollarId />
+    <Invalid_Id />
+    <Invalid_SetProp />
+    <Valid_Args $user_id=42 />
+    <Valid_Methods />
+  </div>
+</Define:Test_DOM_Access_Restriction>

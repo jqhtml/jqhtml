@@ -1,0 +1,5 @@
+<!-- Style overlap: Define has "color: red; font-size: 14px", invocation has "color: blue; margin: 10px" -->
+<!-- Expected: "color: blue; font-size: 14px; margin: 10px" (invocation color wins, Define font-size preserved, invocation margin added) -->
+<Define:Style_Overlap_Define style="color: red; font-size: 14px;">
+  <%= content() %>
+</Define:Style_Overlap_Define>

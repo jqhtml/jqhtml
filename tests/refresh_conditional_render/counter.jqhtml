@@ -1,0 +1,10 @@
+<!--
+Counter - Simple component that displays a count and tracks renders
+-->
+<Define:Counter>
+  <div class="counter">
+    <div class="count"><%= this.data.count %></div>
+    <div class="renders">Renders: <span $sid="render_count">0</span></div>
+    <div class="ready_calls">on_ready calls: <span $sid="ready_count">0</span></div>
+  </div>
+</Define:Counter>

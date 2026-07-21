@@ -1,0 +1,32 @@
+<Define:Comment_Component>
+  <div class="comment-test">
+    <h2>Testing Template Comments</h2>
+
+    <%-- This is a single-line comment that should not appear in output --%>
+
+    <div class="test-section">
+      <h3>Before Comment</h3>
+      <%-- Single line comment between elements --%>
+      <h3>After Comment</h3>
+    </div>
+
+    <div class="test-section">
+      <h3>Multi-line Comment Test</h3>
+      <%--
+        This is a multi-line comment.
+        It spans multiple lines.
+        It should be completely removed from the output.
+        None of this text should appear in the DOM.
+      --%>
+      <p $sid="after_multiline">Content after multi-line comment</p>
+    </div>
+
+    <div class="test-section">
+      <h3>Comment with Special Characters</h3>
+      <%-- Comment with <tags>, "quotes", and 'apostrophes' & symbols! --%>
+      <p $sid="after_special">Content after special chars comment</p>
+    </div>
+
+    <div $sid="final_content">All visible content rendered successfully</div>
+  </div>
+</Define:Comment_Component>

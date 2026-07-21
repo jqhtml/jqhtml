@@ -1,0 +1,128 @@
+<Define:HomeRoute>
+  <div class="route-content home-route">
+    <!-- Hero Section -->
+    <section class="hero">
+      <h1>Welcome to JQHTML v2</h1>
+      <p class="hero-subtitle">
+        A pragmatic component framework that embraces jQuery's simplicity
+      </p>
+      <p class="hero-description">
+        Build modern web applications without the complexity of virtual DOM, state management, or build tool configuration nightmares. 
+        JQHTML brings structure to jQuery while keeping the development experience simple and predictable.
+      </p>
+      <div class="hero-actions">
+        <a href="/components" class="btn btn-primary">Explore Components</a>
+        <a href="#quick-start" class="btn btn-secondary">Quick Start</a>
+      </div>
+    </section>
+
+    <!-- Key Features -->
+    <section class="features-section">
+      <h2>Why JQHTML?</h2>
+      <div class="features-grid">
+        <Card title="jQuery at its Core">
+          <p>No virtual DOM, no reconciliation, no magic. When you update the DOM, that IS the state change.</p>
+          <code>this.$id('status').text('Online')</code>
+        </Card>
+        
+        <Card title="Real Components">
+          <p>Components are genuine jQuery objects. Use all jQuery methods and plugins seamlessly.</p>
+          <code>this.$.fadeIn().addClass('active')</code>
+        </Card>
+        
+        <Card title="Simple Templates">
+          <p>Familiar ERB-style syntax that compiles to efficient JavaScript functions.</p>
+          <code>&lt;%= user.name %&gt; • &lt;% if (user.active): %&gt;</code>
+        </Card>
+        
+        <Card title="No Build Required">
+          <p>Works with script tags, webpack, or any build system. Your choice, not ours.</p>
+          <code>&lt;script src="jqhtml.js"&gt;&lt;/script&gt;</code>
+        </Card>
+      </div>
+    </section>
+
+    <!-- Quick Start -->
+    <section id="quick-start" class="quick-start-section">
+      <h2>Quick Start</h2>
+      
+      <ExampleBlock 
+        title="Define a Component" 
+        description="Components are ES6 classes that extend the base Component class"
+        code="// Define your component template
+&lt;Define:Greeting&gt;
+  &lt;div class='greeting'&gt;
+    &lt;h3&gt;Hello &lt;%= args.name %&gt;!&lt;/h3&gt;
+    &lt;p&gt;Welcome to JQHTML&lt;/p&gt;
+  &lt;/div&gt;
+&lt;/Define:Greeting&gt;
+
+// Create the component class
+class Greeting extends Component {
+  static template = GreetingTemplate;
+  
+  async on_ready() {
+    // Component is fully rendered and ready
+    this.$.fadeIn();
+  }
+}"
+        language="javascript">
+        <p>Here's a simple Greeting component in action:</p>
+        <div id="greeting-demo"></div>
+      </ExampleBlock>
+
+      <ExampleBlock 
+        title="Use Components" 
+        description="Components can be used in templates or created programmatically"
+        code="// In a template
+&lt;Greeting name='World' /&gt;
+
+// Programmatically
+$('#container').component(Greeting, { name: 'World' });"
+        language="javascript">
+        <p>Components work anywhere jQuery works.</p>
+      </ExampleBlock>
+    </section>
+
+    <!-- Philosophy -->
+    <section class="philosophy-section">
+      <h2>The JQHTML Philosophy</h2>
+      <Card>
+        <blockquote>
+          <p>"Here I am, brain the size of a planet, and they ask me to manage state."</p>
+          <cite>— What Marvin might say about React's Redux store</cite>
+        </blockquote>
+        <p>
+          JQHTML believes the DOM is already a perfectly good state container. When you update the DOM, 
+          that IS the state change. No reconciliation, no diffing, no wondering when your change will "commit."
+        </p>
+        <p>
+          We built JQHTML because 95% of web applications are CRUD interfaces that don't benefit from 
+          architectural astronautics. jQuery has powered millions of production applications for nearly 
+          two decades. JQHTML just adds the structure needed for modern component-based development.
+        </p>
+      </Card>
+    </section>
+
+    <!-- Latest Updates -->
+    <section class="updates-section">
+      <h2>Latest from the Blog</h2>
+      <div class="blog-preview">
+        <% if (this.data.latestPosts && this.data.latestPosts.length > 0): %>
+          <% for (const post of this.data.latestPosts): %>
+            <div class="blog-preview-card">
+              <h3><a href="/blog/<%= post.id %>"><%= post.title %></a></h3>
+              <p class="meta">Published on <%= post.date %></p>
+              <p><%= post.excerpt %></p>
+            </div>
+          <% endfor; %>
+        <% else: %>
+          <p>Loading latest posts...</p>
+        <% endif; %>
+      </div>
+      <p class="text-center mt-2">
+        <a href="/blog" class="btn">View All Posts →</a>
+      </p>
+    </section>
+  </div>
+</Define:HomeRoute>

@@ -1,0 +1,8 @@
+<!--
+Wrapper - Component that renders content() in a div
+-->
+<Define:Wrapper>
+  <div class="wrapper">
+    <%= content() %>
+  </div>
+</Define:Wrapper>

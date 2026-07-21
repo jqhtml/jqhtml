@@ -1,0 +1,21 @@
+<Define:AttributeTest as="article" class="default-style" $title="Default Title" $count="0">
+    <div class="attribute-test">
+        <h2><%= this.args.title || '[title undefined]' %></h2>
+        <p>Count: <%= this.args.count !== undefined ? this.args.count : '[count undefined]' %></p>
+        <p>Status: <%= this.args.status || 'unknown' %></p>
+        <p>User: <%= typeof this.args.user === 'object' ? JSON.stringify(this.args.user) : (this.args.user || 'anonymous') %></p>
+        <% if (this.args.items && this.args.items.length > 0): %>
+            <ul>
+                <% for (const item of this.args.items): %>
+                    <li><%= item %></li>
+                <% endfor; %>
+            </ul>
+        <% endif; %>
+        <details>
+            <summary>Debug Info</summary>
+            <pre style="font-size: 10px; background: #eee; padding: 5px;">
+this.args = <%= JSON.stringify(this.args, null, 2) %>
+            </pre>
+        </details>
+    </div>
+</Define:AttributeTest>

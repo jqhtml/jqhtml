@@ -1,0 +1,28 @@
+<Define:AdminRoute>
+  <div class="route-content admin-dashboard">
+    <h2>🎛️ Control Panel Dashboard</h2>
+    <p>Welcome to the super secret admin area!</p>
+    
+    <div class="admin-stats">
+      <Card title="Total Users" footer="Updated 5 min ago">
+        <h3>1,337</h3>
+      </Card>
+      
+      <Card title="Server Status" footer="All systems operational">
+        <h3 style="color: green;">✓ Online</h3>
+      </Card>
+      
+      <Card title="Secret Level">
+        <h3>TOP SECRET</h3>
+        <p>Clearance Level: Omega</p>
+      </Card>
+    </div>
+    
+    <p>This page demonstrates:</p>
+    <ul>
+      <li>Different layout (AdminLayout vs MainLayout)</li>
+      <li>Layout switching when navigating</li>
+      <li>Nested Card components work across layouts</li>
+    </ul>
+  </div>
+</Define:AdminRoute>

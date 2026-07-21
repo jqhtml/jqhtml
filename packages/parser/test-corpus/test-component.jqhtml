@@ -1,0 +1,7 @@
+<Define:DemoComponent>
+    <div class="demo-component">
+        <h1><%= this.data.title %></h1>
+        <p>This is a test JQHTML component.</p>
+        <button @click="handleClick">Click me!</button>
+    </div>
+</Define:DemoComponent>

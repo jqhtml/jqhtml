@@ -1,0 +1,5 @@
+<Define:Test_Component>
+  <div class="test-component">
+    <p>Data: <%= JSON.stringify(this.data) %></p>
+  </div>
+</Define:Test_Component>

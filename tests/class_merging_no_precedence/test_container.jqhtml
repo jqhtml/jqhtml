@@ -1,0 +1,11 @@
+<!--
+Test_Container - Invokes Base_Card with additional classes
+-->
+<Define:Test_Container>
+  <div>
+    <h1>Class Merging Test</h1>
+    <Base_Card class="highlight shadow" $sid="card">
+      Card Content
+    </Base_Card>
+  </div>
+</Define:Test_Container>

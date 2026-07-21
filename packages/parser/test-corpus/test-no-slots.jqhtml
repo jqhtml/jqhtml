@@ -1,0 +1,6 @@
+<Define:Container>
+  <div class="container">
+    <!-- Output the passed innerHTML/content here -->
+    <%= content() %>
+  </div>
+</Define:Container>

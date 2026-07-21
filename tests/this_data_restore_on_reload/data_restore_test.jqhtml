@@ -1,0 +1,8 @@
+<Define:Data_Restore_Test class="card">
+  <div class="restore-test">
+    <h2>this.data Restore on reload() Test</h2>
+    <div $sid="counter_display">Counter: <%= this.data.counter %></div>
+    <div $sid="loaded_value">Loaded: <%= this.data.loaded_value || 'N/A' %></div>
+    <div $sid="results"></div>
+  </div>
+</Define:Data_Restore_Test>

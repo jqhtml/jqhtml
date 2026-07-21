@@ -1,0 +1,7 @@
+<Define:Render_Reload_Test class="card">
+  <div class="test-component">
+    <h2>render() vs reload() Test</h2>
+    <div $sid="on_load_count">on_load count: <%= this.data.load_count || 0 %></div>
+    <div $sid="results"></div>
+  </div>
+</Define:Render_Reload_Test>

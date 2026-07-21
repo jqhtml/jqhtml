@@ -1,0 +1,8 @@
+<%--
+Rendered_Flag_Target - plain template-only component (no JS class needed) used
+to boot with the { _load_render_only: true } arg. Per lifecycle-manager.ts,
+that path returns before ever reaching the 'rendered' trigger.
+--%>
+<Define:Rendered_Flag_Target>
+  <div>flag target</div>
+</Define:Rendered_Flag_Target>

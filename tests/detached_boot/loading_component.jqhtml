@@ -1,0 +1,4 @@
+<Define:Loading_Component>
+  <% window.__render_log.push('Loading_Component'); %>
+  <div $sid="content"><%= this.data.message || 'no data' %></div>
+</Define:Loading_Component>

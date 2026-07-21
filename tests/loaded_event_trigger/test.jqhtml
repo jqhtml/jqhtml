@@ -1,0 +1,13 @@
+<%--
+Loaded_Event_Test - Test that 'loaded' event fires after on_load completes
+
+Validates:
+1. 'loaded' event fires after on_load() completes for components with custom on_load
+2. 'loaded' event fires for components without custom on_load (at the same lifecycle point)
+3. Event can be listened to via this.on('loaded', callback)
+--%>
+<Define:Loaded_Event_Test>
+  <h1>Loaded Event Trigger Test</h1>
+  <With_On_Load $sid="with_load" />
+  <Without_On_Load $sid="without_load" />
+</Define:Loaded_Event_Test>

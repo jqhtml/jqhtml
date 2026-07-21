@@ -1,0 +1,11 @@
+<%--
+Gated_Component - Registers load gates in on_create() to defer the first on_load.
+
+ARGS:
+    $gate_key   - Key into window.__gate_registry for this component's gate promises
+DATA:
+    this.data.message - 'initial' from on_create, 'loaded' after on_load
+--%>
+<Define:Gated_Component>
+  <div $sid="content"><%= this.data.message %></div>
+</Define:Gated_Component>

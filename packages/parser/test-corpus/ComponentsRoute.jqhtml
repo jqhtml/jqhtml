@@ -1,0 +1,362 @@
+<Define:ComponentsRoute>
+  <div class="route-content">
+    <h2>JQHTML v2 Feature Showcase</h2>
+    <p>This page demonstrates all the syntactical features and capabilities of JQHTML v2.</p>
+    
+    <!-- Template Registration & Inheritance -->
+    <div class="feature-section">
+      <h3>🎯 Template Registration & Inheritance</h3>
+      
+      <div class="example-group">
+        <h4>Standard Card Component</h4>
+        <Card title="Base Card" footer="Using Card template">
+          <p>This is a standard Card component using its own template.</p>
+        </Card>
+        <pre class="code-comment">// Uses Card.template via static property
+// Registered as: register_component('Card', Card, CardTemplate)</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>Template Inheritance Example</h4>
+        <div id="fancy-card-demo"></div>
+        <pre class="code-comment">// FancyCard extends Card but has no template
+// Automatically inherits Card's template through prototype chain
+// Only the behavior changes, template stays the same</pre>
+      </div>
+    </div>
+
+    <!-- Attribute Syntax Demonstrations -->
+    <div class="feature-section">
+      <h3>🔧 Component Attribute Syntax</h3>
+      
+      <div class="example-group">
+        <h4>1. Regular Attributes</h4>
+        <AttributeTest title="Regular String" count="42" />
+        <pre class="code-comment">// Regular attributes: title="Regular String" count="42"
+// Accessed as: this.args.title and this.args.count</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>2. Default Attributes (from Define tag)</h4>
+        <AttributeTest />
+        <pre class="code-comment">// No attributes provided - uses defaults from Define tag
+// Define:AttributeTest $title="Default Title" $count="0"
+// Defaults are automatically applied</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>3. Data Attributes with $ Prefix</h4>
+        <AttributeTest $theme="dark" $priority="high" />
+        <pre class="code-comment">// $theme="dark" becomes data-theme="dark" in DOM
+// Accessed as: this.args['data-theme']</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>4. Interpolated String Expressions</h4>
+        <% const userName = "Alice"; const userStatus = "active"; %>
+        <AttributeTest 
+          $message="Hello <%= userName %>!" 
+          $status="User is <%= userStatus %>" />
+        <pre class="code-comment">// Expressions in strings are evaluated and HTML-escaped
+// $message="Hello <%= userName %>!" → "Hello Alice!"
+// Variables from template scope are accessible</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>5. Parenthesized Expressions (Objects/Arrays)</h4>
+        <% 
+          const userData = { name: 'Bob', role: 'Admin', level: 5 };
+          const itemList = ['TypeScript', 'jQuery', 'JQHTML'];
+        %>
+        <AttributeTest 
+          $user=(userData)
+          $items=(itemList)
+          $count=(100 + 23) />
+        <pre class="code-comment">// Parentheses pass raw JavaScript values without conversion
+// $user=(userData) passes the object directly
+// $items=(itemList) passes the array
+// $count=(100 + 23) evaluates to 123</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>6. Bare Identifiers</h4>
+        <% const currentTheme = "cyberpunk"; const debugMode = true; %>
+        <AttributeTest 
+          $theme=currentTheme
+          $debug=debugMode />
+        <pre class="code-comment">// Simple identifiers without parentheses
+// $theme=currentTheme → this.args['data-theme'] = "cyberpunk"
+// Works for variable names without spaces/operators</pre>
+      </div>
+    </div>
+
+    <!-- Slot System -->
+    <div class="feature-section">
+      <h3>🎰 Slot System & Content Projection</h3>
+      
+      <div class="example-group">
+        <h4>Basic Content Slot</h4>
+        <Card title="Card with Content" footer="Footer text">
+          <p>This content is passed via the default slot.</p>
+          <p>The Card template uses <%= "<" + "%= content() %" + ">" %> to render it.</p>
+        </Card>
+        <pre class="code-comment">// Parent passes content between component tags
+// Child template calls content() to render the slot</pre>
+      </div>
+
+      <div class="example-group">
+        <h4>Named Slots (v2.1 Syntax)</h4>
+        <Card title="Named Slot Demo" footer="Multiple slots">
+          <#default>
+            <p>This goes in the default slot using &lt;#default&gt; tags.</p>
+          </#default>
+        </Card>
+        <pre class="code-comment">// Named slots use &lt;#slotname&gt; syntax
+// &lt;#default&gt; is explicit default slot
+// Future: &lt;#header&gt;, &lt;#footer&gt;, etc.</pre>
+      </div>
+    </div>
+
+    <!-- Component .val() Override -->
+    <div class="feature-section">
+      <h3>🎛️ Component Value Handling (.val() Override)</h3>
+      
+      <div class="example-group">
+        <h4>Custom Input with .val() Override</h4>
+        <CustomInput 
+          $id="custom-input-demo"
+          label="Username" 
+          placeholder="Enter username..." />
+        
+        <div style="margin-top: 1rem; padding: 1rem; background: #f0f0f0; border-radius: 4px;">
+          <p><strong>Try these in the console:</strong></p>
+          <code style="display: block; margin: 0.5rem 0;">$('#custom-input-demo\\:' + $('#custom-input-demo').attr('data-cid')).val()</code>
+          <code style="display: block; margin: 0.5rem 0;">$('#custom-input-demo\\:' + $('#custom-input-demo').attr('data-cid')).val('hello world')</code>
+          <p style="margin-top: 0.5rem; font-size: 0.85rem; color: #666;">The component intercepts .val() to enforce max 10 chars and uppercase formatting.</p>
+        </div>
+        
+        <pre class="code-comment">// Component defines val(value?) method
+// jQuery .val() automatically delegates to component.val()
+// Component controls validation, formatting, and events
+// Works seamlessly with jQuery's getter/setter pattern</pre>
+      </div>
+      
+      <div class="example-group">
+        <h4>Interactive Demo</h4>
+        <div style="display: flex; gap: 1rem; align-items: center;">
+          <button id="set-value-btn" style="padding: 0.5rem 1rem; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Set Value via .val()
+          </button>
+          <button id="get-value-btn" style="padding: 0.5rem 1rem; background: #27ae60; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Get Value via .val()
+          </button>
+          <div id="value-display" style="padding: 0.5rem 1rem; background: #ecf0f1; border-radius: 4px; font-family: monospace;">Value: (none)</div>
+        </div>
+        <pre class="code-comment">// The buttons above use jQuery .val() on the component
+// Click "Get Value" to see the current value
+// Click "Set Value" to set a test value (will be truncated and uppercased)</pre>
+      </div>
+    </div>
+
+    <!-- Component Lifecycle -->
+    <div class="feature-section">
+      <h3>🔄 Component Lifecycle & Re-rendering</h3>
+      
+      <div class="example-group">
+        <h4>Data-Driven Re-rendering</h4>
+        <div id="lifecycle-demo"></div>
+        <pre class="code-comment">// Components track data changes with JSON.stringify
+// Only re-render after load() if data actually changed
+// Override should_rerender() to control this behavior</pre>
+      </div>
+    </div>
+
+    <!-- Nested Components -->
+    <div class="feature-section">
+      <h3>🪆 Nested Components</h3>
+      
+      <div class="example-group">
+        <h4>Components Inside Components</h4>
+        <Card title="User Status Card" footer="Updated 5 mins ago">
+          <p>Current Status: <StatusBadge status="online" label="Active" /></p>
+          <p>Previous: <StatusBadge status="offline" label="Away" /></p>
+          <p>Busy Status: <StatusBadge status="busy" label="In Meeting" /></p>
+        </Card>
+        <pre class="code-comment">// StatusBadge renders as &lt;span&gt; due to as="span" in Define tag
+// Nested components work seamlessly within slots
+// Each gets proper status-based styling</pre>
+      </div>
+    </div>
+
+    <!-- Control Flow Syntax -->
+    <div class="feature-section">
+      <h3>🔀 Control Flow Syntax</h3>
+      
+      <div class="example-group">
+        <h4>Both Syntax Styles Supported</h4>
+        
+        <div class="syntax-comparison">
+          <div class="syntax-example">
+            <h5>Python/Colon Style:</h5>
+            <% const items1 = ['First', 'Second', 'Third']; %>
+            <ul>
+              <% for (const item of items1): %>
+                <li><%= item %> (colon syntax)</li>
+              <% endfor; %>
+            </ul>
+          </div>
+          
+          <div class="syntax-example">
+            <h5>JavaScript/Brace Style:</h5>
+            <% const items2 = ['Alpha', 'Beta', 'Gamma']; %>
+            <ul>
+              <% for (const item of items2) { %>
+                <li><%= item %> (brace syntax)</li>
+              <% } %>
+            </ul>
+          </div>
+        </div>
+        <pre class="code-comment">// Both styles work simultaneously in the same template
+// Use whichever feels more natural to you
+// No warnings or style enforcement</pre>
+      </div>
+    </div>
+
+    <!-- Scoped IDs -->
+    <div class="feature-section">
+      <h3>🆔 Component-Scoped IDs</h3>
+      
+      <div class="example-group">
+        <h4>Collision-Free Element IDs</h4>
+        <Card $id="scoped-card" title="Card with Scoped ID">
+          <p $id="content">This paragraph has a scoped ID.</p>
+          <button $id="action-btn" onclick="alert('Scoped button clicked!')">Click Me</button>
+        </Card>
+        <pre class="code-comment">// $id="name" becomes id="name:_cid" in DOM
+// this.$id('name') finds the scoped element
+// Each component instance has unique _cid</pre>
+      </div>
+    </div>
+
+    <!-- CSS Class Hierarchy -->
+    <div class="feature-section">
+      <h3>🎨 CSS Class Hierarchy</h3>
+      
+      <div class="example-group">
+        <h4>Inheritance Chain in DOM</h4>
+        <p>Inspect these components to see their CSS classes:</p>
+        <StatusBadge status="online" label="StatusBadge Component" />
+        <Card title="Card Component">
+          <p>Inspect this Card to see class="Card Component"</p>
+        </Card>
+        <AttributeTest title="AttributeTest Component" />
+        <pre class="code-comment">// Components automatically get CSS classes for their inheritance chain
+// &lt;span class="StatusBadge Component"&gt;
+// Enables CSS targeting by component type or base class</pre>
+      </div>
+    </div>
+
+    <!-- Advanced Examples -->
+    <div class="feature-section">
+      <h3>🚀 Advanced Patterns</h3>
+      
+      <div class="example-group">
+        <h4>Mixed Attribute Types</h4>
+        <% 
+          const config = { theme: 'dark', showLabels: true };
+          const activeItems = ['Home', 'About', 'Contact'];
+          const userCount = 1337;
+        %>
+        <AttributeTest 
+          class="advanced-test"
+          title="Advanced Patterns"
+          $config=(config)
+          $items=activeItems
+          $count=(userCount * 2)
+          $status="<%= userCount %> users online"
+          $debug=true
+        />
+        <pre class="code-comment">// Combining all attribute syntaxes in one component
+// Regular HTML attributes (class)
+// Regular component props (title)
+// $ prefix with objects, arrays, expressions, and booleans</pre>
+      </div>
+    </div>
+  </div>
+
+  <style>
+    .feature-section {
+      margin: 2rem 0;
+      padding: 2rem;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border: 1px solid #dee2e6;
+    }
+    
+    .feature-section h3 {
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .example-group {
+      margin: 1.5rem 0;
+      padding: 1rem;
+      background: white;
+      border-radius: 4px;
+      border: 1px solid #e9ecef;
+    }
+    
+    .example-group h4 {
+      color: #495057;
+      margin-bottom: 1rem;
+    }
+    
+    .code-comment {
+      background: #263238;
+      color: #aed581;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      margin: 1rem 0 0 0;
+      white-space: pre-wrap;
+    }
+    
+    .syntax-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    
+    .syntax-example {
+      background: #f1f3f4;
+      padding: 1rem;
+      border-radius: 4px;
+    }
+    
+    .syntax-example h5 {
+      margin-top: 0;
+      color: #5f6368;
+    }
+    
+    .info-box {
+      background: #e3f2fd;
+      border: 1px solid #90caf9;
+      border-radius: 4px;
+      padding: 1rem;
+      color: #1565c0;
+    }
+    
+    .info-box p {
+      margin: 0.5rem 0;
+    }
+    
+    @media (max-width: 768px) {
+      .syntax-comparison {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</Define:ComponentsRoute>

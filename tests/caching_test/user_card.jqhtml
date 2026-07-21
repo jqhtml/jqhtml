@@ -1,0 +1,11 @@
+<Define:User_Card>
+  <div $sid="status">
+    <% if (this.data.loaded) { %>
+      <h3>User: <%= this.data.name %></h3>
+      <p>Email: <%= this.data.email %></p>
+      <p $sid="render_time">Rendered at: <%= this.data.render_time %></p>
+    <% } else { %>
+      <p style="color: orange;">⏳ Loading user <%= this.args.user_id %>...</p>
+    <% } %>
+  </div>
+</Define:User_Card>

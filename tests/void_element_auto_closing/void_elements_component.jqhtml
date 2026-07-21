@@ -1,0 +1,45 @@
+<Define:Void_Elements_Component>
+  <div class="void-elements-test">
+    <h2>Testing HTML5 Void Elements</h2>
+
+    <div class="test-section">
+      <h3>Form Input Elements</h3>
+      <input $sid="text_input" type="text" placeholder="Text input">
+      <input $sid="checkbox" type="checkbox">
+      <input $sid="radio" type="radio" name="test">
+    </div>
+
+    <div class="test-section">
+      <h3>Image Element</h3>
+      <img $sid="image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100'%3E%3Crect fill='%23ff0000' width='100' height='100'/%3E%3C/svg%3E" alt="Red square">
+    </div>
+
+    <div class="test-section">
+      <h3>Line Break and Horizontal Rule</h3>
+      <p>Line one<br $sid="line_break">Line two</p>
+      <hr $sid="horizontal_rule">
+    </div>
+
+    <div class="test-section">
+      <h3>Other Void Elements</h3>
+      <meta $sid="meta_tag" name="test" content="value">
+      <link $sid="link_tag" rel="stylesheet" href="#">
+      <area $sid="area_tag" shape="rect" coords="0,0,10,10" alt="Test area">
+      <embed $sid="embed_tag" type="text/plain">
+      <source $sid="source_tag" src="test.mp4" type="video/mp4">
+      <track $sid="track_tag" kind="subtitles" src="test.vtt">
+      <wbr $sid="wbr_tag">
+    </div>
+
+    <div class="test-section">
+      <h3>Table-Specific Void Element (col)</h3>
+      <table>
+        <colgroup>
+          <col $sid="col_tag" style="background-color: red;">
+        </colgroup>
+        <tr><td>Test cell</td></tr>
+      </table>
+    </div>
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Void_Elements_Component>

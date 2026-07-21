@@ -1,0 +1,7 @@
+<Define:Async_Bootable class="async-bootable" style="border: 2px solid orange; padding: 10px;">
+  <div>
+    <h4>Async Component</h4>
+    <p>Status: <%= this.data.loaded ? 'Loaded!' : 'Loading...' %></p>
+    <p>Value: <%= this.data.value || 'N/A' %></p>
+  </div>
+</Define:Async_Bootable>

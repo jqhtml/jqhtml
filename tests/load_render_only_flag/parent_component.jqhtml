@@ -1,0 +1,7 @@
+<Define:Parent_Component>
+  <div class="parent">
+    <h2>Parent: <%= this.data.parent_value %></h2>
+    <Child_A />
+    <Child_B />
+  </div>
+</Define:Parent_Component>

@@ -1,0 +1,42 @@
+<Define:Control_Flow_Test>
+  <div class="test-container">
+    <h2>Control Flow Test</h2>
+
+    <!-- Test 1: Simple if statement -->
+    <div class="test-1">
+      <% if (this.data.show_message) { %>
+        <p>Message is visible!</p>
+      <% } %>
+    </div>
+
+    <!-- Test 2: If-else statement -->
+    <div class="test-2">
+      <% if (this.data.is_admin) { %>
+        <p>Admin user</p>
+      <% } else { %>
+        <p>Regular user</p>
+      <% } %>
+    </div>
+
+    <!-- Test 3: For loop -->
+    <div class="test-3">
+      <ul>
+        <% for (let item of this.data.items) { %>
+          <li><%= item.name %></li>
+        <% } %>
+      </ul>
+    </div>
+
+    <!-- Test 4: Nested if/for -->
+    <div class="test-4">
+      <% if (this.data.items.length > 0) { %>
+        <h3>Items Found</h3>
+        <% for (let i = 0; i < this.data.items.length; i++) { %>
+          <div>Item <%= i + 1 %>: <%= this.data.items[i].name %></div>
+        <% } %>
+      <% } else { %>
+        <p>No items found</p>
+      <% } %>
+    </div>
+  </div>
+</Define:Control_Flow_Test>

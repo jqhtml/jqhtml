@@ -1,0 +1,10 @@
+<Define:Cacheable_Component class="card">
+  <div class="card-body">
+    <% if (this.data.loaded) { %>
+      <p>Item: <%= this.data.name %></p>
+      <p>Email: <%= this.data.email %></p>
+    <% } else { %>
+      <p>Loading...</p>
+    <% } %>
+  </div>
+</Define:Cacheable_Component>

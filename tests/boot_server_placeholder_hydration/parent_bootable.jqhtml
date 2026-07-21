@@ -1,0 +1,8 @@
+<Define:Parent_Bootable class="parent-bootable" style="border: 2px solid blue; padding: 10px; margin: 5px;">
+  <div>
+    <h4>Parent: <%= this.args.title || 'Untitled' %></h4>
+    <div class="parent-content">
+      <%= content() %>
+    </div>
+  </div>
+</Define:Parent_Bootable>

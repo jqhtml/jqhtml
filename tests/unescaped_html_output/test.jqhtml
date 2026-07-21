@@ -1,0 +1,6 @@
+<Define:Test_Unescaped_Html>
+  <div>
+    <h1>Unescaped HTML Output Test</h1>
+    <Html_Output_Component />
+  </div>
+</Define:Test_Unescaped_Html>

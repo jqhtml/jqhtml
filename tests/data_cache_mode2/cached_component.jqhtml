@@ -1,0 +1,12 @@
+<Define:Cached_Component class="cached-component">
+  <% if (this.data.loading) { %>
+    <div class="loading-state">Loading...</div>
+  <% } else { %>
+    <div class="loaded-state">
+      <h2 class="name"><%= this.data.contact ? this.data.contact.name : 'No contact' %></h2>
+      <p class="email"><%= this.data.contact ? this.data.contact.email : '' %></p>
+      <span class="is-class"><%= this.data.contact && this.data.contact.constructor.name === 'Contact_Model' ? 'ES6 Class Restored!' : 'Plain Object' %></span>
+      <span class="timestamp">Loaded at: <%= this.data.loaded_at %></span>
+    </div>
+  <% } %>
+</Define:Cached_Component>

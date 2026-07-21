@@ -1,0 +1,24 @@
+<Define:Parent_Component class="parent-component">
+    <div class="card">
+        <div class="card-header bg-primary text-white">
+            Parent Component
+        </div>
+        <div class="card-body">
+            <p>Parent is invoking Child_Component with two named slots:</p>
+
+            <Child_Component>
+                <Slot:header>
+                    <div class="alert alert-info">
+                        <strong>This is the HEADER slot</strong> from Parent_Component
+                    </div>
+                </Slot:header>
+
+                <Slot:body>
+                    <div class="alert alert-success">
+                        <strong>This is the BODY slot</strong> from Parent_Component
+                    </div>
+                </Slot:body>
+            </Child_Component>
+        </div>
+    </div>
+</Define:Parent_Component>

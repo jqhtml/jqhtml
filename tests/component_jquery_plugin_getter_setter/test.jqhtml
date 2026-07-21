@@ -1,0 +1,5 @@
+<Define:Component_Plugin_Test_Main>
+  <div>
+    <Test_Container />
+  </div>
+</Define:Component_Plugin_Test_Main>

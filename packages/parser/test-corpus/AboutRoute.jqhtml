@@ -1,0 +1,24 @@
+<Define:AboutRoute>
+    <div class="route-content">
+        <% console.log('[AboutRoute Template] this:', this); %>
+        <% console.log('[AboutRoute Template] typeof this:', typeof this); %>
+        <% console.log('[AboutRoute Template] this === undefined:', this === undefined); %>
+        <% console.log('[AboutRoute Template] this === null:', this === null); %>
+        <% console.log('[AboutRoute Template] data param:', data); %>
+        <% console.log('[AboutRoute Template] args param:', args); %>
+        <% if (this && this.data && this.data.content): %>
+            <h2><%= this.data.content.title %></h2>
+            <p><%= this.data.content.description %></p>
+            <p>JQHTML Router provides:</p>
+            <ul>
+                <li>Laravel-style route patterns</li>
+                <li>Nested layouts</li>
+                <li>Route parameters</li>
+                <li>Navigation guards</li>
+                <li>And much more!</li>
+            </ul>
+        <% else: %>
+            <div class="loading">Loading about page...</div>
+        <% endif; %>
+    </div>
+</Define:AboutRoute>

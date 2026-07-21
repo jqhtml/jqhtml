@@ -1,0 +1,16 @@
+<Define:Parent_Component>
+  <% this.data.parent_value = 'DATA_FROM_PARENT'; %>
+  <div class="parent-component">
+    <h2>Parent Component</h2>
+    <p>Parent CID: <span id="parent-cid"><%= this._cid %></span></p>
+    <p>Parent data value: <span id="parent-data"><%= this.data.parent_value %></span></p>
+
+    <Child_Component>
+      <div $sid="element_defined_in_parent" class="content-element">
+        <p><strong>This element was defined in Parent's render function</strong></p>
+        <p>Scoped ID: element_defined_in_parent:<span class="expected-parent-cid"><%= this._cid %></span></p>
+        <p>Accessing parent's this.data: <span class="parent-this-data"><%= this.data.parent_value %></span></p>
+      </div>
+    </Child_Component>
+  </div>
+</Define:Parent_Component>

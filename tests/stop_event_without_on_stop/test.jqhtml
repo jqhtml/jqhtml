@@ -1,0 +1,7 @@
+<Define:Stop_Event_Test_Main>
+  <div>
+    <h1>stop event without on_stop() Test</h1>
+    <Stop_Event_Child $sid="child" />
+    <p id="results"></p>
+  </div>
+</Define:Stop_Event_Test_Main>

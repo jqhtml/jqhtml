@@ -1,0 +1,11 @@
+<Define:Test_Container>
+  <div>
+    <h1>content() Instruction Flattening Test</h1>
+    <Wrapper $sid="wrapper">
+      <Inner />
+      <p>Text content</p>
+      <Inner />
+    </Wrapper>
+    <div $sid="results"></div>
+  </div>
+</Define:Test_Container>

@@ -1,0 +1,7 @@
+<Define:Test_Container>
+  <div class="test-container">
+    <h2>Component Replacement Test</h2>
+    <div $sid="target_element">Initial Content</div>
+    <div $sid="results"></div>
+  </div>
+</Define:Test_Container>

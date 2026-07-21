@@ -1,0 +1,7 @@
+<Define:Test_Root>
+  <div class="test-container">
+    <h1>on_render Child Access Test</h1>
+    <Component_A $sid="component_a" />
+    <div $sid="results" class="results"></div>
+  </div>
+</Define:Test_Root>

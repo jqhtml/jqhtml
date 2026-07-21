@@ -1,0 +1,30 @@
+<!--
+Id_Precedence_Test - Validates $sid takes precedence over id when both present
+
+ELEMENTS:
+  1. Both id and $sid present - $sid should win
+  2. Only $sid present - works normally
+  3. Only id present - passes through unchanged
+-->
+<Define:Id_Precedence_Test>
+  <div>
+    <h3>ID vs $sid Precedence Test</h3>
+
+    <!-- TEST 1: Both attributes present - $sid should take precedence -->
+    <div id="regular_foo" $sid="scoped_bar" class="both-present">
+      Both id="regular_foo" and $sid="scoped_bar"
+    </div>
+
+    <!-- TEST 2: Only $sid present - should work normally -->
+    <div $sid="only_scoped" class="only-scoped">
+      Only $sid="only_scoped"
+    </div>
+
+    <!-- TEST 3: Only regular id present - should pass through unchanged -->
+    <div id="only_regular" class="only-regular">
+      Only id="only_regular"
+    </div>
+
+    <div $sid="results"></div>
+  </div>
+</Define:Id_Precedence_Test>

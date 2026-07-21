@@ -1,0 +1,14 @@
+<!--
+Form_Base - Base class with template
+-->
+<Define:Form_Base class="card">
+  <div class="card-body">
+    <h4>Form Base Template</h4>
+    <p>This template belongs to Form_Base class (parent)</p>
+    <div class="form-group">
+      <label>Sample Field:</label>
+      <input type="text" $sid="field" class="form-control" value="test value" />
+    </div>
+    <p class="text-muted">Base class template rendering</p>
+  </div>
+</Define:Form_Base>

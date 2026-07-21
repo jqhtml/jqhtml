@@ -1,0 +1,18 @@
+<%--
+Size_Cap_Component - leaf component used to drive Jqhtml_Local_Storage.set() through the
+1MB entry-size cap (local-storage.ts ~622-640).
+
+ARGS: (none - cache key comes from cache_id(), not args, so it stays fixed across phases)
+
+DATA:
+    this.data = {tag: 'init'|'small'|'big', length: <serialized payload length>, payload: <string>}
+
+Note: the template deliberately does NOT render this.data.payload into the DOM. That keeps the
+rendered HTML tiny even when this.data.payload is >1MB, which is what lets the test distinguish
+"data" cache mode (caps based on this.data size) from "html" cache mode (caps based on the
+rendered HTML string size).
+--%>
+<Define:Size_Cap_Component>
+  <div $sid="tag"><%= this.data.tag %></div>
+  <div $sid="length"><%= this.data.length %></div>
+</Define:Size_Cap_Component>

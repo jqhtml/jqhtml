@@ -1,0 +1,4 @@
+<!-- Case 1: Overlapping classes (A has "foo bar", B has "foo baz" -> "foo bar baz") -->
+<Define:Class_Overlap_Define class="foo baz">
+  <%= content() %>
+</Define:Class_Overlap_Define>

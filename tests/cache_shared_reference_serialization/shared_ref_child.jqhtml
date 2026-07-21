@@ -1,0 +1,8 @@
+<%--
+Shared_Ref_Child - minimal component whose on_load() assigns the SAME
+array reference to two different this.data keys (a non-circular shared
+reference, i.e. a DAG, not a cycle).
+--%>
+<Define:Shared_Ref_Child>
+  <div></div>
+</Define:Shared_Ref_Child>
