@@ -116,6 +116,32 @@ class UserCard extends Jqhtml_Component {
 - **Only modify `this.data`**
 - No access to child components
 
+### Delaying the first load: gate_load()
+
+Sometimes `on_load()` should wait for something external — an auth token, a
+WebSocket connection, a feature flag. Register one or more promises in
+`on_create()` with `gate_load()`; the component's **first** `on_load()` waits
+until all of them settle. The initial render is not delayed — the component
+paints immediately and loads data once the gates clear.
+
+```javascript
+class AccountPanel extends Jqhtml_Component {
+  on_create() {
+    this.gate_load(window.auth_ready);   // on_load() waits for auth
+  }
+
+  async on_load() {
+    this.data = await fetch('/api/account').then(r => r.json());
+  }
+}
+```
+
+**Rules:**
+- Only affects the first load — `reload()` and `refresh()` do not re-await gates (and calling either while gated releases the wait)
+- Multiple `gate_load()` calls accumulate; all gates are awaited together
+- A rejected gate is logged and the load proceeds anyway
+- Calling `gate_load()` after the first load has started throws
+
 ## 5. on_loaded
 
 Called after `on_load()` completes, on the real component (not a detached proxy). `this.data` is frozen (read-only) here, but `this.$`, `this.state`, and `this.args` are all accessible.
