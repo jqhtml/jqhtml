@@ -23,7 +23,7 @@ import {
   syntaxError,
   getSuggestion
 } from './errors.js';
-import { CodeGenerator } from './codegen.js';
+import { CodeGenerator, VOID_ELEMENTS } from './codegen.js';
 
 export class Parser {
   private tokens: Token[];
@@ -31,12 +31,6 @@ export class Parser {
   private source?: string;
   private filename?: string;
 
-  // HTML5 void elements that cannot have closing tags
-  // These are automatically treated as self-closing
-  private static readonly VOID_ELEMENTS = new Set([
-    'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-    'link', 'meta', 'source', 'track', 'wbr'
-  ]);
 
   constructor(tokens: Token[], source?: string, filename?: string) {
     this.tokens = tokens;
@@ -646,7 +640,7 @@ export class Parser {
     let is_component = tag_name[0] >= 'A' && tag_name[0] <= 'Z';
 
     // Check if this is an HTML5 void element (only for HTML tags, not components)
-    const is_void_element = !is_component && Parser.VOID_ELEMENTS.has(tag_lower);
+    const is_void_element = !is_component && VOID_ELEMENTS.has(tag_lower);
 
     // Parse attributes
     const { attributes, conditionalAttributes } = this.parse_attributes();
