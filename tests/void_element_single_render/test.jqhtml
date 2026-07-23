@@ -1,0 +1,13 @@
+<Define:Void_Element_Single_Render_Main>
+  <div>
+    <h1>Void elements render exactly once</h1>
+    <p $sid="para">line one<br>line two<br>line three</p>
+    <hr>
+    <input type="text" value="x">
+    <img src="data:image/gif;base64,R0lGODlhAQABAAAAACw=" alt="dot">
+    <div $sid="nested">
+      <span>before<br>after</span>
+    </div>
+    <p id="results"></p>
+  </div>
+</Define:Void_Element_Single_Render_Main>

@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## Unreleased
+
+### Fixed
+
+- `<br>` no longer renders doubled. The compiler emitted a stray closing-tag string
+  after every HTML5 void element (`</br>`, `</hr>`, …); browsers parse a stray `</br>`
+  as a second `<br>` element, so every template `<br>` produced a double line break.
+  Closing tags are no longer emitted for the void element set (`area base br col embed
+  hr img input link meta source track wbr`). Regression test:
+  `tests/void_element_single_render`.
+
 ## 2.3.50 (2026-07-21)
 
 First public release on GitHub ([github.com/jqhtml/jqhtml](https://github.com/jqhtml/jqhtml)).

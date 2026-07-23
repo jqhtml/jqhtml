@@ -1,6 +1,15 @@
 // JQHTML Code Generator - Converts AST to JavaScript functions
 // Generates v1-compatible instruction arrays for efficient DOM construction
 
+// HTML5 void elements: no closing tag exists. Emitting one is invalid HTML and
+// actively harmful for <br> - browsers parse a stray </br> as a SECOND <br>
+// element, producing a double line break. Shared with the parser (which uses it
+// to auto-close these tags without requiring /> syntax).
+export const VOID_ELEMENTS = new Set([
+  'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
+  'link', 'meta', 'source', 'track', 'wbr'
+]);
+
 import {
   ASTNode,
   NodeType,
@@ -505,15 +514,19 @@ export class CodeGenerator {
               tag.children.forEach(processNodeForLine);
             }
 
-            // Closing tag might be on a different line
-            const closeTag = `_output.push("</${tag.name}>");`;
-            // For simplicity, put closing tag on the last child's line or same line
-            const closeLine = tag.children && tag.children.length > 0
-              ? (tag.children[tag.children.length - 1].line || node.line)
-              : node.line;
-            const closeIndex = closeLine - 2;
-            if (closeIndex >= 0 && closeIndex < lines.length) {
-              lines[closeIndex] = (lines[closeIndex] || '') + ' ' + closeTag;
+            // Closing tag might be on a different line.
+            // Void elements get NO closing tag - a stray </br> makes browsers
+            // create a second <br> (double line break bug).
+            if (!VOID_ELEMENTS.has(tag.name.toLowerCase())) {
+              const closeTag = `_output.push("</${tag.name}>");`;
+              // For simplicity, put closing tag on the last child's line or same line
+              const closeLine = tag.children && tag.children.length > 0
+                ? (tag.children[tag.children.length - 1].line || node.line)
+                : node.line;
+              const closeIndex = closeLine - 2;
+              if (closeIndex >= 0 && closeIndex < lines.length) {
+                lines[closeIndex] = (lines[closeIndex] || '') + ' ' + closeTag;
+              }
             }
           }
           break;
