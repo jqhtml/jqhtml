@@ -27,7 +27,18 @@ await this.render('counter');
 
 For selective re-rendering of specific elements, see [$redrawable in Scoped IDs](../10-scoped-ids/#selective-re-rendering-with-redrawable).
 
-`redraw()` is an alias for `render()`.
+## redraw()
+
+An alias for `render()` — same arguments, same behavior, same return value.
+
+```javascript
+await this.redraw();          // identical to this.render()
+await this.redraw('counter'); // identical to this.render('counter')
+```
+
+It exists for readability: `redraw()` reads better where the intent is "repaint what is
+already on screen," while `render()` reads better as the counterpart to `on_render()`. Pick
+whichever makes the calling code clearer; there is no behavioral difference to weigh.
 
 ## load()
 
@@ -198,6 +209,7 @@ $('#live-chart').remove();  // Safe to remove DOM
 |--------|-----------------|------------------|-------------|----------|
 | `load()` | Yes | No | No | Re-fetch data only (you control next step) |
 | `render()` | No | Yes | Yes | Re-render with current data |
+| `redraw()` | No | Yes | Yes | Alias for `render()` |
 | `reload()` | Yes | Yes | Conditional* | Refresh data from server |
 | `refresh()` | Yes | Conditional | Conditional | Poll for changes |
 | `ready()` | No | No | No | Wait for full initialization |
@@ -270,7 +282,7 @@ class Dashboard extends Jqhtml_Component {
 - `docs/official/14_lifecycle_complete_specification.md` - Complete method documentation
 
 ### Last Updated
-2026-08-07
+2026-08-19
 
 ### Editorial Notes
 - Focused on the 7 main methods: load, render, reload, refresh, ready, rendered, stop
@@ -285,3 +297,4 @@ class Dashboard extends Jqhtml_Component {
 - 2026-02-20: Added load() method documentation
 - 2026-07-21: Accuracy pass - render() now documented as also invalidating the sticky 'ready' state (matches reload()'s behavior); load()'s "What it does" now notes it calls on_loaded() and triggers 'loaded'; stop() rewritten to describe the fast-path optimization (skips the _Component_Stopped class and stop event when there's no custom on_stop() and no registered 'stop' listener); corrected JqhtmlComponent references to Jqhtml_Component. The `await this.render()` examples were verified against current code and are correct as written - render()/redraw() properly return a promise that resolves after the full render lifecycle.
 - 2026-08-07: Noted that on_viewport_resize() tracks the render/ready columns of the comparison table — the hook is documented in full in chapter 06, so only the interaction with these methods is stated here.
+- 2026-08-19: Promoted `redraw()` from a trailing sentence in the render() section to its own heading and a comparison-table row. It is a true alias with nothing to explain, so the section stays short — the problem was findability, not missing detail.

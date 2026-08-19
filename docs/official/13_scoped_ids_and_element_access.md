@@ -408,6 +408,46 @@ class NestedComponent extends Jqhtml_Component {
 }
 ```
 
+### this.closest() - Find Ancestor Component
+
+`this.closest(selector)` is the component-level counterpart to `this.$.closest()`. Same
+selector syntax, different contract: it returns the nearest ancestor **component instance**,
+or `null`.
+
+```javascript
+class NestedComponent extends Jqhtml_Component {
+  on_ready() {
+    const layout = this.closest('.LayoutComponent');
+    if (layout) {
+      layout.register_child(this);
+    }
+  }
+}
+```
+
+It differs from the jQuery form in three ways:
+
+| | `this.$.closest(sel)` | `this.closest(sel)` |
+|---|---|---|
+| Returns | jQuery object, possibly empty | component instance, or `null` |
+| Starts at | this component's own element | this component's **parent** — never matches itself |
+| Element matches selector but has no component | returned as a plain element | skipped; the walk continues upward |
+
+The third row is the reason to prefer it. `this.$.closest('.LayoutComponent').component()`
+stops at the first element carrying that class — if a plain `<div class="LayoutComponent">`
+sits between the child and the real component, `.component()` yields nothing. The component
+form walks past non-component matches until it finds an actual `Jqhtml_Component`.
+
+The second row matters when a component's own root would match the selector: the jQuery form
+returns itself, the component form does not.
+
+Implementation: `closest()` in `packages/core/src/component.ts`.
+
+**Design caution:** both forms create a child-to-parent dependency. Prefer passing a callback
+down as a `$` attribute. Climbing upward breaks top-down data flow, risks circular
+dependencies, and `await parent.ready()` from a child can deadlock, since the parent's ready
+phase waits on its children. See `08_jquery_integration.md`.
+
 ### this.$.parent() - Direct Parent
 
 ```javascript
@@ -679,7 +719,7 @@ class TableComponent extends Jqhtml_Component {
 4. **Returns jQuery object** - all jQuery methods available
 5. **Works for elements AND components** - use `.component()` to access component instance, or use `this.sid('name')` as a shortcut for `this.$sid('name').component()`
 6. **this.$.find()** - find descendant elements/components
-7. **this.$.closest()** - find ancestor elements/components
+7. **this.$.closest()** - find ancestor elements; **this.closest()** - find ancestor COMPONENT (returns instance or null, skips non-component matches)
 8. **this.$.siblings()** - find sibling elements
 9. **Cache references** for repeated access
 10. **Component-scoped** - prevents ID conflicts between instances

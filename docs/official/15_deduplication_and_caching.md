@@ -244,9 +244,38 @@ derivable from its args at all — one that legitimately takes a function — sh
 1. Component still functions normally; `on_load()` executes as expected
 2. Caching is disabled for that instance — no localStorage reads/writes
 3. Deduplication is disabled — it executes its own `on_load()`
-4. The element is marked `data-nocache="<arg>:<reason>"`
-5. In development, a console warning names the arg, the reason, and the fix
-6. Nothing throws
+4. SSR preload is disabled — preload lookup is keyed by cache key, so a null key can never
+   match a captured entry (see `21_server_side_rendering.md`)
+5. The element is marked `data-nocache="<arg>:<reason>"`
+6. In development, a console warning names the arg, the reason, and the fix
+7. Nothing throws
+
+**Implementation:** content serialization lives in `packages/core/src/cache-key-serializer.ts`.
+It is deliberately SEPARATE from `process_for_serialization()` in `local-storage.ts`, and the
+two must not be merged — they have inverted failure policies. Cache-VALUE serialization is
+permissive: it stores what it can and a lossy round-trip merely costs a re-fetch. Cache-KEY
+serialization must be strict, because a lossy key silently maps two different inputs onto one
+entry. Any future "cleanup" that unifies them reintroduces exactly the false-hit bug the
+decline list exists to prevent.
+
+### Null Keys Are Never Coordination Keys
+
+An un-keyable component yields a `null` invocation key. `Map` accepts `null` as a perfectly
+valid key, so without an explicit guard every un-keyable component on the page would share a
+single coordination entry — and a follower could adopt an unrelated component's data. The
+Load Coordinator therefore short-circuits before touching the registry:
+
+```javascript
+// should_execute_on_load()
+if (key === null) { return true; }      // no identity means no coordination: always load
+
+// register_leader()
+if (key === null) { return () => {}; }  // no-op release handle
+```
+
+This is reachable in normal use whenever a component defines `cache_id()` while its args stay
+un-keyable — the cache path succeeds via `cache_id()` while the dedup path still produces
+`null`. Source: `packages/core/src/load-coordinator.ts`.
 
 **Best practice:** pass plain data. Objects and arrays of primitives are keyed automatically,
 so passing `{parent_type, parent_id}` is fine and preferred over flattening it. Pass ids
@@ -398,6 +427,27 @@ jqhtml.set_cache_key(cache_key);
 ```
 
 **Scope validation:** When `set_cache_key()` is called, the framework checks if the key changed since last page load. If changed, all JQHTML cache entries are automatically cleared (other localStorage data is preserved).
+
+**Framework version is part of the scope.** `set_cache_key()` does not validate against the
+caller's key alone — it composes a scope marker of `<core_version>::<cache_key>` and validates
+against that. Upgrading `@jqhtml/core` therefore changes the scope and clears all JQHTML cache
+entries automatically, without the integrator versioning anything.
+
+This exists because a cache entry written by an older core may not match what the current
+version expects to read back. Clearing on upgrade is cheap — one repopulation from the network
+on first load — while deserializing a stale shape is a silent correctness bug.
+
+Two consequences for the documented convention above:
+
+- The **app build identifier** is still the caller's responsibility. It invalidates on *your*
+  deploys, which the framework knows nothing about.
+- A jqhtml version in the cache key is redundant. `set_cache_key('myapp_v2.3.0_...')` reads as
+  though it refers to the framework; it should identify the application's own build.
+
+The version is deliberately kept in the scope marker rather than in each stored key, so the
+per-entry key format (`jqhtml::<cache_key>::<developer_key>`) stays readable and does not
+repeat the version in every entry. Implementation: `_scope_marker` and `_validate_scope()` in
+`packages/core/src/local-storage.ts`.
 
 ### Cache Entry Size Limit
 

@@ -80,6 +80,13 @@ For user-entered text with line breaks (comments, descriptions, etc.), use `<%br
 - HTML is escaped (safe, like `<%= %>`)
 - Newline characters (`\n`) are converted to `<br />` tags
 
+The compiler emits a call to `jqhtml.escape_html_nl2br(value)`, a public export alongside
+`escape_html()`. Escaping happens FIRST (via `textContent`/`innerHTML`, so it follows the
+browser's own rules), and only then are newlines replaced — which is why the injected
+`<br />` survives while any `<br>` the user typed does not. Both functions are exported from
+`packages/core/src/template-renderer.ts` and can be called directly when building markup
+outside a template.
+
 ```javascript
 this.data.comment_text = "Line 1\nLine 2\nLine 3";
 // Renders as: Line 1<br />Line 2<br />Line 3

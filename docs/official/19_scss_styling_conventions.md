@@ -66,6 +66,47 @@ Renders as:
 
 The wrapper class provides namespace isolation without BEM naming, CSS modules, or build tool configuration.
 
+### Inherited Components Carry the Whole Chain
+
+A component's element receives a class for **every class in its prototype chain**, not just its
+own name. `class Contacts_DataGrid extends DataGrid_Abstract` renders as:
+
+```html
+<div class="Contacts_DataGrid DataGrid_Abstract Component">...</div>
+```
+
+This is the single most useful fact for organizing SCSS around an abstract base: style
+`.DataGrid_Abstract` once and every subclass picks it up, then override per-subclass in
+`.Contacts_DataGrid`. Specificity works in your favor — both are single class selectors, so
+whichever is defined later wins, which means the subclass file should load after the base.
+
+Two details:
+
+- Classes beginning with `_` are filtered out, so internal base classes can be hidden from
+  styling by naming them with a leading underscore.
+- When a component's registered name differs from its JS class name, the registered name is
+  added first as the most specific entry.
+
+Implementation: `_apply_css_classes()` in `packages/core/src/component.ts`.
+
+### Which Classes Survive Component Replacement
+
+Calling `.component()` on an element that already has one replaces it, and the replacement
+strips the old component's classes before applying the new ones. The filter keeps:
+
+| Class | Kept? | Why |
+|---|---|---|
+| `Contacts_DataGrid` | removed | starts uppercase — treated as a component class |
+| `Contacts_DataGrid__header` | **kept** | contains `__` — BEM classes persist by design |
+| `status-active` | **kept** | starts lowercase — a styling class |
+
+This is why the modifier convention below uses lowercase names, and why BEM element classes
+are safe to attach in templates: neither is destroyed when a component is swapped out.
+Uppercase non-component classes on a component's root element are NOT safe — they will be
+stripped on replacement.
+
+Implementation: the setter branch of `component()` in `packages/core/src/jquery-plugin.ts`.
+
 ---
 
 ## File Naming Conventions
@@ -406,6 +447,9 @@ Start with leaf components (no children) and work up to containers. Each migrati
 ---
 
 ## Build-Time Validation
+
+**Not implemented.** This is a suggestion for downstream build tooling, not a jqhtml feature —
+nothing in the framework or the compiler checks SCSS structure today.
 
 Consider adding validation to enforce the wrapper pattern:
 
