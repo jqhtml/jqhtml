@@ -1,0 +1,4 @@
+<%-- No JS class: uses the base Jqhtml_Component, so on_viewport_resize() is the base stub --%>
+<Define:Vr_Plain>
+  plain
+</Define:Vr_Plain>

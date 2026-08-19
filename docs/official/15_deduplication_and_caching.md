@@ -188,40 +188,71 @@ Three identical StatusBadge components: **1 request** instead of 3
 // (But this is rare due to parallel sibling processing)
 ```
 
-**Non-serializable args disable deduplication and caching:**
+**Plain-data object args are keyed by content; anything else is not keyed at all.**
 
-If component args contain non-serializable values (objects with circular references, DOM elements, jQuery objects, component instances, etc.), deduplication and caching are automatically disabled for that component instance.
+Templates rebuild `{parent_id: 12}` on every render, so an object arg can never match by
+identity. Rather than opt such components out of caching, the CACHE keys them by
+deterministic content: two structurally equal objects produce the same key.
+
+The keyable set is deliberately narrow — `null`, `undefined`, booleans, numbers, strings,
+`Date`, arrays, and plain objects (prototype `Object.prototype` or null), nested in any
+combination. Object keys are sorted recursively; array order is preserved; the encoding
+includes each value's shape, so `{a: 1}`, `[1]` and `"1"` cannot collide.
+
+Anything else DECLINES rather than being approximated:
+
+| Reason | Cause |
+|--------|-------|
+| `function` | a function anywhere in the value |
+| `symbol` / `bigint` | a symbol or bigint |
+| `dom-node` / `jquery` | a DOM node or jQuery object |
+| `circular` | a circular reference |
+| `non-plain-object` | a class instance, `Map`, `Set`, `RegExp`, … |
+| `too-large` | serializes to more than 500 bytes |
+| `invalid-date` | an unparseable `Date` |
+| `cache-id-threw` | the component's own `cache_id()` threw |
+
+Declining is not conservatism for its own sake. A serializer that DROPPED a function — as
+`JSON.stringify` silently does — would make two argument objects differing only by a callback
+produce the same key, and the component would render another component's cached content. A
+false cache hit is strictly worse than no caching.
 
 ```javascript
-// This works - primitives are serializable
-<UserCard $user_id=123 $name="John" />
+// Keyed by content - cached, and stable across renders
+<Rows_List $params={parent_type: 'Contact_Model', parent_id: 12} />
+<Picker $ids=[1, 2, 3] />
 
-// This disables caching - component reference is not serializable
-<ChildComponent $parent_component=this />
+// Declines - a callback is real identity that content cannot express
+<Rows_List $params={parent_id: 12, on_select: this.handle} />
 
-// This disables caching - jQuery object has circular references
-<Widget $layout=this.$ />
+// Declines - a class instance; two classes with equal fields would collide
+<Widget $model=contact_model_instance />
 ```
 
-**What happens when args are non-serializable:**
-1. Component still functions normally
-2. `on_load()` executes as expected
-3. Data loading works correctly
-4. **Deduplication is disabled** - each instance executes its own `on_load()`
-5. **Caching is disabled** - no localStorage reads/writes
-6. No errors are thrown - failure is silent
+**Deduplication does NOT use content keys.** It still requires primitive args or an
+author-supplied id. This asymmetry is deliberate: a deduplicated follower never runs
+`on_load()` and adopts the leader's data with no revalidation, so a wrong key there is
+permanently wrong data, while a wrong cache key is corrected on the next revalidation. The
+cost of staying strict is redundant concurrent requests — the cheaper failure.
 
-**When this is acceptable:**
-- Components that don't load data (`on_load()` is empty or trivial)
-- One-off components where caching provides no benefit
-- Intentionally passing component/jQuery references for parent-child communication
+**Overriding identity.** `._jqhtml_cache_id` on the value, or a `jqhtml_cache_id()` method on
+it, always takes precedence over content serialization. A component whose identity is not
+derivable from its args at all — one that legitimately takes a function — should define
+`cache_id()` on the component itself.
 
-**When to avoid:**
-- High-frequency data-loading components
-- Components rendered in lists/grids
-- Scenarios where identical components should share cached data
+**What happens when an arg cannot be keyed:**
+1. Component still functions normally; `on_load()` executes as expected
+2. Caching is disabled for that instance — no localStorage reads/writes
+3. Deduplication is disabled — it executes its own `on_load()`
+4. The element is marked `data-nocache="<arg>:<reason>"`
+5. In development, a console warning names the arg, the reason, and the fix
+6. Nothing throws
 
-**Best practice:** Use primitive values (strings, numbers, booleans) for `$args` whenever possible. For complex object passing, consider passing IDs instead of object references, or accept that caching will be disabled.
+**Best practice:** pass plain data. Objects and arrays of primitives are keyed automatically,
+so passing `{parent_type, parent_id}` is fine and preferred over flattening it. Pass ids
+rather than model instances, and keep callbacks out of objects that also carry data — a
+callback in its own arg still declines the whole component, so use `cache_id()` when a
+component genuinely needs one.
 
 ---
 

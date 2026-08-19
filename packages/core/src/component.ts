@@ -19,8 +19,10 @@ import { Jqhtml_Local_Storage } from './local-storage.js';
 import { event_on, event_once, event_trigger, event_on_registered, event_invalidate } from './component-events.js';
 import { setup_data_property, execute_on_load_detached } from './data-proxy.js';
 import { read_cache_in_create, check_cache_on_reload, write_html_cache_snapshot, write_cache_on_loaded } from './component-cache.js';
+import { debug_attributes_enabled } from './config.js';
 import { Component_Queue } from './component-queue.js';
 import { capture_component_data, is_capture_enabled, consume_preload_data, has_preload_data } from './preload-data.js';
+import { get_viewport_width } from './viewport.js';
 
 // WeakMap storage for protected lifecycle method implementations (Option 2)
 // See docs/internal/lifecycle-method-protection.md for design details
@@ -265,6 +267,24 @@ export class Jqhtml_Component {
   }
 
   /**
+   * Fire on_viewport_resize() with the current viewport width.
+   * Called after every on_render() and on_ready(); the debounced window
+   * listener in viewport.ts drives it from then on. Errors are isolated so a
+   * bad handler cannot break the lifecycle.
+   * @private
+   */
+  private _fire_viewport_resize(): void {
+    try {
+      this.on_viewport_resize(get_viewport_width());
+    } catch (error) {
+      console.error(
+        `[JQHTML] Error in on_viewport_resize() for ${this.component_name()}:`,
+        error
+      );
+    }
+  }
+
+  /**
    * Check if on_load() is overridden in a subclass
    * Used to skip the load phase entirely for components that don't fetch data
    * Returns cached value set in _boot() for O(1) performance
@@ -372,6 +392,7 @@ export class Jqhtml_Component {
             `on_render() must be synchronous code. Remove 'async' from the function declaration.`
           );
         }
+        this._fire_viewport_resize();
       }
 
       // Emit lifecycle event
@@ -597,6 +618,7 @@ export class Jqhtml_Component {
           `on_render() must be synchronous code. Remove 'async' from the function declaration.`
         );
       }
+      this._fire_viewport_resize();
     }
 
     // Emit lifecycle event
@@ -688,6 +710,7 @@ export class Jqhtml_Component {
 
       // Call on_ready hook with authorization
       await this._call_lifecycle('on_ready');
+      this._fire_viewport_resize();
 
       // Trigger ready event
       this.trigger('ready');
@@ -949,9 +972,18 @@ export class Jqhtml_Component {
       return;
     }
 
-    // Generate cache key (needed for both preload check and load deduplication)
+    // TWO identities, deliberately computed separately.
+    //
+    // cache_key  - may key a plain-data object arg by deterministic CONTENT, and may come
+    //              from the author's cache_id(). A wrong key here is corrected by
+    //              stale-while-revalidate.
+    // dedup_key  - args only, no content serialization, no cache_id(). A deduplicated
+    //              follower never runs on_load() and adopts the leader's data with NO
+    //              revalidation, so a wrong key here is permanently wrong data. Redundant
+    //              concurrent requests are the cheaper failure.
     let cache_key: string | null = null;
     let uncacheable_property: string | undefined;
+    let uncacheable_reason: string | undefined;
 
     if (typeof this.cache_id === 'function') {
       try {
@@ -960,13 +992,20 @@ export class Jqhtml_Component {
       } catch (error) {
         // cache_id() threw error - disable caching
         uncacheable_property = 'cache_id()';
+        uncacheable_reason = 'cache-id-threw';
       }
     } else {
-      // Use standard args-based cache key generation
-      const result = Load_Coordinator.generate_invocation_key(this.component_name(), this.args);
+      const result = Load_Coordinator.generate_invocation_key(
+        this.component_name(),
+        this.args,
+        { allow_content_serialization: true }
+      );
       cache_key = result.key;
       uncacheable_property = result.uncacheable_property;
+      uncacheable_reason = result.uncacheable_reason;
     }
+
+    const dedup_key = Load_Coordinator.generate_invocation_key(this.component_name(), this.args).key;
 
     // SSR preload check: if preloaded data exists for this component+args, use it
     if (cache_key !== null && has_preload_data()) {
@@ -990,30 +1029,35 @@ export class Jqhtml_Component {
     // Store cache key for later use
     this._cache_key = cache_key;
 
-    // If cache_key is null, args are not serializable - skip load deduplication and caching
-    if (cache_key === null) {
-      // Set data-nocache attribute for debugging (shows which property prevented caching)
-      if (uncacheable_property) {
-        this.$.attr('data-nocache', uncacheable_property);
-      }
+    // Caching disabled - mark the element with the offending arg AND why
+    if (cache_key === null && uncacheable_property) {
+      this.$.attr(
+        'data-nocache',
+        uncacheable_reason ? `${uncacheable_property}:${uncacheable_reason}` : uncacheable_property
+      );
 
       if ((window as any).jqhtml?.debug?.verbose) {
         console.log(
-          `[Cache] Component ${this._cid} (${this.component_name()}) has non-serializable args - load deduplication and caching disabled`,
-          { uncacheable_property }
+          `[Cache] Component ${this._cid} (${this.component_name()}) has non-keyable args - caching disabled`,
+          { uncacheable_property, uncacheable_reason }
         );
       }
-
-      // Execute on_load on detached proxy without deduplication
-      const { data: result_data } = await this._execute_on_load_detached();
-
-      // Apply result via sequential queue
-      await this._apply_load_result(result_data, null);
-      return;
     }
 
     // Store "before" snapshot for comparison after on_load()
     const data_before_load = JSON.stringify(this.data);
+
+    // No dedup identity - run on_load() alone rather than risk sharing a load
+    if (dedup_key === null) {
+      if ((window as any).jqhtml?.debug?.verbose) {
+        console.log(
+          `[Load Deduplication] Component ${this._cid} (${this.component_name()}) has no dedup key - loading independently`
+        );
+      }
+      const { data: result_data } = await this._execute_on_load_detached();
+      await this._apply_load_result(result_data, data_before_load);
+      return;
+    }
 
     // Check if this component should execute on_load() or wait for existing request
     const should_execute = Load_Coordinator.should_execute_on_load(this);
@@ -1216,6 +1260,7 @@ export class Jqhtml_Component {
     await this._wait_for_children_ready();
 
     await this._call_lifecycle('on_ready');
+    this._fire_viewport_resize();
 
     this._ready_state = 4;
     this._update_debug_attrs();
@@ -1486,6 +1531,7 @@ export class Jqhtml_Component {
       this._render();
       await this._wait_for_children_ready();
       await this._call_lifecycle('on_ready');
+      this._fire_viewport_resize();
       this.trigger('ready');
 
       this._log_lifecycle('reload', 'complete (no on_load)');
@@ -1571,6 +1617,7 @@ export class Jqhtml_Component {
     if (rendered_from_cache || should_render) {
       await this._wait_for_children_ready();
       await this._call_lifecycle('on_ready');
+      this._fire_viewport_resize();
       // Trigger ready event so parent callbacks fire on subsequent reloads
       this.trigger('ready');
     }
@@ -1671,6 +1718,17 @@ export class Jqhtml_Component {
   on_loaded(): void | Promise<void> {}  // Override to process loaded data (e.g., clone this.data to this.state)
   async on_ready(): Promise<void> {}
   on_stop(): void {}
+
+  /**
+   * Called with the viewport width in CSS pixels:
+   *   - after every on_render()
+   *   - after every on_ready()
+   *   - on window resize, debounced 30ms, for every component in the document
+   *
+   * MUST be synchronous. Prefer CSS media/container queries for pure styling -
+   * override this only when layout requires imperative measurement.
+   */
+  on_viewport_resize(viewport_width: number): void {}
 
   /**
    * Optional: Override cache key generation
@@ -2105,8 +2163,13 @@ export class Jqhtml_Component {
   }
 
   private _set_attributes(): void {
-    // Always set data-cid
-    this.$.attr('data-cid', this._cid);
+    // data-cid on the rendered element is debug-only: it mirrors this._cid so component
+    // boundaries are legible in DevTools. The runtime never reads it - scoping uses the
+    // _cid property, and the transient data-cid placeholder the instruction processor
+    // matches on is written and removed before this ever runs.
+    if (debug_attributes_enabled()) {
+      this.$.attr('data-cid', this._cid);
+    }
 
     // Only set lifecycle state attribute if verbose mode enabled
     if ((window as any).jqhtml?.debug?.verbose) {

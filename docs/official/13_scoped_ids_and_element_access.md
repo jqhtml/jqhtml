@@ -39,7 +39,10 @@ Use `$sid` instead of `id` to get component-scoped IDs:
 
 **Note**: `$sid` can only be used on descendant elements/components within the template body - not on the `<Define:...>` tag itself. Component definitions cannot have scoped IDs (the compiler throws a syntax error: `$sid is not allowed in <Define:> tags. Component definitions cannot have scoped IDs.`).
 
-**Rendered HTML** (for three instances):
+**Rendered HTML** (for three instances). `data-cid` and `data-sid` below are debug mirrors,
+present in development only — the scoped `id` is what `$sid()` resolves against. See
+`20_runtime_configuration.md`.
+
 ```html
 <!-- Instance 1 -->
 <div class="UserCard Component" data-cid="c123">

@@ -170,9 +170,12 @@ If using any named slots, all content must be in slots:
 
 ```jqhtml
 <Define:UserDashboard>
-  <Header $title="Users">
-    <button @click=this.add_user>Add User</button>
-  </Header>
+  <PageHeader>
+    <Slot:title>Users</Slot:title>
+    <Slot:actions>
+      <button @click=this.add_user>Add User</button>
+    </Slot:actions>
+  </PageHeader>
 
   <UserTable $users=this.data.users>
     <Slot:header>
@@ -184,13 +187,18 @@ If using any named slots, all content must be in slots:
     <Slot:row>
       <td><%= row.id %></td>
       <td><%= row.name %></td>
-      <td><button>Edit</button></td>
+      <td><UserRowActions $user_id=row.id /></td>
     </Slot:row>
   </UserTable>
 </Define:UserDashboard>
 ```
 
 The `<Slot:header>` content renders where `content('header')` is called. The `<Slot:row>` content renders for each iteration, with `row` available because the slot is named `row`.
+
+Note what the page template does *not* contain: no layout classes, no repeated button
+markup, no title styling. `PageHeader` owns the header's arrangement and `UserRowActions`
+owns the per-row controls, so this template reads as a list of concepts. That is the
+practice covered in [Semantic Design](../17-semantic-design/).
 
 ## Slot-Based Inheritance
 
@@ -250,7 +258,7 @@ Most components (95%) only need `content()`. Use slots when you need multiple di
 - `docs/official/06_slot_system.md` - Named slots and inheritance
 
 ### Last Updated
-2026-07-21
+2026-08-18
 
 ### Editorial Notes
 - Started with simple content() before introducing slots
@@ -259,4 +267,5 @@ Most components (95%) only need `content()`. Use slots when you need multiple di
 - "All or nothing" rule is important gotcha
 - Slot forwarding omitted - too advanced for main docs
 - Server-rendered _inner_html omitted - covered in server integration chapter
+- 2026-08-18: Revised the "Complex Example" to demonstrate semantic composition while still teaching slots. `<Header $title="Users">` became `<PageHeader>` with `<Slot:title>`/`<Slot:actions>` (the title is authored content, so it belongs in a slot, not an argument), and the inline `<button>Edit</button>` in the row slot became `<UserRowActions $user_id=row.id />`. The slot lesson is unchanged — the example now uses one more slotted component instead of one fewer. Left alone: the `Panel`/`Card`/`DataTable` definitions earlier in the chapter, which teach `content()` and named-slot mechanics and already own their own look inside their `<Define:>` blocks.
 - 2026-07-21: Accuracy pass - softened the "inheritance chains must match" note; the framework does not actually validate/enforce this, it silently resolves via independent chain walks instead of erroring.

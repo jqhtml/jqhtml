@@ -196,6 +196,7 @@ Use the `$sid` attribute for component-scoped element IDs:
 **Key behaviors:**
 - Scoping uses the PARENT component's `_cid`
 - Child components get scoped IDs using their parent's `_cid`, not their own `data-cid`
+- `data-sid`/`data-cid` above are debug mirrors, absent in production (see Runtime Configuration) — the scoped `id` is what resolves
 - Regular `id` attributes pass through unchanged
 - When both `id` and `$sid` are present, `$sid` takes precedence
 
@@ -269,6 +270,13 @@ class My_Component extends Jqhtml_Component {
   on_stop() {
     // Cleanup: timers, intervals, listeners. Synchronous.
     clearInterval(this.state.update_interval);
+  }
+
+  on_viewport_resize(viewport_width) {
+    // window.innerWidth, delivered after every on_render(), after every
+    // on_ready(), and on window resize (debounced 30ms). Synchronous.
+    // Never bind $(window).on('resize') yourself.
+    this.$.toggleClass('is_narrow', viewport_width < 768);
   }
 }
 ```
@@ -383,7 +391,9 @@ this.sid('name')  // Get child component instance by scoped ID
 
 `redraw()` is an alias for `render()`.
 
-**Synchronous requirements:** `on_create()`, `on_render()`, `on_stop()`, `stop()` MUST be sync. `on_load()`, `on_loaded()`, `on_ready()` CAN be async.
+**Synchronous requirements:** `on_create()`, `on_render()`, `on_stop()`, `on_viewport_resize()`, `stop()` MUST be sync. `on_load()`, `on_loaded()`, `on_ready()` CAN be async.
+
+**`on_viewport_resize(viewport_width)`** - Not a lifecycle stage; a notification. Fires after every `on_render()`, after every `on_ready()`, and on window resize (debounced 30ms) for every component in the document. The argument is `window.innerWidth` in CSS pixels - it agrees with CSS media queries; for the component's own width use `this.$.width()`. Detached and stopped components are skipped, and a handler that throws is logged without stopping the fan-out. Prefer CSS media/container queries; use this only when layout needs real measurement (canvas sizing, chart redraw, virtual scroll windowing, text truncation).
 
 **Invocation/hook pattern:** you call the unprefixed method (`render()`, `load()`); the framework runs your `on_` hook (`on_render()`, `on_load()`).
 
@@ -489,7 +499,49 @@ One-shot: gates apply only to the first load; `reload()`/`refresh()`/`stop()` re
 
 `this.$.shallowFind(selector)` — framework-added jQuery method that searches downward but stops descending at the first match on each branch (unlike `.find()`, which recurses fully). Useful for finding direct child regions without reaching into nested components.
 
+### Runtime Configuration
+
+Integration-level settings the host app supplies at load. Distinct from `jqhtml.debug`
+(a developer's interactive tracing switch) — this describes the ENVIRONMENT the app runs in.
+
+```javascript
+jqhtml.init($, { mode: 'production' });   // or jqhtml.configure({ mode: 'production' })
+jqhtml.get_config();                       // read resolved settings
+```
+
+`mode` is `'development'` (default) or `'production'`, and sets defaults for every flag;
+an explicit flag in the same call overrides that default. Passing nothing keeps current
+behavior — production is always opt-in.
+
+| Flag | dev | prod | Effect |
+|------|-----|------|--------|
+| `warn_uncacheable_args` | on | off | Warns when a component with a custom `on_load()` gets a non-serializable arg AND defines no `cache_id()` — it still works but silently loses cache reuse and load deduplication |
+| `debug_attributes` | on | off | Emits `data-sid` and `data-cid` — debug mirrors of the scoped `id="<sid>:<cid>"` and of `_cid` |
+
+Both are inspection-only: `$sid()` resolves through the scoped `id` and scoping uses the
+`_cid` property, so suppressing them changes nothing functional. **Do not write selectors
+against either.** The *transient* `data-cid` the instruction processor uses to correlate
+freshly-injected HTML with component data is a separate, functional thing — written and
+removed during rendering, and never suppressed.
+
+Configure before components boot; `debug_attributes` is read during rendering.
+
+**Full documentation:** `/docs/official/20_runtime_configuration.md`
+
 ### Caching (Stale-While-Revalidate)
+
+**Cache keys from plain data.** A component's cache key is its name plus its args. Primitives
+and plain data (objects/arrays of primitives, nested freely) are keyed by deterministic
+CONTENT, so `$params={parent_id: 12}` rebuilt on every render still hits the same entry.
+Functions, class instances, DOM/jQuery objects, circular structures and values over 500 bytes
+DECLINE instead — the element is marked `data-nocache="<arg>:<reason>"` and dev mode warns.
+Declining is deliberate: a serializer that dropped a callback would let two different args
+share a key and serve the wrong cached content.
+
+**Deduplication is stricter than caching** and does NOT use content keys — it needs primitive
+args or an author-supplied id. A deduplicated follower skips `on_load()` entirely with no
+revalidation, so a wrong key there is permanently wrong data; redundant requests are the
+cheaper failure.
 
 Opt-in localStorage caching. Enable with `jqhtml.set_cache_key('myapp_v1.2.3_user_456')` — the key should include app build hash + user ID (cache auto-clears when it changes). Behavior: cache hit → instant render → `on_load()` revalidates in background → re-render if changed.
 

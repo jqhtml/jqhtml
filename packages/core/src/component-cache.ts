@@ -10,6 +10,7 @@
 
 import { Load_Coordinator } from './load-coordinator.js';
 import { Jqhtml_Local_Storage } from './local-storage.js';
+import { warn_uncacheable_args_enabled } from './config.js';
 
 /**
  * Result of generating a cache key for a component.
@@ -17,6 +18,7 @@ import { Jqhtml_Local_Storage } from './local-storage.js';
 interface Cache_Key_Result {
   cache_key: string | null;
   uncacheable_property?: string;
+  uncacheable_reason?: string;
 }
 
 /**
@@ -32,13 +34,90 @@ export function generate_cache_key(component: any): Cache_Key_Result {
       const custom_cache_id = component.cache_id();
       return { cache_key: `${component.component_name()}::${String(custom_cache_id)}` };
     } catch (error) {
-      return { cache_key: null, uncacheable_property: 'cache_id()' };
+      return { cache_key: null, uncacheable_property: 'cache_id()', uncacheable_reason: 'cache-id-threw' };
     }
   }
 
-  // Use standard args-based cache key generation
-  const result = Load_Coordinator.generate_invocation_key(component.component_name(), component.args);
-  return { cache_key: result.key, uncacheable_property: result.uncacheable_property };
+  // Standard args-based key. The CACHE opts into content serialization for plain-data
+  // object args; deduplication does not - see InvocationKeyOptions for why.
+  const result = Load_Coordinator.generate_invocation_key(
+    component.component_name(),
+    component.args,
+    { allow_content_serialization: true }
+  );
+  return {
+    cache_key: result.key,
+    uncacheable_property: result.uncacheable_property,
+    uncacheable_reason: result.uncacheable_reason,
+  };
+}
+
+// One warning per component+property. A list of 50 rows must not print 50 warnings.
+const _warned_uncacheable = new Set<string>();
+
+/**
+ * Development warning: this component fetches data but cannot be cached, because
+ * its args do not reduce to a stable key and it defines no cache_id() to say what
+ * its identity is. Nothing is broken - the component works - but it silently opts
+ * out of cache reuse and of load deduplication.
+ *
+ * Controlled by the `warn_uncacheable_args` integration flag (see config.ts).
+ */
+function warn_uncacheable_component(
+  component: any,
+  uncacheable_property?: string,
+  uncacheable_reason?: string
+): void {
+  if (!warn_uncacheable_args_enabled()) return;
+
+  let name = 'unknown';
+  try { name = component.component_name(); } catch { /* name unavailable */ }
+
+  const dedupe_key = `${name}::${uncacheable_property || '?'}::${uncacheable_reason || '?'}`;
+  if (_warned_uncacheable.has(dedupe_key)) return;
+  _warned_uncacheable.add(dedupe_key);
+
+  // cache_id() exists but threw - a different problem with a different fix
+  if (uncacheable_property === 'cache_id()' || uncacheable_reason === 'cache-id-threw') {
+    console.warn(
+      `[JQHTML] <${name}> defines cache_id() but it threw, so this component is not cached ` +
+      `and its loads are not deduplicated. Fix cache_id() so it returns a stable string.`,
+      { component: name, cid: component._cid }
+    );
+    return;
+  }
+
+  const REASONS: Record<string, string> = {
+    'function': 'it contains a function - a callback is real identity that content cannot express',
+    'symbol': 'it contains a symbol',
+    'bigint': 'it contains a bigint',
+    'dom-node': 'it contains a DOM node',
+    'jquery': 'it contains a jQuery object',
+    'circular': 'it contains a circular reference',
+    'non-plain-object': 'it contains a class instance, Map, Set or similar - only plain objects and arrays can be keyed by content',
+    'too-large': 'it serializes to more than 500 bytes - args are meant to identify data, not carry it',
+    'invalid-date': 'it contains an invalid Date',
+  };
+  const why = REASONS[uncacheable_reason || ''] || 'it cannot be serialized deterministically';
+
+  console.warn(
+    `[JQHTML] <${name}> cannot be cached: arg $${uncacheable_property} is not keyable because ` +
+    `${why}.\n` +
+    `  The component works, but it will not be restored from cache when reused.\n` +
+    `  Fix: define cache_id() on the component to state its identity explicitly, e.g.\n` +
+    `    cache_id() { return \`${name.toLowerCase()}_\${this.args.some_id}\`; }\n` +
+    `  Or pass plain data (objects/arrays of primitives are keyed automatically) instead of ` +
+    `$${uncacheable_property}.\n` +
+    `  Find it in DevTools with the selector ` +
+    `[data-nocache="${uncacheable_property}:${uncacheable_reason || ''}"].`,
+    {
+      component: name,
+      cid: component._cid,
+      uncacheable_arg: uncacheable_property,
+      reason: uncacheable_reason,
+      all_args: component.args ? Object.keys(component.args) : [],
+    }
+  );
 }
 
 /**
@@ -48,14 +127,20 @@ export function generate_cache_key(component: any): Cache_Key_Result {
  * @param component - The component instance
  */
 export function read_cache_in_create(component: any): void {
-  const { cache_key, uncacheable_property } = generate_cache_key(component);
+  const { cache_key, uncacheable_property, uncacheable_reason } = generate_cache_key(component);
 
   // If cache_key is null, caching disabled
   if (cache_key === null) {
     // Set data-nocache attribute for debugging
     if (uncacheable_property) {
-      component.$.attr('data-nocache', uncacheable_property);
+      // "<arg>:<reason>" - a bare property name left authors reverse-engineering why
+      component.$.attr(
+        'data-nocache',
+        uncacheable_reason ? `${uncacheable_property}:${uncacheable_reason}` : uncacheable_property
+      );
     }
+
+    warn_uncacheable_component(component, uncacheable_property, uncacheable_reason);
 
     if ((window as any).jqhtml?.debug?.verbose) {
       console.log(

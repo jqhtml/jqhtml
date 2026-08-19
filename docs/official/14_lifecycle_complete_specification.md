@@ -1054,7 +1054,7 @@ class LiveChart extends Jqhtml_Component {
     }
 
     // Unregister external listeners
-    $(window).off('resize', this.handle_resize);
+    $(window).off('scroll', this.handle_scroll);
   }
 }
 
@@ -1231,6 +1231,101 @@ Developer-callable methods invoke their corresponding `on_` hooks:
 **Note:** `redraw()` is an alias for `render()`
 
 **\*`refresh()` calls `on_ready()`/redraws DOM conditionally:** Only if the data changed after `on_load()` compared to the last-rendered data. If no render occurs, `on_ready()` is NOT called.
+
+---
+
+## Viewport Resize - on_viewport_resize()
+
+**Signature**: `on_viewport_resize(viewport_width: number): void`
+
+The only lifecycle hook that is not tied to a single point in the lifecycle. It is a
+notification: "the viewport is this wide right now."
+
+```javascript
+class Sales_Chart extends Jqhtml_Component {
+  on_viewport_resize(viewport_width) {
+    // Canvas needs pixel dimensions - CSS alone cannot do this
+    const canvas = this.$sid('canvas')[0];
+    canvas.width = this.$.width();
+    canvas.height = viewport_width < 768 ? 160 : 320;
+    this.draw();
+  }
+}
+```
+
+### When It Fires
+
+Three times, all driven by the framework. You never bind a window listener yourself.
+
+| Trigger | Timing |
+|---------|--------|
+| After `on_render()` | Immediately after `on_render()` returns, on every render |
+| After `on_ready()` | Immediately after `on_ready()` returns, on every ready |
+| Window resize | Debounced 30ms, on every component in the document |
+
+The two lifecycle calls exist so that a component's sizing logic lives in exactly one
+place. Without them you would write the same code twice - once in `on_ready()` for the
+initial layout, once in the resize handler for subsequent layouts.
+
+Because the hook fires after `on_render()`, it runs before children are ready. If your
+sizing logic depends on children, do the work from the `on_ready()` call instead - guard
+on `this._ready_state >= 4` or simply tolerate the earlier call.
+
+### The Argument
+
+`viewport_width` is `window.innerWidth`: the viewport width in CSS pixels, **including**
+the scrollbar gutter. This is the width CSS media queries resolve against, so a
+`viewport_width < 768` check in JavaScript agrees with `@media (max-width: 767px)` in SCSS.
+
+It is the element's *container* that is usually interesting for component-level layout,
+and that is available as `this.$.width()` at any time. The argument is the viewport, not
+the component.
+
+### Dispatch Rules
+
+On resize the framework walks `$('.Component')` in document order (parents before
+children) and calls the hook on each live instance.
+
+- **Detached components are skipped** - a component not in the document is not found by
+  the walk. It receives the hook again on its next render or ready.
+- **Stopped components are skipped** - checked explicitly, so a stopped component whose
+  element is still in the DOM receives nothing.
+- **Errors are isolated** - a component that throws is logged to the console and the walk
+  continues. One broken handler cannot stop the rest of the page from resizing.
+- **30ms trailing debounce** - a drag-resize produces one call per component after the
+  drag settles, not one per frame. The debounce is shared: all components are dispatched
+  from a single listener in the same tick.
+
+### Rules
+
+**Must be synchronous.** Like `on_render()` and `on_stop()`. Do not make it `async`.
+
+**Must be cheap.** It runs once per component per resize. Reading layout properties
+(`offsetWidth`, `getBoundingClientRect()`) and then writing styles forces synchronous
+reflow; on a page with many components that adds up. Prefer writing a class and letting
+CSS do the work.
+
+**Not protected from manual invocation.** Unlike the other `on_*` hooks, calling
+`this.on_viewport_resize(w)` yourself does not throw. The hook has no lifecycle
+invariants to violate.
+
+### Prefer CSS
+
+This hook is an escape hatch, not the primary way to be responsive. Reach for CSS first:
+
+```scss
+.Sales_Chart {
+  @media (max-width: 767px) { flex-direction: column; }
+}
+```
+
+Use `on_viewport_resize()` when layout genuinely requires JavaScript measurement:
+
+- Sizing a `<canvas>` or WebGL surface (pixel dimensions are not a CSS concern)
+- Redrawing a chart that computes its own scales
+- Virtual scroll windowing - how many rows fit
+- Measuring rendered text to decide truncation or tooltip placement
+- Repositioning an absolutely-positioned popover against a moved anchor
 
 ---
 
@@ -1835,6 +1930,21 @@ this.trigger('saved');
 this.trigger('selected', { item_id: 123, item_name: 'Widget' });
 ```
 
+**Dispatch semantics:** `trigger()` dispatches to a **snapshot** of the handlers
+registered at the moment it was called. Every one of them is invoked exactly once for
+that trigger, in registration order, and a handler that deregisters itself during
+dispatch (which is exactly what `.once()` does) does not affect delivery to the others.
+
+Two consequences worth knowing:
+
+- Any number of `.once()` handlers can be pending on the same event. All of them fire on
+  the next trigger. Two independent code paths can each
+  `await new Promise(r => component.once('ready', r))` and both promises resolve.
+- A handler registered *during* a dispatch is not part of that dispatch's snapshot. It
+  does not miss the event, though: `trigger()` marks the event as occurred before
+  dispatching, so `.on()`/`.once()` registered from inside a handler take the sticky
+  immediate-fire path instead.
+
 #### on(event_name, callback)
 
 Registers a callback for an event. Callback signature: `(component, data?) => void`
@@ -1986,9 +2096,12 @@ class UserList extends Jqhtml_Component {
 - Custom application events where fire-if-already-occurred is helpful
 
 **Use jQuery DOM events (`this.$.trigger()`, `this.$.on()`) for:**
-- Actual DOM events (click, submit, resize)
+- Actual DOM events (click, submit, scroll)
 - jQuery plugin integration
 - Events that need to bubble through the DOM
+
+**Do not bind `$(window).on('resize')` yourself** - override `on_viewport_resize()`
+instead. The framework already runs one debounced window listener for the whole page.
 
 ---
 

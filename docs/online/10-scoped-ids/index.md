@@ -41,6 +41,10 @@ Use `$sid` instead of `id`:
 
 Each instance gets unique IDs: `title:c123`, `title:c456`, `title:c789`.
 
+The `data-sid` and `data-cid` attributes are debug mirrors for reading the DOM in DevTools.
+They are absent when jqhtml runs in production mode, and nothing resolves through them — the
+scoped `id` does the work. Never write selectors against them.
+
 ## Accessing Elements: this.$sid()
 
 Access scoped elements with `this.$sid()`:
@@ -306,9 +310,12 @@ this.$sid('row2').addClass('table-row');
 - `docs/official/13_scoped_ids_and_element_access.md` - Complete element access guide
 
 ### Last Updated
-2026-07-21
+2026-08-19
 
 ### Editorial Notes
+- 2026-08-19: Noted that `data-sid`/`data-cid` in the rendered example are debug mirrors absent
+  in production. The example is development-accurate, but without the note a reader would
+  reasonably assume the attributes are stable API and write selectors against them.
 - Focused on the practical "how to use" over internal mechanisms
 - Showed common patterns: forms, dynamic updates, images
 - this.sid() vs this.$sid() distinction important

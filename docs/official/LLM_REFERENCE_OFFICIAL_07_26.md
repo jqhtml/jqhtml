@@ -160,10 +160,19 @@ Full order: `create` → `render` → `on_render` → `load` → (`on_loaded`) �
 | `on_loaded()` | Yes | After `on_load()` completes, on the real component: `this.data` frozen, `this.$`/`this.state`/`this.args` accessible. Use to clone `this.data` into `this.state` for local manipulation |
 | `on_ready()` | Yes | All children guaranteed ready, safe to hook/initialize |
 | `on_stop()` | No | Cleanup (timers, connections) |
+| `on_viewport_resize(width)` | No | Viewport width changed. Fires after every `on_render()`, after every `on_ready()`, and on window resize (debounced 30ms, dispatched to every component in the document) |
 
 **Key timing differences:**
 - `on_render()` - Child components exist in DOM but have NOT completed their lifecycle
 - `on_ready()` - All child components have completed `on_ready()` themselves (bottom-up)
+
+**`on_viewport_resize(viewport_width)`** — the argument is `window.innerWidth` (CSS pixels,
+includes scrollbar gutter, agrees with CSS media queries); for the component's own width use
+`this.$.width()`. NEVER bind `$(window).on('resize')` in a component — the framework owns one
+debounced listener for the whole page, so there is nothing to unbind. Detached and stopped
+components are skipped; a handler that throws is logged and the fan-out continues. Must be
+synchronous. Prefer CSS media/container queries; use this hook only when layout needs real
+measurement (canvas sizing, chart redraw, virtual scroll windowing, text truncation).
 
 ### this.data Freeze Cycle
 
@@ -356,7 +365,29 @@ jqhtml.set_cache_key('myapp_v1.2.3_user_456');           // 'data' mode (default
 jqhtml.set_cache_key('myapp_v1.2.3_user_456', 'html');   // caches rendered HTML, can skip template execution
 ```
 
-The key should include app build hash + user ID (cache auto-clears when it changes). Behavior on cache hit: instant render → `on_load()` revalidates in background → re-render if changed. Per-component cache identity is component name + `this.args`; override with a `cache_id()` method when args don't capture what matters.
+The key should include app build hash + user ID (cache auto-clears when it changes; the core version is also folded into the scope, so a jqhtml upgrade invalidates too). Behavior on cache hit: instant render → `on_load()` revalidates in background → re-render if changed. Per-component cache identity is component name + `this.args`; override with a `cache_id()` method when args don't capture what matters.
+
+**Which args can be keyed.** Primitives, plus plain data — objects and arrays of primitives, nested freely — which are keyed by CONTENT (keys sorted recursively, array order preserved, shape encoded). So `$params={parent_id: 12}` caches fine even though the template rebuilds it every render. Declined, with the element marked `data-nocache="<arg>:<reason>"`: a function anywhere in the value, a class instance / `Map` / `Set` / `RegExp`, a DOM node or jQuery object, a circular reference, or more than 500 bytes. Declining is deliberate — dropping a callback (as `JSON.stringify` does) would let two different args share a key and serve the wrong cached content.
+
+**Deduplication is stricter than caching** and does NOT use content keys: it still needs primitive args or an author-supplied id. A deduplicated follower never runs `on_load()` and adopts the leader's data with no revalidation, so a wrong key there is permanently wrong data.
+
+## Runtime Configuration
+
+A host app declares its environment when jqhtml loads. Distinct from `jqhtml.debug`, which is an interactive tracing switch.
+
+```javascript
+jqhtml.init($, { mode: 'production' });   // or jqhtml.configure({ mode: 'production' })
+jqhtml.get_config();                     // read resolved settings
+```
+
+`mode` is `'development'` (default) or `'production'` and sets defaults for every flag; an explicit flag overrides its mode default. Passing nothing keeps current behavior — production is opt-in.
+
+| Flag | dev | prod | Effect |
+|------|-----|------|--------|
+| `warn_uncacheable_args` | on | off | Warns once per component+arg when a data-loading component gets an unkeyable arg and defines no `cache_id()` |
+| `debug_attributes` | on | off | Emits `data-sid` and `data-cid` — debug mirrors of the scoped `id="<sid>:<cid>"` and of `_cid` |
+
+`$sid()` resolves via the scoped `id` and scoping uses the `_cid` property, so neither debug attribute is read by the runtime and production drops both. **Never write selectors against `data-sid` or `data-cid`.**
 
 ## SSR
 

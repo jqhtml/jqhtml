@@ -293,6 +293,48 @@ Children's `on_ready()` always completes before parent's `on_ready()`.
 | on_loaded | Yes | Yes | Read only |
 | on_ready | Yes | Yes | Read only |
 | on_stop | No | Yes | Read only |
+| on_viewport_resize | No | Yes | Read only |
+
+## on_viewport_resize
+
+Called with the viewport width in CSS pixels. Unlike the other hooks it is not tied to a single point in the lifecycle — it is a notification that fires:
+
+- after every `on_render()`
+- after every `on_ready()`
+- whenever the window resizes, debounced 30 ms
+
+```javascript
+class SalesChart extends Jqhtml_Component {
+  on_viewport_resize(viewport_width) {
+    const canvas = this.$sid('canvas')[0];
+    canvas.width = this.$.width();
+    canvas.height = viewport_width < 768 ? 160 : 320;
+    this.draw();
+  }
+}
+```
+
+The two lifecycle calls mean sizing logic lives in one place. Without them you would write it twice — once in `on_ready()` for the initial layout, once in a resize handler for every layout after that.
+
+**Never bind `$(window).on('resize')` yourself.** The framework runs one debounced listener for the whole page and fans out to every component in the document. There is nothing to unbind: a component that is stopped or removed from the document simply stops being called.
+
+**The argument is the viewport, not the component.** `viewport_width` is `window.innerWidth`, including the scrollbar gutter, so a `viewport_width < 768` check agrees with `@media (max-width: 767px)`. For the component's own width use `this.$.width()`.
+
+**Must be synchronous**, like `on_render()` and `on_stop()`. It runs once per component per resize, so keep it cheap.
+
+A component that throws from this hook is logged to the console; the other components on the page still receive their call.
+
+### Prefer CSS
+
+This is an escape hatch. Reach for CSS first:
+
+```scss
+.SalesChart {
+  @media (max-width: 767px) { flex-direction: column; }
+}
+```
+
+Override `on_viewport_resize()` only when layout genuinely needs JavaScript measurement — sizing a `<canvas>`, redrawing a chart that computes its own scales, deciding how many rows fit in a virtual scroll, measuring text to truncate it, or repositioning a popover against a moved anchor.
 
 ## on_stop
 
@@ -438,7 +480,7 @@ class InvoiceEditor extends Jqhtml_Component {
 - `docs/official/14_lifecycle_complete_specification.md` - Complete lifecycle specification
 
 ### Last Updated
-2026-07-21
+2026-08-07
 
 ### Editorial Notes
 - Focused on the practical "what goes where" rather than internal mechanisms
@@ -447,6 +489,7 @@ class InvoiceEditor extends Jqhtml_Component {
 - Kept state management brief since it has dedicated chapter (07)
 - 2026-03-06: Added lifecycle truncation flags section (_load_only, _load_render_only)
 - 2026-07-21: Added on_loaded() as the sixth lifecycle hook (was previously undocumented despite being a real overridable method fired between on_load() and re-render/ready; also referenced in the Lifecycle Events table). Updated overview diagram, hooks table, rules summary, and execution-order walkthrough accordingly. Also normalized JqhtmlComponent → Jqhtml_Component to match the actual runtime export.
+- 2026-08-07: Added on_viewport_resize(). Placed before on_stop() rather than in the numbered stage walkthrough, because it is not a stage — it fires after on_render, after on_ready, and on debounced window resize. Led with the "never bind $(window).on('resize') yourself" instruction since the previous docs actively taught that pattern, and closed with a "prefer CSS" subsection so the hook doesn't read as the default way to be responsive.
 - Component methods (render, reload, etc.) covered briefly since they have dedicated chapter (12)
 - Rules summary table provides quick reference
 - Common mistakes table addresses frequent issues

@@ -153,19 +153,57 @@ For deduplication and caching to work:
 3. **Only modify `this.data` in `on_load()`** - no DOM manipulation
 4. **Call `reload()` when args change** - handles cache automatically
 
-## Args Must Be Serializable
+## Which Args Can Be Keyed
 
-Both features require args to be JSON-serializable:
+A component's key is its name plus its args, so the args have to reduce to something stable.
+Primitives always do. **Plain data does too** — objects and arrays of primitives, nested
+freely — because they are keyed by their *content*, not their identity. That matters: a
+template rebuilds `{parent_id: 12}` on every render, so identity could never match.
 
-```javascript
-// Works - primitives are serializable
-<UserCard $user_id=123 $name="John" />
-
-// Disables caching/deduplication - component reference not serializable
-<ChildComponent $parent=this />
+```jqhtml
+<!-- Keyed. Cached across visits, and stable even though the object is rebuilt each render -->
+<RowsList $params={parent_type: 'Contact', parent_id: 12} />
+<Picker $ids=[1, 2, 3] />
 ```
 
-Use primitive values (strings, numbers, booleans) for args.
+Object keys are sorted (recursively), array order is preserved, and each value's shape is
+part of the key — so `{a: 1}`, `[1]` and `"1"` are three different keys.
+
+Some values cannot be keyed and are declined rather than guessed at:
+
+| Declined | Why |
+|---|---|
+| a function anywhere in the value | a callback is real identity that content cannot express |
+| a class instance, `Map`, `Set`, `RegExp` | two classes with the same fields would collide |
+| a DOM node or jQuery object | two different elements would collide |
+| a circular reference | no stable serialization |
+| more than 500 bytes | args identify data; they do not carry it |
+
+Declining is deliberate. If the framework instead *dropped* the callback — which
+`JSON.stringify` does silently — then two argument objects differing only by their callback
+would produce the same key, and a component would render with another component's cached
+content. Not caching is better than caching the wrong thing.
+
+A declined component still works normally. It is marked `data-nocache="<arg>:<reason>"`, and
+in development mode a console warning names the argument, the reason, and the fix (see
+[Production & Configuration](../18-production-configuration/)).
+
+```jqhtml
+<!-- Declined: data-nocache="params:function" -->
+<RowsList $params={parent_id: 12, on_select: this.handle} />
+```
+
+If a component genuinely needs an unkeyable arg, give it a `cache_id()` (below).
+
+### Deduplication is stricter than caching
+
+Deduplication does **not** use content keys. It still requires primitive args or an explicit
+id, so a component taking an object arg runs its own `on_load()` rather than sharing one.
+
+This asymmetry is intentional. A deduplicated component never calls `on_load()` at all — it
+adopts another component's result — so a wrong key there means permanently wrong data, with
+no revalidation to correct it. A wrong *cache* key is corrected the next time data is
+revalidated. Duplicate requests are the cheaper mistake.
 
 ## What Gets Cached
 
@@ -228,7 +266,8 @@ class ProductGrid extends Jqhtml_Component {
 
 **When to use `cache_id()`:**
 - Args contain display options that don't affect data loading
-- Args contain non-serializable values but you still want caching
+- Args contain values that cannot be keyed (a callback, a model instance) but you still want caching
+- You want deduplication for a component whose args are objects
 - You need finer control over cache granularity
 
 ## Cache Invalidation
@@ -305,9 +344,15 @@ Both flags cascade from parent to children automatically.
 - `docs/official/15_deduplication_and_caching.md` - Complete deduplication and caching specification
 
 ### Last Updated
-2026-03-06
+2026-08-19
 
 ### Editorial Notes
+- 2026-08-19: Rewrote "Args Must Be Serializable" as "Which Args Can Be Keyed". The old text
+  said both caching and deduplication require JSON-serializable args and to prefer primitives;
+  that is no longer true and was actively misleading. Plain data (objects/arrays of primitives)
+  is now keyed by content, unkeyable values decline with a stated reason, and deduplication is
+  deliberately stricter than caching. Explained WHY declining beats approximating, since the
+  natural assumption is that the framework should just do its best.
 - Separated deduplication (automatic) from caching (opt-in) clearly
 - Added `set_cache_key()` documentation with convention (build + user + session)
 - Added `cache_id()` method for custom cache keys

@@ -1,0 +1,13 @@
+<%--
+Test_Cache_Key_Content - plain-data object args are cacheable end to end
+
+Object/array args used to null the cache key, silently opting the component out of
+cache reuse. They are now keyed by deterministic content. Values that cannot be
+expressed exactly still decline, and the reason reaches data-nocache.
+--%>
+<Define:Test_Cache_Key_Content>
+  <h2>Cache Key Content Serialization</h2>
+  <Ck_Child $sid="plain" $params=this.state.params />
+  <Ck_Child $sid="fn" $params=this.state.with_fn />
+  <div $sid="results"></div>
+</Define:Test_Cache_Key_Content>

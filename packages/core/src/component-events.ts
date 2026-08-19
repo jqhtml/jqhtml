@@ -99,10 +99,15 @@ export function event_trigger(component: any, event_name: string, data?: any): v
   // Mark this event as occurred and store the data for late subscribers
   component._lifecycle_states.set(event_name, data);
 
-  // Fire all registered callbacks for this event
+  // Fire all registered callbacks for this event.
+  // Iterate a SNAPSHOT: handlers registered via once() splice themselves out of the
+  // live array while it is being iterated, which would shift later handlers into
+  // already-visited slots and skip them. The snapshot also means a handler
+  // registered during dispatch does not fire in this dispatch (event_on's sticky
+  // immediate-fire already delivered it).
   const callbacks = component._lifecycle_callbacks.get(event_name);
   if (callbacks) {
-    for (const callback of callbacks) {
+    for (const callback of [...callbacks]) {
       try {
         callback.bind(component)(component, data);
       } catch (error) {

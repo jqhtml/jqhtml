@@ -538,6 +538,21 @@ Recommended (not enforced) SCSS organization patterns for JQHTML projects:
 - Avoiding class name collisions between components
 - Conventions vs framework-enforced behavior
 
+### 20. Runtime Configuration
+**File**: `20_runtime_configuration.md`
+
+Integration-level settings the host application supplies when jqhtml loads, via
+`jqhtml.init($, config)` or `jqhtml.configure(config)`:
+- `mode: 'development' | 'production'` — defaults to development; production is opt-in
+- `warn_uncacheable_args` — warn when a data-fetching component has non-serializable args and no `cache_id()`
+- `debug_attributes` — emit `data-sid` (a debug mirror of the scoped `id`); off in production
+
+**Key Topics**:
+- How this differs from `jqhtml.debug` (environment vs interactive tracing)
+- Per-flag overrides on top of a mode
+- Why suppressing `data-sid`/`data-cid` is safe, and the one transient `data-cid` that must never be
+- Adding a new convention
+
 ## Additional References
 
 ### LLM Reference

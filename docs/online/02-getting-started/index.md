@@ -40,6 +40,15 @@ window.$ = window.jQuery = $;
 init($);
 ```
 
+`init()` also takes optional configuration describing the environment your app is running in:
+
+```javascript
+init($, { mode: 'production' });
+```
+
+The default is `development`, which keeps every diagnostic on. See
+[Production & Configuration](../18-production-configuration/).
+
 Components extend `Jqhtml_Component`:
 
 ```javascript
@@ -252,9 +261,12 @@ First-party bundler plugins are available for Vite and esbuild — [`@jqhtml/vit
 - `docs/official/12_incremental_scaffolding.md` - Undefined components and workflow
 
 ### Last Updated
-2026-07-21
+2026-08-19
 
 ### Editorial Notes
+- 2026-08-19: Noted `init()`'s optional configuration argument and linked chapter 18. The
+  installation snippet previously showed `init($)` with no indication that an environment can
+  be declared at all.
 - Focused on practical "get running quickly" content
 - Showed the minimum needed to create and use a component
 - Introduced incremental scaffolding early as it's a key differentiator

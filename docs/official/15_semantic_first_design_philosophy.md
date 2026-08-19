@@ -124,9 +124,9 @@ Write the page using semantic component names:
   </DashboardHeader>
 
   <StatsGrid>
-    <StatCard $label="Revenue" $value="$45,230" />
-    <StatCard $label="Orders" $value="1,234" />
-    <StatCard $label="Customers" $value="567" />
+    <StatCard $value="$45,230">Revenue</StatCard>
+    <StatCard $value="1,234">Orders</StatCard>
+    <StatCard $value="567">Customers</StatCard>
   </StatsGrid>
 
   <ChartArea>
@@ -166,7 +166,7 @@ Define component templates when needed:
 ```jqhtml
 <Define:StatCard tag="article" class="card">
   <div class="card-body">
-    <h5 class="card-title"><%= this.args.label %></h5>
+    <h5 class="card-title"><%= content() %></h5>
     <p class="card-text display-4"><%= this.args.value %></p>
   </div>
 </Define:StatCard>
@@ -251,6 +251,210 @@ class RefreshButton extends Jqhtml_Component {
 <Alert $type="danger">
 <Alert $type="warning">
 ```
+
+## The Success Test
+
+There is one test for whether a page has been designed semantically:
+
+**The page template reads like the main routine of a well-engineered program - a sequence of named concepts - and the page's own stylesheet is close to empty.**
+
+```blade
+<InvoicePage>
+  <PageLayout>
+    <Slot:main>
+      <InvoiceHeader $invoice_id=this.args.invoice_id />
+      <InvoiceLineItems $invoice_id=this.args.invoice_id />
+      <InvoiceTotals $invoice_id=this.args.invoice_id />
+    </Slot:main>
+
+    <Slot:sidebar>
+      <InvoiceStatusPanel $invoice_id=this.args.invoice_id />
+      <PaymentHistory $invoice_id=this.args.invoice_id />
+    </Slot:sidebar>
+  </PageLayout>
+</InvoicePage>
+```
+
+A page template that weaves markup, styling hooks and business logic together across
+hundreds of lines is a symptom of skipping this discipline, not a natural consequence of
+a complex page. If a page needs its own stylesheet, each surviving rule should carry a
+comment saying why it could not live inside a component.
+
+The permanent reason is cohesion. When one concept renders through one component
+everywhere, four things follow at once:
+
+1. **A consistent vocabulary** - the same tag renders the same concept on every page
+2. **Separation of concerns by layer** - layout, chrome, and content vocabulary are distinct
+3. **One unit type per data shape** - the application has a countable set of components
+4. **Reskinning readiness** - change one component's styles, every page follows
+
+## Argument Rules: Content Goes Inside the Tag
+
+**Anything the user reads belongs in `content()` or a named slot. Never in an attribute.**
+
+Arguments carry *data* that the component formats itself (`$user_id`, `$status_id`,
+`$count`) and *behavioral flags* (`$variant`, `$size`, `$removable`).
+
+```blade
+{{-- ❌ Authored content trapped as a dead string --}}
+<SummaryTile $label="Open Tasks" $count=12 />
+
+{{-- ✅ Content is content --}}
+<SummaryTile $count=12>Open Tasks</SummaryTile>
+```
+
+`$label="Open Tasks"` is exactly as wrong as `$title="Dashboard"`. Even a single word
+today may need markup tomorrow - an icon, an abbreviation, a nested component - and an
+attribute can hold none of those.
+
+**HTML inside an argument string is always a defect:**
+
+```blade
+{{-- ❌ Never --}}
+<SectionCard $title="<i class='bi bi-star'></i> Rating">
+
+{{-- ✅ The icon is content, so it goes in a slot --}}
+<SectionCard>
+  <Slot:title><i class="bi bi-star"></i> Rating</Slot:title>
+  <Slot:body>...</Slot:body>
+</SectionCard>
+```
+
+### Dual-Channel Chrome (the one allowance)
+
+Structural wrappers - page layouts, section cards, form fields - may accept a
+plain-string `$title`/`$label` argument for convenience, **provided they also expose a
+matching slot that wins when present**:
+
+```jqhtml
+<Define:SectionCard class="section-card">
+  <div class="section-card-title">
+    <%= content('title') || this.args.title %>
+  </div>
+  <div class="section-card-body">
+    <%= content('body') %>
+  </div>
+</Define:SectionCard>
+```
+
+`content('name')` returns an empty string when the caller supplied no such slot, so the
+`||` fallback resolves to the argument only when the slot is absent.
+
+Plain text - the argument is fine. Any markup, icon, emphasis or nested component - the
+slot, always.
+
+### Variants Are Arguments, Validated Loudly
+
+A component should reject an unknown variant rather than render unstyled:
+
+```javascript
+class Alert extends Jqhtml_Component {
+  on_create() {
+    this.args.variant = this.args.variant || 'info';
+
+    const allowed = ['info', 'success', 'warning', 'danger'];
+    if (!allowed.includes(this.args.variant)) {
+      throw new Error(`Alert: unknown $variant "${this.args.variant}"`);
+    }
+  }
+}
+```
+
+A fail-loud error at development time beats a silently unstyled banner in production.
+
+## Spacing and Containment Ownership
+
+This is the mechanism that keeps page templates free of spacing markup. Three rules.
+
+### R1 - Blocks carry no outer margins
+
+A component styles its interior only. Containers own the gaps between their children.
+
+```scss
+// ❌ SectionCard pushes on whatever is above it
+.SectionCard { margin-bottom: 1.5rem; }
+
+// ✅ The container owns the rhythm
+.PageLayout {
+    .main { display: flex; flex-direction: column; gap: var(--section-gap); }
+}
+```
+
+A component that carries no outer margin can be dropped into any container without
+bringing spacing assumptions with it, and no page ever needs a negative-margin clawback
+to undo one.
+
+### R2 - Containers pad; content never pushes back
+
+When a block must run edge-to-edge inside a padded container, that is a flag on the
+**container**, not CSS inside the child cancelling its parent's padding.
+
+```blade
+{{-- ❌ Child fights the parent from inside --}}
+<SectionCard>
+  <Slot:body>
+    <div style="margin: -1rem;"><RecordTable /></div>
+  </Slot:body>
+</SectionCard>
+
+{{-- ✅ The container is told to drop its padding --}}
+<SectionCard $bleed=true>
+  <Slot:body>
+    <RecordTable />
+  </Slot:body>
+</SectionCard>
+```
+
+### R3 - One variable per gap relationship, defined once
+
+Name gaps by the relationship they express, not by their size, and define each in exactly
+one place:
+
+```scss
+:root {
+    --section-gap:   1.5rem;  // between stacked sections
+    --card-padding:  1rem;    // inside a card body
+    --column-gutter: 2rem;    // between layout columns
+}
+```
+
+Never write `var(--section-gap, 1.5rem)`. An inline fallback hides an undefined variable
+instead of letting it fail visibly.
+
+## The Empty-State Mandate
+
+Every region that can render zero children renders a named empty-state component - never
+bare "no results" text, never nothing at all.
+
+```jqhtml
+<Define:ActivityFeed>
+  <% if (this.data.events.length === 0) { %>
+    <EmptyState $icon="clock">
+      No activity yet. Events appear here once this account is used.
+    </EmptyState>
+  <% } else { %>
+    <% for (let event of this.data.events) { %>
+      <ActivityRow $event=event />
+    <% } %>
+  <% } %>
+</Define:ActivityFeed>
+```
+
+A single empty cell gets its own component too, so "no value" looks the same everywhere:
+
+```jqhtml
+<td>
+  <% if (record.assignee) { %>
+    <UserLink $user_id=record.assignee.id />
+  <% } else { %>
+    <EmptyValue />
+  <% } %>
+</td>
+```
+
+**Every count must agree with what its list actually renders.** A tab labelled
+"Invoices (4)" above a list of three is a bug. Building empty states is usually what
+surfaces it.
 
 ## Real-World Example: Form Design
 

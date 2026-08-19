@@ -1,0 +1,13 @@
+<%--
+Test_Integration_Config_Modes - jqhtml.configure() mode flags
+
+Verifies the two integration conventions driven by mode:
+  debug_attributes      - data-sid emitted (dev) or suppressed (prod)
+  warn_uncacheable_args - console.warn for uncacheable args without cache_id()
+--%>
+<Define:Test_Integration_Config_Modes>
+  <h2>Integration Config Modes</h2>
+  <div $sid="probe" class="probe">plain element with $sid</div>
+  <Cfg_Child $sid="child" />
+  <div $sid="results"></div>
+</Define:Test_Integration_Config_Modes>

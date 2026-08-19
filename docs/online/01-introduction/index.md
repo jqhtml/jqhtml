@@ -127,6 +127,10 @@ Name components for what they represent, not how they look:
 - `<InvoiceStatusBadge>` not `<span class="badge badge-success">`
 - `<DashboardHeader>` not `<div class="d-flex justify-content-between">`
 
+This is the practice the rest of the framework exists to support: when a component earns
+its name, what belongs in an argument versus inside the tag, and who owns spacing.
+[Semantic Design](../17-semantic-design/) covers it in full.
+
 ### Incremental Scaffolding
 
 Undefined components work immediately. Write your page structure first:
@@ -155,6 +159,8 @@ JQHTML is designed for developers who:
 
 Continue to [Getting Started](../02-getting-started/) to set up your first JQHTML project.
 
+For the design practice behind the framework, see [Semantic Design](../17-semantic-design/).
+
 ---
 
 <!-- DOCUMENTATION METADATA (removed in public export) -->
@@ -165,9 +171,10 @@ Continue to [Getting Started](../02-getting-started/) to set up your first JQHTM
 - `docs/official/15_semantic_first_design_philosophy.md` - Core philosophy and examples
 
 ### Last Updated
-2026-07-21
+2026-08-18
 
 ### Editorial Notes
+- 2026-08-18: Added cross-references to the new [Semantic Design](../17-semantic-design/) chapter (from the "Semantic First" principle and from Next Steps). This chapter keeps its doorway role — the condensed semantic-first pitch stays here; the working practice moved to chapter 17. No examples changed: chapter 01's markup is already semantically named, and its raw-`div` block is the deliberate anti-pattern illustration.
 - Focused on "what" and "why" rather than "how" - details belong in later chapters
 - Used the traditional HTML vs JQHTML comparison as the core illustration
 - Deliberately kept brief - this is a doorway, not a manual

@@ -21,6 +21,7 @@
  */
 
 import type { Jqhtml_Component } from './component.js';
+import { serialize_for_cache_key } from './cache-key-serializer.js';
 
 interface CoordinationEntry {
     status: 'loading' | 'completed' | 'failed';
@@ -35,6 +36,24 @@ interface CoordinationEntry {
 export interface InvocationKeyResult {
     key: string | null;
     uncacheable_property?: string;
+    /** Why the property could not be keyed - 'function', 'circular', 'too-large', ... */
+    uncacheable_reason?: string;
+}
+
+export interface InvocationKeyOptions {
+    /**
+     * Allow a plain-data object/array arg with no author-supplied cache id to be
+     * keyed by DETERMINISTIC CONTENT.
+     *
+     * The CACHE passes true: two structurally equal args should hit the same
+     * cache entry, and a wrong key there is corrected by stale-while-revalidate.
+     *
+     * DEDUPLICATION passes false (the default), deliberately. A deduplicated
+     * follower never runs on_load() at all and adopts the leader's data with no
+     * revalidation, so a key that is wrong there is permanently wrong data.
+     * Redundant concurrent requests are cheaper than that risk.
+     */
+    allow_content_serialization?: boolean;
 }
 
 export class Load_Coordinator {
@@ -54,8 +73,13 @@ export class Load_Coordinator {
      * - key: Cache key string, or null if uncacheable
      * - uncacheable_property: Name of first property that prevented caching (for debugging)
      */
-    static generate_invocation_key(component_name: string, args: any): InvocationKeyResult {
+    static generate_invocation_key(
+        component_name: string,
+        args: any,
+        options: InvocationKeyOptions = {}
+    ): InvocationKeyResult {
         let uncacheable_property: string | undefined;
+        let uncacheable_reason: string | undefined;
 
         // Filter out internal properties (starting with _) and serialize args
         const serializable_args: any = {};
@@ -100,23 +124,40 @@ export class Load_Coordinator {
                         // Method threw error - treat as uncacheable
                         if (!uncacheable_property) {
                             uncacheable_property = key;
+                            uncacheable_reason = 'cache-id-threw';
                         }
-                        return { key: null, uncacheable_property };
+                        return { key: null, uncacheable_property, uncacheable_reason };
                     }
                 }
 
-                // No cache ID available - this property is uncacheable
+                // No author-supplied id. The cache may fall back to keying by
+                // deterministic content; deduplication deliberately may not.
+                if (options.allow_content_serialization) {
+                    const serialized = serialize_for_cache_key(value);
+                    if (serialized.ok) {
+                        serializable_args[key] = `__JQHTML_CONTENT__:${serialized.text}`;
+                        continue;
+                    }
+                    if (!uncacheable_property) {
+                        uncacheable_property = key;
+                        uncacheable_reason = serialized.reason;
+                    }
+                    return { key: null, uncacheable_property, uncacheable_reason };
+                }
+
                 if (!uncacheable_property) {
                     uncacheable_property = key;
+                    uncacheable_reason = value_type === 'function' ? 'function' : 'object';
                 }
-                return { key: null, uncacheable_property };
+                return { key: null, uncacheable_property, uncacheable_reason };
             }
 
             // Unknown type (symbol, bigint, etc.) - uncacheable
             if (!uncacheable_property) {
                 uncacheable_property = key;
+                uncacheable_reason = value_type;
             }
-            return { key: null, uncacheable_property };
+            return { key: null, uncacheable_property, uncacheable_reason };
         }
 
         // Try to serialize - if it fails (shouldn't happen now, but safety net), return null
@@ -135,6 +176,14 @@ export class Load_Coordinator {
      */
     static should_execute_on_load(component: Jqhtml_Component): boolean {
         const { key } = this.generate_invocation_key(component.component_name(), component.args);
+
+        // No identity means no coordination. Without this, every un-keyable component
+        // would share the single `null` registry entry and adopt an unrelated
+        // component's data - the worst failure this system can produce.
+        if (key === null) {
+            return true;
+        }
+
         const entry = this._registry.get(key);
 
         if (!entry) {
@@ -164,6 +213,11 @@ export class Load_Coordinator {
         on_load_promise: Promise<void>
     ): (final_data: Record<string, any>) => void {
         const { key } = this.generate_invocation_key(component.component_name(), component.args);
+
+        // Un-keyable component: run alone, register nothing. See should_execute_on_load().
+        if (key === null) {
+            return () => { /* no coordination to complete */ };
+        }
 
         // Create a promise that we control - it resolves when complete_coordination is called
         let resolve_promise!: () => void;

@@ -24,6 +24,19 @@ load()   // Async data fetch (parallel, NO DOM)
 ready()  // Fully initialized (bottom-up)
 ```
 
+#### Overridable Hooks
+
+- `on_create()` - Sync. Set defaults on `this.data` before first render
+- `on_render()` - Sync. Immediately after DOM update, before children are ready
+- `on_load()` - Async. Fetch data into `this.data` (no DOM access)
+- `on_loaded()` - Async. After `on_load()`, on the real component (`this.data` frozen)
+- `on_ready()` - Async. All children ready, safe for DOM manipulation
+- `on_stop()` - Sync. Cleanup (timers, connections)
+- `on_viewport_resize(viewport_width)` - Sync. Viewport width in CSS pixels
+  (`window.innerWidth`). Fires after every `on_render()`, after every `on_ready()`, and
+  on window resize — one framework-owned listener, debounced 30ms, dispatched to every
+  component in the document. Do not bind `$(window).on('resize')` in a component.
+
 #### DOM Access Methods
 
 - `$sid(name)` - Get element with scoped ID (`$sid="name"` in template)

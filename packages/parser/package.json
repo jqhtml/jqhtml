@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/parser",
-  "version": "2.3.51",
+  "version": "2.3.54",
   "description": "JQHTML template parser - converts templates to JavaScript",
   "type": "module",
   "main": "dist/index.js",
@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc && node ../../scripts/inject-parser-version.js",
     "build:no-inject": "tsc",
-    "test": "jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "clean": "rm -rf dist",
     "baseline:generate": "node test-regression/generate-baseline.js",
     "test:regression": "node test-regression/compare-outputs.js",

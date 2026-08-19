@@ -207,8 +207,9 @@ Use modifier classes for variants:
 Apply in templates:
 
 ```jqhtml
-<Define:StatusBadge class="<%= this.args.status ? 'status-' + this.args.status : '' %>">
-    <%= this.args.label %>
+<Define:StatusBadge tag="span" class="StatusBadge">
+    <% if (this.args.status) this.$.addClass('status-' + this.args.status); %>
+    <%= content() %>
 </Define:StatusBadge>
 ```
 
@@ -267,6 +268,26 @@ When styles grow, split into multiple files with the same wrapper:
 // Pass a prop if you need variants
 ```
 
+### Outer Margins on a Component
+
+```scss
+// WRONG - UserCard pushes on whatever sits above it
+.UserCard {
+    margin-bottom: 1.5rem;
+}
+
+// CORRECT - the container owns the gaps between its children
+.Dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+```
+
+A component that carries no outer margin can be dropped into any container without
+bringing spacing assumptions with it. See [Semantic Design](../17-semantic-design/) for
+the full spacing-ownership rules.
+
 ### Over-Nesting
 
 ```scss
@@ -306,7 +327,7 @@ When styles grow, split into multiple files with the same wrapper:
 - `docs/official/19_scss_styling_conventions.md` - Full specification
 
 ### Last Updated
-2025-12-15
+2026-08-18
 
 ### Editorial Notes
 - Focused on practical usage over comprehensive rules
@@ -315,3 +336,8 @@ When styles grow, split into multiple files with the same wrapper:
 - Used PascalCase component names per online docs convention
 - Omitted migration guidance (advanced topic)
 - Omitted build validation (implementation detail)
+- 2026-08-18: Added an "Outer Margins on a Component" anti-pattern under Common Mistakes,
+  with a cross-reference to the new [Semantic Design](../17-semantic-design/) chapter. The
+  chapter's existing wrapper-pattern and child-component examples were already correct and
+  were left untouched; spacing ownership was the one rule genuinely missing here, and it is
+  a styling rule, so it belongs in this chapter as well as in 17.

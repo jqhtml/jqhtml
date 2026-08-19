@@ -8,6 +8,7 @@
 // Use global jQuery
 declare const $: any;
 import { Jqhtml_Component } from './component.js';
+import { debug_attributes_enabled } from './config.js';
 import { get_component_class, get_template } from './component-registry.js';
 
 // Instruction types from parser
@@ -205,6 +206,9 @@ function process_tag_to_html(
   
   // Add simple string/numeric attributes directly
   for (const [key, value] of Object.entries(attrs)) {
+    if (key === 'data-sid' && !debug_attributes_enabled()) {
+      continue;  // debug-only attribute; the scoped id is what $sid() resolves
+    }
     if (!key.startsWith('$') && !key.startsWith('on') && !key.startsWith('@') &&
         !key.startsWith('data-bind-') && !key.startsWith('data-__-on-') &&
         (typeof value === 'string' || typeof value === 'number')) {
@@ -310,7 +314,12 @@ function process_component_to_html(
     const baseId = props['data-sid'];
     // The compiled code ALWAYS sets props['id'] with the correct scoped value
     // Just use it directly - it already has the correct parent _cid baked in
-    html.push(` id="${props['id']}" data-sid="${baseId}"`);
+    // data-sid is debug-only: $sid() resolves via the scoped id, never this.
+    html.push(
+      debug_attributes_enabled()
+        ? ` id="${props['id']}" data-sid="${baseId}"`
+        : ` id="${props['id']}"`
+    );
   }
   // Regular id passes through unchanged
   else if (props['id']) {
@@ -472,6 +481,10 @@ function apply_attributes(
         console.warn("(JQHTML) Tried to assign a non function to on event handler "+key)
       }
     } else if (key.startsWith('data-')) {
+      // data-sid is debug-only - suppressed entirely in production
+      if (key === 'data-sid' && !debug_attributes_enabled()) {
+        continue;
+      }
       // Data attributes - go into DOM
       const attrValue = typeof value === "string" ? value.trim() : value;
       element.attr(key, attrValue);

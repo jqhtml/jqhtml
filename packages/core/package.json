@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/core",
-  "version": "2.3.51",
+  "version": "2.3.54",
   "description": "Core runtime library for JQHTML",
   "type": "module",
   "main": "./dist/index.js",
@@ -23,8 +23,13 @@
     "build": "rollup -c",
     "build:tsc": "tsc",
     "watch": "rollup -c -w",
-    "test": "jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "clean": "rm -rf dist"
+  },
+  "jest": {
+    "setupFiles": [
+      "<rootDir>/test/jest.setup.js"
+    ]
   },
   "peerDependencies": {
     "jquery": "^3.7.0"

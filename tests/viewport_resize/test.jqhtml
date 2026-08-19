@@ -1,0 +1,8 @@
+<Define:Viewport_Resize_Test>
+  <h2>on_viewport_resize() Lifecycle Test</h2>
+  <Vr_Recorder $sid="alpha" $key="alpha" />
+  <Vr_Thrower $sid="thrower" />
+  <Vr_Recorder $sid="beta" $key="beta" />
+  <Vr_Recorder $sid="gamma" $key="gamma" />
+  <Vr_Plain $sid="plain" />
+</Define:Viewport_Resize_Test>
