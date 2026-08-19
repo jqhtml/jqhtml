@@ -39,6 +39,33 @@ This behavior is essential for lifecycle events. Without it, you'd have race con
 
 **During reload:** When `reload()` is called on an already-ready component, the framework automatically resets the "already occurred" state for `'ready'`. This ensures that new `.on('ready')` handlers wait for the reload to complete, rather than firing immediately based on the previous lifecycle.
 
+### invalidate() - Reset the "Already Occurred" State
+
+`invalidate(event_name)` clears the stored state for an event, so the next `.on()` or
+`.once()` handler waits for the event to happen again instead of firing immediately:
+
+```javascript
+component.invalidate('ready');
+```
+
+This is the mechanism `reload()` uses internally. Call it directly when your own custom
+event has a "current" state that has gone stale:
+
+```javascript
+class ImportJob extends Jqhtml_Component {
+  start_new_import() {
+    // A previous run already triggered 'import-complete'. Without this, a handler
+    // registered now would fire immediately for the OLD run.
+    this.invalidate('import-complete');
+    this.run();
+  }
+}
+```
+
+**It does not remove registered handlers** — already-registered `.on()` callbacks stay
+subscribed and fire on the next `trigger()`. It only discards the remembered occurrence and
+its stored data.
+
 ## Built-in Lifecycle Events
 
 Every component automatically triggers these events:
@@ -90,6 +117,16 @@ component.on('event-name', (component, data) => {
 ```
 
 The callback always receives the component as the first argument. The data argument is optional and will be `undefined` if `trigger()` was called without data.
+
+**How a trigger dispatches:** `trigger()` first records the event as having occurred (storing
+`data` for late subscribers), then calls each registered handler. Two consequences worth
+knowing:
+
+- **A throwing handler does not stop the others.** Each callback is called independently and
+  an error is logged to the console, so one bad listener cannot suppress the rest.
+- **A handler registered *during* a dispatch does not fire in that same dispatch.** It does
+  not miss the event, though — because the event is already marked as occurred, `.on()`
+  delivers it immediately at registration time.
 
 **Note:** For already-occurred events, the callback fires immediately with the `data` from the most recent `trigger()` call for that event (not `undefined`) — the framework stores each event's latest data so late subscribers see it. If `trigger()` is called again later, that new data replaces the stored value for any future late subscribers.
 
@@ -258,7 +295,7 @@ This approach is often cleaner than event broadcasting when the parent-child rel
 - `docs/official/14_lifecycle_complete_specification.md` - Viewport Resize section
 
 ### Last Updated
-2026-08-07
+2026-08-19
 
 ### Editorial Notes
 - Rewrote to focus on JQHTML's component event system
@@ -270,3 +307,4 @@ This approach is often cleaner than event broadcasting when the parent-child rel
 - 2025-12-26: Added note about how reload() resets the "already occurred" state for ready events
 - 2026-07-21: Accuracy pass - corrected the late-subscriber note (already-occurred events replay the most recent trigger()'s data, not undefined); added a `.once()` subsection; added `'create'`, `'load'`, `'loaded'` to the Built-in Lifecycle Events table with a note on when `'loaded'` fires; corrected `JqhtmlComponent` references to `Jqhtml_Component`.
 - 2026-08-07: Window resize is no longer shown as a plain jQuery DOM event. The example now uses scroll, and a callout directs readers to `on_viewport_resize()` — the framework owns the resize listener, so binding one per component is now wrong rather than merely unnecessary.
+- 2026-08-19: Added `invalidate(event_name)` — the public method behind the reload behavior already described here, previously unnamed in the chapter — with the point that it discards the remembered occurrence WITHOUT unsubscribing existing handlers. Added trigger dispatch semantics: a throwing handler does not suppress the others, and a handler registered mid-dispatch does not fire in that dispatch (it has already been delivered by the sticky immediate-fire, so it is not a missed event).

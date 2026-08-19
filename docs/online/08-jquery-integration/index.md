@@ -101,7 +101,8 @@ class Dashboard extends Jqhtml_Component {
 
 ## Finding Parent Components
 
-Use `this.$.closest()` to find an ancestor component:
+There are two ways to reach an ancestor. `this.$.closest()` is jQuery's, and walks up to the
+nearest matching **element**:
 
 ```javascript
 class ChildWidget extends Jqhtml_Component {
@@ -112,14 +113,34 @@ class ChildWidget extends Jqhtml_Component {
 }
 ```
 
-**However, this pattern is discouraged.** Prefer passing callbacks from parent to child instead:
+`this.closest()` is the component-level equivalent. It takes the same CSS selector but
+returns the **component instance** directly, or `null` if there isn't one:
+
+```javascript
+const parent = this.closest('.ParentDashboard');
+if (parent) parent.handle_child_event();
+```
+
+Three differences worth knowing:
+
+| | `this.$.closest(sel)` | `this.closest(sel)` |
+|-|---|---|
+| Returns | jQuery object (possibly empty) | component instance, or `null` |
+| Starts at | this component's own element | this component's **parent** — never matches itself |
+| Non-component matches | returned as a plain element | skipped; the search keeps walking up |
+
+That last row is the useful one. If a plain `<div class="ParentDashboard">` sits between the
+child and the real component, the jQuery form stops there and `.component()` gives you
+nothing, while `this.closest()` walks past it to the nearest actual component.
+
+**However, reaching upward at all is discouraged.** Prefer passing callbacks from parent to child instead:
 
 ```javascript
 // Better approach: parent passes callback to child
 <ChildWidget $on_event=this.handle_child_event />
 ```
 
-**Why avoid `.closest()` for parent access:**
+**Why avoid climbing to a parent (either form):**
 - Breaks top-down data flow, making code harder to reason about
 - Risk of circular dependencies
 - Parent may not be ready when child accesses it—awaiting `parent.ready()` can deadlock if parent is also waiting for child
@@ -232,7 +253,7 @@ card.set_title('Hello').set_theme('dark');
 - `docs/official/08_jquery_integration.md` - Complete jQuery integration guide
 
 ### Last Updated
-2025-12-26
+2026-08-19
 
 ### Editorial Notes
 - Rewritten to be more conversational with practical examples
@@ -243,3 +264,4 @@ card.set_title('Hello').set_theme('dark');
 - Removed "Finding Components" section (redundant with find/closest examples)
 - Added shallowFind() documentation (2025-11-26)
 - Added note about BEM class preservation during component replacement (2025-12-26)
+- 2026-08-19: Documented the component-level `this.closest(selector)` alongside jQuery's `this.$.closest()`. Only the jQuery form was covered, and the two are not interchangeable: the component form returns a component instance or `null`, starts at the parent (never matches itself), and skips ancestors that match the selector but carry no component. Reframed the existing caution to cover climbing to a parent by either route, since the objection is to the direction of the dependency, not to a particular method.

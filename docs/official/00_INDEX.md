@@ -553,7 +553,27 @@ Integration-level settings the host application supplies when jqhtml loads, via
 - Why suppressing `data-sid`/`data-cid` is safe, and the one transient `data-cid` that must never be
 - Adding a new convention
 
+### 21. Server-Side Rendering
+**File**: `21_server_side_rendering.md`
+
+The `@jqhtml/ssr` render server and the SSR preload API. Distinct from `18_boot.md`:
+boot() hydrates placeholders a backend wrote by hand, while this covers rendering real
+component HTML by running the actual lifecycle in jsdom on the server.
+
+**Key Topics**:
+- Persistent Node render server, jsdom isolation, bundle LRU caching
+- `render` vs `render_spa` request types, and the options behind "SSR returned an empty page"
+- Preload capture/replay: skipping redundant `on_load()` during hydration
+- Why preload lookup is keyed by cache key — an unkeyable arg disables preload too
+- Interaction with `gate_load()` (suppressed during capture) and deduplication
+
 ## Additional References
+
+### Project README
+**File**: `README.md`
+
+Orientation for the docs directory itself — what these documents are and how they relate
+to the tutorial-style chapters in `docs/online/`.
 
 ### LLM Reference
 **File**: `LLM_REFERENCE_OFFICIAL_07_26.md`

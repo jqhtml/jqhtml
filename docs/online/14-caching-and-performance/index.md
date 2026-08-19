@@ -83,6 +83,11 @@ const cache_key = `${APP_BUILD_HASH}_${user.id}_${session.id}`;
 jqhtml.set_cache_key(cache_key);
 ```
 
+**You do not need to include the jqhtml version.** The framework version is part of the
+cache scope automatically, so upgrading `@jqhtml/core` clears previously cached entries on
+its own. A version in your key identifies *your* application's build — that part is still
+yours to manage.
+
 ### How Caching Works
 
 **First Load (No Cache):**
@@ -284,6 +289,11 @@ jqhtml.set_cache_key('myapp_v2.3.1_' + user.id);
 
 The framework automatically clears old JQHTML entries when the cache key changes.
 
+The same clearing happens when the jqhtml version changes, since the version forms part of
+the cache scope. This means an upgrade never serves entries written by an older core, whose
+cached shape may no longer match what the current version expects — the first load after an
+upgrade repopulates from the network.
+
 ## Debugging Cache Behavior
 
 Enable verbose mode to see cache operations in the console:
@@ -299,7 +309,7 @@ This logs cache checks, hits/misses, deduplication leader/follower decisions, an
 1. **Keep `on_load()` deterministic** - same args should return same data
 2. **Use `reload()` to refresh** - don't manually re-call `on_load()`
 3. **Handle empty data** - template should work even if data not yet loaded
-4. **Use primitive args** - ensures cache and deduplication work correctly
+4. **Keep args keyable** - primitives and plain data are keyed automatically; give a component a `cache_id()` when it must take a callback or a class instance (see [Which Args Can Be Keyed](#which-args-can-be-keyed))
 5. **Set cache key on app startup** - include version, user, and session info
 
 ## Gotchas
@@ -363,3 +373,4 @@ Both flags cascade from parent to children automatically.
 - 2025-12-10: Added `use_cached_data` section for skipping revalidation
 - 2026-03-06: Added preloading SPA routes section (_load_only, _load_render_only)
 - 2026-07-21: Documented `cache_mode` parameter of `set_cache_key()` and HTML cache mode; scoped the "render always runs" claim in "What Gets Cached" to data cache mode. Fixed `JqhtmlComponent` references to `Jqhtml_Component`.
+- 2026-08-19: Documented that the jqhtml version forms part of the cache scope, so upgrading the framework clears prior entries automatically and callers need only version their OWN build in the cache key. Replaced Best Practice #4 ("use primitive args") which contradicted the Which Args Can Be Keyed section added earlier the same day.

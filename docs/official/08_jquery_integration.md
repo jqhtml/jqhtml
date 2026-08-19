@@ -585,6 +585,13 @@ class Container extends Jqhtml_Component {
 
 `shallowFind()` is the "opposite of `.closest()`" - where `.closest()` searches upward and stops at the first match, `.shallowFind()` searches downward and stops at each match.
 
+**Reaching upward to a component:** there are two methods and they are not interchangeable.
+`this.$.closest(sel)` returns a jQuery object for the nearest matching element; `this.closest(sel)`
+returns the nearest ancestor **component instance** or `null`, starts at the parent rather than
+this component, and walks past elements that match the selector but carry no component. Full
+comparison, and the reasons to prefer passing a callback down from the parent instead of
+climbing up at all, are in `13_scoped_ids_and_element_access.md`.
+
 ## jQuery Chaining
 
 ### Components Support Chaining

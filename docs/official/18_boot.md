@@ -284,13 +284,15 @@ server (jsdom-based) that a backend talks to over a newline-delimited JSON proto
   app's router, and render the resulting page to HTML (full-page SSR for SPA
   frameworks built on JQHTML; added in v2.3.36 for RSpade-style integrations)
 
-The SSR flow pairs with the client-side preload API (`jqhtml.start_data_capture()`,
-`get_captured_data()`, `set_preload_data()` — see `packages/core/src/preload-data.ts`):
-data captured during the server render is replayed on the client so hydration skips
-`on_load()` entirely on preload hits.
+The SSR flow pairs with the client-side preload API — data captured during the server
+render is replayed on the client so hydration skips `on_load()` entirely on preload hits.
+Note that preload is keyed by cache key, so a component whose args decline serialization
+can never consume preloaded data.
 
-**Full documentation:** `packages/ssr/README.md` (protocol, payload shapes, options)
-and `packages/ssr/INTEGRATION_GUIDE.md`.
+**Full documentation:** `21_server_side_rendering.md` (architecture, request types, the
+complete preload API and its lifecycle interactions). For wire-protocol payload shapes,
+server options, and error codes, see `packages/ssr/README.md` and
+`packages/ssr/INTEGRATION_GUIDE.md`.
 
 ## Client-Side Setup
 
