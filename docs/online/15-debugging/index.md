@@ -2,6 +2,13 @@
 
 When something isn't working, start here. JQHTML includes built-in tools for diagnosing component issues, tracking lifecycle execution, and profiling performance.
 
+Everything on this page is an interactive switch you flip while chasing a specific problem.
+That is different from [Production & Configuration](../18-production-configuration/), which
+describes the environment your application runs in and is set once at startup. One consequence
+worth knowing here: in production mode the `data-sid` and `data-cid` attributes are not
+rendered, so a production DOM shows the scoped `id` but no debug mirrors. You can turn them
+back on without leaving production mode.
+
 ## Quick Diagnostics
 
 Before diving into code, run these commands in your browser console to understand the current state.
@@ -327,9 +334,12 @@ Every bug report and question helps improve JQHTML. Don't hesitate to reach out.
 - `packages/core/src/component-registry.ts` - Registry functions (list_components, etc.)
 
 ### Last Updated
-2025-11-26
+2026-08-19
 
 ### Editorial Notes
+- 2026-08-19: Distinguished this chapter's interactive debug switches from runtime
+  configuration (chapter 18), and noted that `data-sid`/`data-cid` are absent in production —
+  the most likely surprise for someone inspecting a production DOM.
 - **Major rewrite (2025-11-26):** Restructured for developers hitting problems
 - Added Quick Diagnostics section with `list_components()`, `_version()` - previously undocumented
 - Added `setDebugSettings()` and `enableDebugMode()` API documentation

@@ -1,0 +1,12 @@
+<%--
+Test_Event_Dispatch_Snapshot - Regression test for handler self-deregistration during dispatch
+
+Reproduces the mutate-during-iterate bug in event_trigger(): a .once() wrapper
+splices itself out of the live callback array while trigger() is iterating it,
+which made trigger() skip the next handler in the list.
+--%>
+<Define:Test_Event_Dispatch_Snapshot>
+  <h2>Event Dispatch Snapshot Test</h2>
+  <Test_Dispatch_Child $sid="child" />
+  <div $sid="results"></div>
+</Define:Test_Event_Dispatch_Snapshot>

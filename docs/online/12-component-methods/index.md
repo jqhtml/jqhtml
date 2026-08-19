@@ -206,6 +206,8 @@ $('#live-chart').remove();  // Safe to remove DOM
 
 \* Only re-renders if data changed or didn't render from cache yet.
 
+**`on_viewport_resize()` follows the render and ready columns.** The hook fires after every `on_render()` and after every `on_ready()`, so any method that redraws the DOM or calls `on_ready()` also fires it. `load()` does neither, so it does not. See [Lifecycle](../06-lifecycle/).
+
 ## Common Patterns
 
 ### Filter and Pagination
@@ -268,7 +270,7 @@ class Dashboard extends Jqhtml_Component {
 - `docs/official/14_lifecycle_complete_specification.md` - Complete method documentation
 
 ### Last Updated
-2026-07-21
+2026-08-07
 
 ### Editorial Notes
 - Focused on the 7 main methods: load, render, reload, refresh, ready, rendered, stop
@@ -282,3 +284,4 @@ class Dashboard extends Jqhtml_Component {
 - 2025-12-26: Added note about ready() behavior during reload (invalidate paradigm)
 - 2026-02-20: Added load() method documentation
 - 2026-07-21: Accuracy pass - render() now documented as also invalidating the sticky 'ready' state (matches reload()'s behavior); load()'s "What it does" now notes it calls on_loaded() and triggers 'loaded'; stop() rewritten to describe the fast-path optimization (skips the _Component_Stopped class and stop event when there's no custom on_stop() and no registered 'stop' listener); corrected JqhtmlComponent references to Jqhtml_Component. The `await this.render()` examples were verified against current code and are correct as written - render()/redraw() properly return a promise that resolves after the full render lifecycle.
+- 2026-08-07: Noted that on_viewport_resize() tracks the render/ready columns of the comparison table — the hook is documented in full in chapter 06, so only the interaction with these methods is stated here.

@@ -76,6 +76,9 @@
 const class_registry: Record<string, new (...args: any[]) => any> = Object.create(null);
 
 // Markers for serialized class instances (unique to avoid collisions with user data)
+// Replaced at build time by rollup (see rollup.config.js).
+const CORE_VERSION = '__VERSION__';
+
 const CLASS_MARKER = '__jqhtml_class__';
 const PROPS_MARKER = '__jqhtml_props__';
 
@@ -422,6 +425,8 @@ export type CacheMode = 'data' | 'html';
 
 export class Jqhtml_Local_Storage {
     private static _cache_key: string | null = null;
+    /** Versioned scope identity - compared in _validate_scope() to clear on a core upgrade. */
+    private static _scope_marker: string | null = null;
     private static _cache_mode: CacheMode = 'data';
     private static _storage_available: boolean | null = null;
     private static _initialized: boolean = false;
@@ -434,6 +439,13 @@ export class Jqhtml_Local_Storage {
      */
     static set_cache_key(cache_key: string, cache_mode: CacheMode = 'data'): void {
         this._cache_key = cache_key;
+
+        // Key SHAPE is a function of the library (see cache-key-serializer.ts), so an
+        // upgrade that changes it must invalidate everything persisted under the old shape.
+        // Version the SCOPE MARKER rather than the key itself: _validate_scope() already
+        // clears every jqhtml key when this value changes, and leaving the per-entry key
+        // format alone keeps stored keys readable and avoids repeating the version in each.
+        this._scope_marker = `${CORE_VERSION}::${cache_key}`;
         this._cache_mode = cache_mode;
         this._init();
     }
@@ -512,20 +524,20 @@ export class Jqhtml_Local_Storage {
         try {
             const stored_key = localStorage.getItem('_jqhtml_cache_key');
 
-            // If cache key exists and has changed, clear only JQHTML keys
-            if (stored_key !== null && stored_key !== this._cache_key) {
-                console.log('[JQHTML Local Storage] Cache key changed, clearing JQHTML keys:', {
+            // If the scope marker (core version + developer key) changed, clear only JQHTML keys
+            if (stored_key !== null && stored_key !== this._scope_marker) {
+                console.log('[JQHTML Local Storage] Cache scope changed, clearing JQHTML keys:', {
                     old_key: stored_key,
-                    new_key: this._cache_key,
+                    new_key: this._scope_marker,
                 });
                 this._clear_jqhtml_keys();
-                localStorage.setItem('_jqhtml_cache_key', this._cache_key!);
+                localStorage.setItem('_jqhtml_cache_key', this._scope_marker!);
             } else if (stored_key === null) {
                 // First time JQHTML is using this storage - just set the key, don't clear
-                console.log('[JQHTML Local Storage] Initializing cache key (first use):', {
-                    new_key: this._cache_key,
+                console.log('[JQHTML Local Storage] Initializing cache scope (first use):', {
+                    new_key: this._scope_marker,
                 });
-                localStorage.setItem('_jqhtml_cache_key', this._cache_key!);
+                localStorage.setItem('_jqhtml_cache_key', this._scope_marker!);
             }
         } catch (e) {
             console.error('[JQHTML Local Storage] Failed to validate scope:', e);

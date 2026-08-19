@@ -195,7 +195,7 @@ JQHTML's component events and jQuery's DOM events are **separate systems**:
 | **Syntax** | `component.on()` / `this.trigger()` | `this.$.on()` / `this.$.trigger()` |
 | **Purpose** | Component-to-component communication | DOM interaction, plugin hooks |
 | **Fire if occurred** | Yes | No |
-| **Use for** | Data events, state changes, lifecycle | Click handlers, form events, resize |
+| **Use for** | Data events, state changes, lifecycle | Click handlers, form events, scroll |
 
 **Use component events** for communication between JQHTML components about data and state.
 
@@ -209,11 +209,13 @@ class SortableList extends Jqhtml_Component {
       update: () => this.save_order()
     });
 
-    // Window resize is a DOM event
-    $(window).on('resize', () => this.handle_resize());
+    // Window scroll is a DOM event
+    $(window).on('scroll', () => this.update_sticky_header());
   }
 }
 ```
+
+**Window resize is the exception.** Do not bind `$(window).on('resize')` — override `on_viewport_resize(viewport_width)` instead. The framework runs one debounced listener for the whole page and calls the hook on every component, so there is no listener to clean up. See [Lifecycle](../06-lifecycle/).
 
 ## Passing Callbacks
 
@@ -253,9 +255,10 @@ This approach is often cleaner than event broadcasting when the parent-child rel
 ### References
 - `docs/official/01_template_syntax.md` - @ event binding syntax
 - `docs/official/08_jquery_integration.md` - jQuery event handling
+- `docs/official/14_lifecycle_complete_specification.md` - Viewport Resize section
 
 ### Last Updated
-2026-07-21
+2026-08-07
 
 ### Editorial Notes
 - Rewrote to focus on JQHTML's component event system
@@ -266,3 +269,4 @@ This approach is often cleaner than event broadcasting when the parent-child rel
 - 2025-12-12: Added Event API section documenting callback signature (component, data)
 - 2025-12-26: Added note about how reload() resets the "already occurred" state for ready events
 - 2026-07-21: Accuracy pass - corrected the late-subscriber note (already-occurred events replay the most recent trigger()'s data, not undefined); added a `.once()` subsection; added `'create'`, `'load'`, `'loaded'` to the Built-in Lifecycle Events table with a note on when `'loaded'` fires; corrected `JqhtmlComponent` references to `Jqhtml_Component`.
+- 2026-08-07: Window resize is no longer shown as a plain jQuery DOM event. The example now uses scroll, and a callout directs readers to `on_viewport_resize()` — the framework owns the resize listener, so binding one per component is now wrong rather than merely unnecessary.

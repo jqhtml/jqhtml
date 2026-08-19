@@ -1,5 +1,5 @@
 {
-  "version": "2.3.51",
-  "published": "2026-07-23T12:40:09+00:00",
+  "version": "2.3.54",
+  "published": "2026-08-19T07:18:53+00:00",
   "packages": ["parser", "core", "vscode-extension"]
 }

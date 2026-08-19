@@ -15,6 +15,7 @@ import {
   get_template
 } from './component-registry.js';
 import { applyDebugDelay, devWarn } from './debug.js';
+import { init_viewport_resize } from './viewport.js';
 
 // Extend jQuery interface
 declare global {
@@ -555,6 +556,10 @@ export function init_jquery_plugin(jQuery: any): void {
     PatchedInit.prototype = jQuery.fn;
     jQuery.fn.init = PatchedInit;
   }
+
+  // Install the single debounced window resize listener that drives
+  // on_viewport_resize() on every component. Idempotent.
+  init_viewport_resize(jQuery);
 }
 
 // Try to auto-initialize if global jQuery exists

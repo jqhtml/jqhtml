@@ -120,6 +120,10 @@ knows how to hydrate (see `packages/core/src/boot.ts`), rather than a bespoke
 `$element.component(name, args)`. Once every top-level placeholder is ready, `boot()`
 resolves and a `jqhtml:ready` `CustomEvent` fires on `document`:
 
+> The `data-cid` below is a debug attribute, shown here because this example is a development
+> render. It is absent when jqhtml runs with `mode: 'production'`, and nothing — including
+> `boot()` — resolves through it. See `docs/official/20_runtime_configuration.md`.
+
 ```html
 <div class="UserCard Component" data-cid="abc123xyz">
     <!-- Component's rendered content -->

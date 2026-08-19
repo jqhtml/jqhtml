@@ -194,7 +194,8 @@ If the markup needs to change based on parameters, make it a component:
 The component handles the Bootstrap class logic internally:
 
 ```jqhtml
-<Define:Alert class="alert alert-<%= this.args.type || 'primary' %>" role="alert">
+<Define:Alert class="alert" role="alert">
+  <% this.$.addClass('alert-' + (this.args.type || 'primary')); %>
   <%= content() %>
 </Define:Alert>
 ```
@@ -620,7 +621,9 @@ When you notice a component is used in multiple ways, consider:
 **Option 1: Add parameters**
 
 ```jqhtml
-<Define:Card class="card <%= this.args.shadow ? 'shadow' : '' %> mb-<%= this.args.spacing || '3' %>">
+<Define:Card class="card">
+  <% if (this.args.shadow) this.$.addClass('shadow'); %>
+  <% this.$.addClass('mb-' + (this.args.spacing || '3')); %>
   <!-- ... -->
 </Define:Card>
 ```
@@ -642,6 +645,110 @@ When you notice a component is used in multiple ways, consider:
 ```
 
 Choose based on how **semantically different** the use cases are.
+
+## The Evidence Bar for Extraction
+
+Extraction is **evidence-driven, never speculative**. The bar is:
+
+> **Two or more live call sites with the same shape.**
+
+Do not build a component in anticipation of a second consumer that does not exist yet.
+The first time you write a shape you do not yet know which parts are essential and which
+are incidental to that one page. The second call site is what tells you.
+
+```blade
+{{-- First time writing this shape: leave it in the page --}}
+<div class="summary">
+  <h4>Open Tasks</h4>
+  <p class="count">12</p>
+</div>
+
+{{-- Second page needs the same shape: now extract it --}}
+<SummaryTile $count=12>Open Tasks</SummaryTile>
+```
+
+The one exception is a **domain concept with obvious identity**. `<InvoiceStatusBadge>`
+earns its name on sight, because it is a thing in the business - not a shape somebody
+noticed twice. See "Rule 5: Domain-Specific Concepts Always Become Components" above.
+
+**Preserving a bespoke look is not a reason to skip componentizing.** When a page needs a
+distinctive one-off appearance, the correct output is a named, self-contained component
+carrying that appearance - never page-local markup plus page-local CSS.
+
+## Extract, Add a Lever, or Promote
+
+The single most common mistake is building a **new** component when an existing one
+should have been used or extended.
+
+| Situation | Do this |
+|-----------|---------|
+| An existing component fits | Use it |
+| An existing component ALMOST fits | Add a small, **additive lever** - one argument (`$removable`, `$divided`, `$inline`, `$compact`) |
+| Two or more sites hand-roll the same shape | Extract ONE component and converge the sites onto it |
+| A needed widget RESEMBLES an existing one but has different domain semantics | Do NOT merge the domains. Extract the display primitive both can use, or an abstract base with two concrete variants |
+
+### A lever's default rendering must be identical to before
+
+Adding an argument is only additive if every existing call site renders exactly as it did
+before. If it does not, it is not a lever - it is a rewrite, and you carry the regression
+duty for every existing consumer.
+
+```jqhtml
+<Define:TagChip tag="span" class="chip">
+  <%= content() %>
+  <% if (this.args.removable) { %>
+    <button $sid="remove" class="chip-remove" aria-label="Remove">&times;</button>
+  <% } %>
+</Define:TagChip>
+```
+
+```blade
+<TagChip>Urgent</TagChip>                  {{-- unchanged --}}
+<TagChip $removable=true>Urgent</TagChip>  {{-- new behavior --}}
+```
+
+### Do not merge domains
+
+`<ShipmentStatus>` and `<InvoiceStatus>` may look identical today. They are two concepts
+that happen to share a shape, and they will diverge. Converge the **shape**, not the
+widgets:
+
+```jqhtml
+<%-- Shared display primitive --%>
+<Define:StatusPill tag="span" class="pill">
+  <% this.$.addClass('pill-' + this.args.tone); %>
+  <%= content() %>
+</Define:StatusPill>
+
+<%-- Two domain components, each owning its own mapping --%>
+<Define:ShipmentStatus>
+  <StatusPill $tone=this.args.tone><%= this.data.label %></StatusPill>
+</Define:ShipmentStatus>
+
+<Define:InvoiceStatus>
+  <StatusPill $tone=this.args.tone><%= this.data.label %></StatusPill>
+</Define:InvoiceStatus>
+```
+
+The same reasoning applies within one visual family. A workflow **state**, a
+**classification** and a **count** may all render as pills, but they are three concepts
+and deserve three components. Collapsing them into one `<Pill $variant="...">` moves the
+decision out of the vocabulary and back into every call site - which is the problem you
+were solving.
+
+### Promotion is the direction of travel
+
+- When a look repeats, promote it from page-local markup to a named component.
+- When two components share a display shape, promote that shape to a shared primitive or
+  an abstract base.
+
+Always toward **fewer, better-named, more-reused concepts.**
+
+### Hand-authored seams are a smell
+
+A divider, a spacer div or a one-off wrapper written directly into a page template points
+at a missing lever on an adjacent component. If three pages "need" the same `<hr>` in the
+same position, the adjacent component needs a `$divided` argument.
 
 ## The Team Collaboration Benefit
 

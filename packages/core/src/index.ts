@@ -65,9 +65,14 @@ export {
 // jQuery plugin initialization
 import { init_jquery_plugin } from './jquery-plugin.js';
 export { init_jquery_plugin };
+export { configure, get_config } from './config.js';
+export type { Jqhtml_Config, Jqhtml_Mode } from './config.js';
 
 // Main initialization function
-export function init(jQuery?: any): void {
+export function init(jQuery?: any, config?: Jqhtml_Config): void {
+  // Integration config first - it governs behaviour during the very first render
+  configure(config);
+
   // If jQuery is provided, initialize the plugin
   if (jQuery) {
     init_jquery_plugin(jQuery);
@@ -84,6 +89,8 @@ export function init(jQuery?: any): void {
 export { LifecycleManager as Jqhtml_LifecycleManager } from './lifecycle-manager.js';
 
 // Import all for default export
+import { configure, get_config } from './config.js';
+import type { Jqhtml_Config } from './config.js';
 import { Jqhtml_Component } from './component.js';
 import { LifecycleManager } from './lifecycle-manager.js';
 import {
@@ -201,6 +208,10 @@ const jqhtml = {
 
   // state facts
   tombstone: 'pepperoni and cheese',
+
+  // Integration configuration - see config.ts
+  configure,
+  get_config,
 
   // Debug settings
   debug: {

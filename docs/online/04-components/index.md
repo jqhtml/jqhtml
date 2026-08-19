@@ -18,12 +18,19 @@ A component can consist of:
 For components that just render markup:
 
 ```jqhtml
-<Define:StatusBadge class="badge">
-  <span class="badge-<%= this.args.type %>">
-    <%= this.args.label %>
-  </span>
+<Define:StatusBadge tag="span" class="badge">
+  <% this.$.addClass('badge-' + this.args.type); %>
+  <%= content() %>
 </Define:StatusBadge>
 ```
+
+```jqhtml
+<StatusBadge $type="success">Active</StatusBadge>
+```
+
+`<Define:>` *is* the rendered element, so there is no inner `<span>` to add — `tag=` and
+`class=` shape the root directly. The variant travels as an argument; the words the user
+reads travel as content, never as an attribute. See [Semantic Design](../17-semantic-design/).
 
 ### JavaScript-Only Component
 
@@ -377,7 +384,7 @@ if ($element.hasClass('Component')) {
 - `docs/official/12_incremental_scaffolding.md` - Undefined components
 
 ### Last Updated
-2025-11-25
+2026-08-18
 
 ### Editorial Notes
 - Focused on "what is a component" rather than lifecycle or parameters (separate chapters)
@@ -391,3 +398,10 @@ if ($element.hasClass('Component')) {
 - Accuracy pass: fixed base class name to `Jqhtml_Component` (no export named
   `JqhtmlComponent` exists); removed the claim of an installable `jqhtml-laravel`
   composer package (Blade component syntax is still work-in-progress, not shipped)
+- 2026-08-18: Rewrote the template-only `StatusBadge` example. The old version wrapped a
+  `<span class="badge-...">` inside the component root, which contradicts "`<Define:>` IS
+  the element", and it passed the displayed text as `$label` — an argument holding
+  authored content, which the new [Semantic Design](../17-semantic-design/) chapter
+  identifies as a defect. Now uses `tag="span"`, an interpolated variant class on the
+  root, and `content()`. No other example in this chapter changed: the undefined-component
+  and registration examples are already semantically named, and the rest teach mechanics.
