@@ -2,6 +2,8 @@
 
 **A jQuery-first component templating framework.**
 
+**[jqhtml.org](https://jqhtml.org/)** · **[Documentation](https://docs.jqhtml.org/)** · [npm](https://www.npmjs.com/org/jqhtml) · [GitHub](https://github.com/jqhtml)
+
 JQHTML lets you compose **logical concepts** in your HTML — `<User_Card>`, `<Invoice_Status_Badge>` — instead of visual primitives with cryptic class names. Templates compile at build time to plain JavaScript. Components are genuine jQuery objects. There is no virtual DOM, no state-management layer, and no runtime template parsing: just templates that become functions and components that manipulate the DOM directly, with a deterministic 5-stage lifecycle (`create → render → on_render → load → ready`).
 
 Built as a deliberate alternative to the modern JavaScript ecosystem's complexity and churn. Like jQuery itself: simple, solid, an API that never changes.
@@ -140,15 +142,20 @@ Each directory under `tests/` is a self-contained behavioral scenario that compi
 
 *Coming soon — a gallery of live JQHTML examples will be published at:* **URL pending**
 
-## Online Documentation
+## Documentation
 
-*The full tutorial-style documentation site will be published at:* **URL pending**
+**Full documentation: [docs.jqhtml.org](https://docs.jqhtml.org/)** — tutorial-style chapters
+covering template syntax, the lifecycle, scoped IDs, slots and inheritance, caching, and
+production configuration. Start there.
 
-Until then, the complete documentation ships in this repo:
+The project homepage is **[jqhtml.org](https://jqhtml.org/)**.
+
+Documentation also ships in this repo, which is useful offline or when working against a
+specific commit:
 
 - **[CLAUDE.md](./CLAUDE.md)** — agent & developer quickstart (the fastest complete overview)
 - **[docs/official/](./docs/official/)** — detailed feature specifications
-- **[docs/online/](./docs/online/)** — tutorial-style chapters (source of the future docs site)
+- **[docs/online/](./docs/online/)** — the source the documentation site is built from
 - **[docs/official/LLM_REFERENCE_OFFICIAL_07_26.md](./docs/official/LLM_REFERENCE_OFFICIAL_07_26.md)** — drop-in LLM context for AI-assisted development with JQHTML
 
 ---

@@ -21,7 +21,9 @@ The parser handles the template syntax - `<Define:>` blocks, `<%= %>` expression
 
 ## Status
 
-Alpha release. Works well enough that I use it daily, but documentation is sparse and you might hit edge cases. Webpack loader and proper docs coming soon.
+Alpha release. Works well enough that I use it daily, but you might hit edge cases.
+
+Full documentation: **[docs.jqhtml.org](https://docs.jqhtml.org/)**
 
 Found a bug or built something cool? Drop me a line.
 

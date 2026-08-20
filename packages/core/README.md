@@ -15,7 +15,9 @@ Components have a simple lifecycle: `on_load()` fetches data, `on_render()` sets
 
 ## Status
 
-Alpha release. It works and I use it daily, but expect rough edges. Full documentation and framework plugins coming soon.
+Alpha release. It works and I use it daily, but expect rough edges.
+
+Full documentation: **[docs.jqhtml.org](https://docs.jqhtml.org/)**
 
 If you try it in a project, I'd love to hear about it.
 
