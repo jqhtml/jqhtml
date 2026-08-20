@@ -641,6 +641,6 @@ global.window = undefined;  // Safe
 
 - [SPECIFICATION.md](./SPECIFICATION.md) - Complete technical specification
 - [/packages/core/src/component.ts](/packages/core/src/component.ts) - Component lifecycle
-- [/docs/official/18_boot.md](/docs/official/18_boot.md) - Client-side boot/hydration
+- [/docs/reference/18_boot.md](/docs/reference/18_boot.md) - Client-side boot/hydration
 - [jsdom documentation](https://github.com/jsdom/jsdom)
 - [jQuery in Node.js](https://www.npmjs.com/package/jquery)

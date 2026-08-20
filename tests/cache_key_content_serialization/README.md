@@ -2,7 +2,7 @@
 
 End-to-end test for content-based cache keys, through the real component pipeline.
 
-Full specification: `docs/official/15_deduplication_and_caching.md`.
+Full specification: `docs/reference/15_deduplication_and_caching.md`.
 Exhaustive decline matrix: `packages/core/test/cache-key-serialization.test.js` (31 assertions).
 
 ## The problem

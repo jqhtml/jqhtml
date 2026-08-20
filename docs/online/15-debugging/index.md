@@ -329,7 +329,7 @@ Every bug report and question helps improve JQHTML. Don't hesitate to reach out.
 ## Documentation Notes
 
 ### References
-- `docs/official/09_debugging_tools.md` - Complete debugging tools documentation
+- `docs/reference/09_debugging_tools.md` - Complete debugging tools documentation
 - `packages/core/src/debug.ts` - Debug function implementations
 - `packages/core/src/component-registry.ts` - Registry functions (list_components, etc.)
 

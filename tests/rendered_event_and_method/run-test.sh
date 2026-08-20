@@ -6,7 +6,7 @@
 #   packages/core/src/lifecycle-manager.ts ~146-171 ('rendered' trigger + _load_render_only bypass)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-OUT=$(node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+OUT=$(node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test.jqhtml" \
   "$SCRIPT_DIR/rendered_event_test.jqhtml" \
   "$SCRIPT_DIR/rendered_event_test.js" \

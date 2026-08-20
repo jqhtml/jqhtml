@@ -41,4 +41,4 @@ This is a **critical security feature** - ensuring that:
 ## Related Documentation
 
 - CLAUDE.md: Template Syntax Reference
-- docs/official/01_template_syntax.md: String Interpolation section
+- docs/reference/01_template_syntax.md: String Interpolation section

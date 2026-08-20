@@ -8,7 +8,7 @@
 # reinitialization along with plain lowercase classes.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-OUT=$(node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+OUT=$(node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test.jqhtml" \
   "$SCRIPT_DIR/bem_class_replacement_survival_test.jqhtml" \
   "$SCRIPT_DIR/bem_class_replacement_survival_test.js" \

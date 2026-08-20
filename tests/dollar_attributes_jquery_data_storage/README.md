@@ -63,4 +63,4 @@ class Component extends Jqhtml_Component {
 ## Related Documentation
 
 - CLAUDE.md: $ Attributes (Component Parameters)
-- docs/official/03_dollar_attribute_system.md: Storage mechanism
+- docs/reference/03_dollar_attribute_system.md: Storage mechanism

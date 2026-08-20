@@ -9,7 +9,7 @@
  * A parent component with `_load_only` (or `_load_render_only`) set on its own
  * `this.args` automatically cascades that flag onto every child it invokes in
  * its template, UNLESS the child's own invocation already sets that prop
- * (docs/official/14_lifecycle_complete_specification.md documents explicit
+ * (docs/reference/14_lifecycle_complete_specification.md documents explicit
  * `false`, e.g. `$_load_render_only=false`, as the way a child opts out).
  *
  * NOTE ON TEST DESIGN (boot-skip):

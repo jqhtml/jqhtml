@@ -62,7 +62,7 @@ Should show heading and numbered items when array has elements.
 ## Related Files
 
 - **Parser**: `packages/parser/src/lexer.ts`, `packages/parser/src/parser.ts`, `packages/parser/src/codegen.ts`
-- **Documentation**: `CLAUDE.md`, `docs/official/01_template_syntax.md`
+- **Documentation**: `CLAUDE.md`, `docs/reference/01_template_syntax.md`
 
 ## Running the Test
 

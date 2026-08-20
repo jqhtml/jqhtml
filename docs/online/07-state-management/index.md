@@ -276,8 +276,8 @@ on_ready() {
 ## Documentation Notes
 
 ### References
-- `docs/official/14_lifecycle_complete_specification.md` - State properties and decision tree
-- `docs/official/15_deduplication_and_caching.md` - How args/data affect caching
+- `docs/reference/14_lifecycle_complete_specification.md` - State properties and decision tree
+- `docs/reference/15_deduplication_and_caching.md` - How args/data affect caching
 
 ### Last Updated
 2026-07-21

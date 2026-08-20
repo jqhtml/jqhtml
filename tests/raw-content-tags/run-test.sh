@@ -13,4 +13,4 @@ echo "  - Attributes work correctly on raw tags"
 echo ""
 
 # Run the test with the unified test runner (only .jqhtml file)
-node /var/www/html/jqhtml/jqhtml-tester-10-23/test-runner.js test.jqhtml
+node /var/www/html/jqhtml/jqhtml-render-harness/test-runner.js test.jqhtml

@@ -286,8 +286,8 @@ See [State Management](../07-state-management/) for when to use `this.args`, `th
 ## Documentation Notes
 
 ### References
-- `docs/official/03_dollar_attribute_system.md` - $ attributes and scoped IDs
-- `docs/official/11_attribute_handling_comprehensive.md` - All attribute types
+- `docs/reference/03_dollar_attribute_system.md` - $ attributes and scoped IDs
+- `docs/reference/11_attribute_handling_comprehensive.md` - All attribute types
 
 ### Last Updated
 2026-07-21

@@ -9,7 +9,7 @@ echo "  - First call: filter='initial'"
 echo "  - Second call: filter='modified_by_parent' (after 500ms)"
 echo ""
 
-node ../../jqhtml-tester-10-23/test-runner.js \
+node ../../jqhtml-render-harness/test-runner.js \
   test.jqhtml \
   test.js \
   parent_component.jqhtml \

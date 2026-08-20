@@ -254,8 +254,8 @@ Most components (95%) only need `content()`. Use slots when you need multiple di
 ## Documentation Notes
 
 ### References
-- `docs/official/05_component_nesting_and_content.md` - content() function
-- `docs/official/06_slot_system.md` - Named slots and inheritance
+- `docs/reference/05_component_nesting_and_content.md` - content() function
+- `docs/reference/06_slot_system.md` - Named slots and inheritance
 
 ### Last Updated
 2026-08-18

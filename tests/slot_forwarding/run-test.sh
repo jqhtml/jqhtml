@@ -4,7 +4,7 @@ cd "$(dirname "$0")"
 echo "Running Slot Forwarding Test..."
 echo ""
 
-node ../../jqhtml-tester-10-23/test-runner.js \
+node ../../jqhtml-render-harness/test-runner.js \
   test.jqhtml \
   test.js \
   component_a.jqhtml \
