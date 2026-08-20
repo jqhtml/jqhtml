@@ -16,7 +16,7 @@ JQHTML templates compile to JavaScript functions that return instruction arrays.
 
 ```jqhtml
 <Define:ComponentName tag="span">
-  Content rendered as <span> instead of <div>
+  Content rendered as &lt;span&gt; instead of &lt;div&gt;
 </Define:ComponentName>
 ```
 
@@ -265,7 +265,8 @@ Sometimes you need to conditionally include attributes based on runtime conditio
 ```jqhtml
 <Define:Button>
   <button
-    class="btn <% if (this.args.primary) { %>btn-primary<% } %>"
+    class="btn"
+    <% if (this.args.primary) { %>data-variant="primary"<% } %>
     <% if (this.args.disabled) { %>disabled<% } %>
   >
     <%= this.args.label %>
@@ -274,10 +275,12 @@ Sometimes you need to conditionally include attributes based on runtime conditio
 ```
 
 **How it works**:
-- Conditional blocks can appear in the attribute list
+- Conditional blocks can appear in the ATTRIBUTE LIST, between attributes
 - Attributes inside conditionals are included/excluded at runtime
-- For conditional classes, use in-string conditionals: `class="base <% if (x) { %>extra<% } %>"`
 - Boolean attributes (disabled, checked, etc.) work directly as conditional attributes
+- A `<% %>` block may NOT appear inside a quoted attribute VALUE - the parser
+  rejects `class="base <% if (x) { %>extra<% } %>"`. For a conditional class,
+  add it from JavaScript instead: `<% if (x) { this.$.addClass('extra'); } %>`
 
 **Common use cases**:
 ```jqhtml

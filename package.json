@@ -22,7 +22,8 @@
     "watch:core": "cd packages/core && npm run watch",
     "test": "cd tests && ./run-all-tests.sh",
     "test:core": "cd packages/core && npm test",
-    "test:parser": "cd packages/parser && npm test"
+    "test:parser": "cd packages/parser && npm test",
+    "validate:docs": "node scripts/validate_doc_examples.js"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

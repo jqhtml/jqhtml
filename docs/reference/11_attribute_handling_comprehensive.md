@@ -337,7 +337,8 @@ Include attributes conditionally based on runtime conditions using conditional b
 ```jqhtml
 <Define:Button>
   <button
-    class="btn <% if (this.args.primary) { %>btn-primary<% } %>"
+    class="btn"
+    <% if (this.args.primary) { %>data-variant="primary"<% } %>
     <% if (this.args.disabled) { %>disabled<% } %>
   >
     <%= this.args.label %>
@@ -425,7 +426,7 @@ Renders as:
 
 ### On Define
 ```jqhtml
-<Define:Button tag="button" class="btn" disabled>
+<Define:Button tag="button" class="btn" disabled="disabled">
   <%= content() %>
 </Define:Button>
 ```
