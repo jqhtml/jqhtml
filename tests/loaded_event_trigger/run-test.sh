@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_FILE="$SCRIPT_DIR/test.jqhtml"
 
 # Run the test using the jqhtml-tester with all dependencies
-node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/with_on_load.jqhtml" \
   "$SCRIPT_DIR/without_on_load.jqhtml" \

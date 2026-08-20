@@ -1,14 +1,14 @@
 # JQHTML Testing Guide
 
-## Primary Testing Method: jqhtml-tester-10-23
+## Primary Testing Method: jqhtml-render-harness
 
-**Location:** `/var/www/html/jqhtml/jqhtml-tester-10-23/`
+**Location:** `/var/www/html/jqhtml/jqhtml-render-harness/`
 
 **This is the ONLY approved way to test JQHTML components unless otherwise instructed.**
 
 ### How It Works
 
-The `jqhtml-tester-10-23` test runner:
+The `jqhtml-render-harness` test runner:
 
 1. Compiles `.jqhtml` templates using `jqhtml-compile`
 2. Bundles with Webpack (exactly replicating RSpade's production approach)
@@ -38,7 +38,7 @@ cd /var/www/html/jqhtml/tests
 ./run-all-tests.sh
 ```
 
-`run-all-tests.sh` bootstraps `jqhtml-tester-10-23`'s dependencies on a fresh
+`run-all-tests.sh` bootstraps `jqhtml-render-harness`'s dependencies on a fresh
 clone if needed, then hands off to `parallel-test-runner.js`, which:
 
 1. Discovers every directory under `tests/` that contains a `run-test.sh`
@@ -71,7 +71,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_FILE="$SCRIPT_DIR/test.jqhtml"
 
 # Pass all .jqhtml dependencies to test runner
-node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/dependency1.jqhtml" \
   "$SCRIPT_DIR/dependency2.jqhtml"

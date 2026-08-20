@@ -12,7 +12,7 @@ TEST_FILE="$SCRIPT_DIR/test.jqhtml"
 
 # Run the test using the jqhtml-tester with all dependencies
 # NOTE: phone_text_input.jqhtml does NOT exist - only .js file
-node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/text_input.jqhtml" \
   "$SCRIPT_DIR/tester.jqhtml" \

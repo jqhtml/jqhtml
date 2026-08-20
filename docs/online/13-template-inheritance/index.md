@@ -264,8 +264,8 @@ Use for multi-layer architectures where presentation is defined at the top but r
 ## Documentation Notes
 
 ### References
-- `docs/official/06_slot_system.md` - Slot-based template inheritance
-- `docs/official/10_clarifications_attribute_precedence.md` - Attribute precedence rules
+- `docs/reference/06_slot_system.md` - Slot-based template inheritance
+- `docs/reference/10_clarifications_attribute_precedence.md` - Attribute precedence rules
 
 ### Last Updated
 2025-11-25

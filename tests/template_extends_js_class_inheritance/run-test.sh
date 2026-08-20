@@ -12,7 +12,7 @@ TEST_FILE="$SCRIPT_DIR/test.jqhtml"
 
 # Run the test using the jqhtml-tester with all dependencies
 # NOTE: contacts_datagrid.js does NOT exist - only template
-node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/datagrid_abstract.jqhtml" \
   "$SCRIPT_DIR/contacts_datagrid.jqhtml" \

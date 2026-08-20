@@ -324,7 +324,7 @@ the full spacing-ownership rules.
 ## Documentation Notes
 
 ### References
-- `docs/official/19_scss_styling_conventions.md` - Full specification
+- `docs/reference/19_scss_styling_conventions.md` - Full specification
 
 ### Last Updated
 2026-08-18

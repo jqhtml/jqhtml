@@ -167,8 +167,8 @@ For the design practice behind the framework, see [Semantic Design](../17-semant
 ## Documentation Notes
 
 ### References
-- `docs/official/00_INDEX.md` - Overview and philosophy
-- `docs/official/15_semantic_first_design_philosophy.md` - Core philosophy and examples
+- `docs/reference/00_INDEX.md` - Overview and philosophy
+- `docs/reference/15_semantic_first_design_philosophy.md` - Core philosophy and examples
 
 ### Last Updated
 2026-08-18

@@ -12,7 +12,7 @@ TEST_FILE="$SCRIPT_DIR/test.jqhtml"
 
 # Run the test using the jqhtml-tester with all dependencies
 # NOTE: form_base.jqhtml has template, my_form.js has NO template (just class)
-node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/form_base.jqhtml" \
   "$SCRIPT_DIR/my_form.js" \

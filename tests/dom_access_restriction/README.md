@@ -75,7 +75,7 @@ cd /var/www/html/jqhtml/tests/dom_access_restriction
 ## Related Files
 
 - **Implementation**: `/var/www/html/jqhtml/packages/core/src/component.ts` (load() method)
-- **Documentation**: `/var/www/html/jqhtml/docs/official/15_deduplication_and_caching.md`
+- **Documentation**: `/var/www/html/jqhtml/docs/reference/15_deduplication_and_caching.md`
 - **Feature**: Request deduplication + DOM access restriction
 
 ## Performance

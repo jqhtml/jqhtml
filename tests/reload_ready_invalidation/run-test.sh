@@ -4,7 +4,7 @@
 # Tests that .on('ready') handlers added during reload wait for completion
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-TESTER_DIR="$SCRIPT_DIR/../../jqhtml-tester-10-23"
+TESTER_DIR="$SCRIPT_DIR/../../jqhtml-render-harness"
 
 # Run test
 node "$TESTER_DIR/test-runner.js" \

@@ -380,8 +380,8 @@ if ($element.hasClass('Component')) {
 ## Documentation Notes
 
 ### References
-- `docs/official/02_component_definition.md` - Component structure and registration
-- `docs/official/12_incremental_scaffolding.md` - Undefined components
+- `docs/reference/02_component_definition.md` - Component structure and registration
+- `docs/reference/12_incremental_scaffolding.md` - Undefined components
 
 ### Last Updated
 2026-08-18

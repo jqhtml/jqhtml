@@ -250,7 +250,7 @@ card.set_title('Hello').set_theme('dark');
 ## Documentation Notes
 
 ### References
-- `docs/official/08_jquery_integration.md` - Complete jQuery integration guide
+- `docs/reference/08_jquery_integration.md` - Complete jQuery integration guide
 
 ### Last Updated
 2026-08-19

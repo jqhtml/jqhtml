@@ -25,7 +25,7 @@ echo ""
 echo "Running test..."
 echo ""
 
-node /var/www/html/jqhtml/jqhtml-tester-10-23/test-runner.js \
+node /var/www/html/jqhtml/jqhtml-render-harness/test-runner.js \
   outer.jqhtml \
   inner.jqhtml \
   outer.js \

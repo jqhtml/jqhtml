@@ -3,7 +3,7 @@
 Behavioural test for `jqhtml.configure()` / `jqhtml.init($, config)` — the integration-level
 settings a host application supplies to describe its environment.
 
-Full specification: `docs/official/20_runtime_configuration.md`.
+Full specification: `docs/reference/20_runtime_configuration.md`.
 
 ## What it validates (27 assertions)
 

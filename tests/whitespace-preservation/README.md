@@ -91,7 +91,7 @@ Verify that whitespace in JQHTML templates is properly preserved or collapsed ac
 ## Running the Test
 
 ```bash
-cd /var/www/html/jqhtml/jqhtml-tester-10-23
+cd /var/www/html/jqhtml/jqhtml-render-harness
 node test-runner.js ../tests/whitespace-preservation/test.jqhtml
 ```
 

@@ -152,7 +152,7 @@ class Parent_Component extends Jqhtml_Component {
 
 Or manually:
 ```bash
-node ../../jqhtml-tester-10-23/test-runner.js test.jqhtml
+node ../../jqhtml-render-harness/test-runner.js test.jqhtml
 ```
 
 ## Expected Output

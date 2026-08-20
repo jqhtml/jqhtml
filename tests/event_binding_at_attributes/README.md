@@ -66,4 +66,4 @@ Handlers receive standard DOM event with:
 ## Related Documentation
 
 - CLAUDE.md: Template Syntax - @ Attributes (Event Binding)
-- docs/official/01_template_syntax.md: @ Attributes section
+- docs/reference/01_template_syntax.md: @ Attributes section

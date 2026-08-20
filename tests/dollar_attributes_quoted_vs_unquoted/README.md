@@ -62,4 +62,4 @@ this.args.handler === this.callback     // typeof: "function"
 ## Related Documentation
 
 - CLAUDE.md: $ Attributes (Component Parameters)
-- docs/official/03_dollar_attribute_system.md: Quoted vs Unquoted
+- docs/reference/03_dollar_attribute_system.md: Quoted vs Unquoted

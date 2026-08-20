@@ -24,7 +24,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
     scoping, `reload()` and `render()` are all unaffected. The separate TRANSIENT `data-cid`
     the instruction processor uses to correlate freshly-injected HTML with component data is
     functional and is never suppressed. Docs:
-    `docs/official/20_runtime_configuration.md`. Test: `tests/integration_config_modes`
+    `docs/reference/20_runtime_configuration.md`. Test: `tests/integration_config_modes`
     (34 assertions).
 
 - `on_viewport_resize(viewport_width)` — a viewport hook on `Jqhtml_Component`. The

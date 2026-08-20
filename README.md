@@ -154,9 +154,9 @@ Documentation also ships in this repo, which is useful offline or when working a
 specific commit:
 
 - **[CLAUDE.md](./CLAUDE.md)** — agent & developer quickstart (the fastest complete overview)
-- **[docs/official/](./docs/official/)** — detailed feature specifications
+- **[docs/reference/](./docs/reference/)** — detailed feature specifications
 - **[docs/online/](./docs/online/)** — the source the documentation site is built from
-- **[docs/official/LLM_REFERENCE_OFFICIAL_07_26.md](./docs/official/LLM_REFERENCE_OFFICIAL_07_26.md)** — drop-in LLM context for AI-assisted development with JQHTML
+- **[docs/reference/LLM_REFERENCE_OFFICIAL_07_26.md](./docs/reference/LLM_REFERENCE_OFFICIAL_07_26.md)** — drop-in LLM context for AI-assisted development with JQHTML
 
 ---
 

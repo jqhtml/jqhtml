@@ -295,7 +295,7 @@ Access component data through `this`:
 ## Documentation Notes
 
 ### References
-- `docs/official/01_template_syntax.md` - Complete template syntax reference
+- `docs/reference/01_template_syntax.md` - Complete template syntax reference
 
 ### Last Updated
 2026-07-21

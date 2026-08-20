@@ -3,7 +3,7 @@
 # (packages/core/src/component-registry.ts:349-389)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-OUT=$(node "$SCRIPT_DIR/../../jqhtml-tester-10-23/test-runner.js" \
+OUT=$(node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test.jqhtml" \
   "$SCRIPT_DIR/test.js" \
   --delay=2 2>&1)

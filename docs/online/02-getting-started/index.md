@@ -257,8 +257,8 @@ First-party bundler plugins are available for Vite and esbuild — [`@jqhtml/vit
 ## Documentation Notes
 
 ### References
-- `docs/official/02_component_definition.md` - Component structure and registration
-- `docs/official/12_incremental_scaffolding.md` - Undefined components and workflow
+- `docs/reference/02_component_definition.md` - Component structure and registration
+- `docs/reference/12_incremental_scaffolding.md` - Undefined components and workflow
 
 ### Last Updated
 2026-08-19

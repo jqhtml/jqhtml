@@ -11,4 +11,4 @@ echo "  - Even when rendered inside Child component via content()"
 echo ""
 
 # Run the test with the unified test runner (parent.jqhtml is main, child.jqhtml is dependency)
-node /var/www/html/jqhtml/jqhtml-tester-10-23/test-runner.js parent.jqhtml child.jqhtml
+node /var/www/html/jqhtml/jqhtml-render-harness/test-runner.js parent.jqhtml child.jqhtml

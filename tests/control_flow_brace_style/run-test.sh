@@ -7,7 +7,7 @@ echo "=========================================="
 cd "$(dirname "$0")"
 
 # Use the unified test runner
-../../jqhtml-tester-10-23/test-runner.js test.jqhtml test.js
+../../jqhtml-render-harness/test-runner.js test.jqhtml test.js
 
 echo ""
 echo "✅ Test complete!"

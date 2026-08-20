@@ -11,7 +11,7 @@ Copyright (c) 2026 HansonXyz. MIT License.
 **Always consult project documentation before answering questions about jqhtml syntax, features, or behavior.** JQHTML has its own syntax and conventions — do not give generic answers based on how other frameworks work.
 
 When asked about jqhtml:
-1. Search/read this file, `docs/official/`, and relevant source files
+1. Search/read this file, `docs/reference/`, and relevant source files
 2. Verify the answer against actual project documentation
 3. Only then respond with the documented answer
 
@@ -526,7 +526,7 @@ removed during rendering, and never suppressed.
 
 Configure before components boot; `debug_attributes` is read during rendering.
 
-**Full documentation:** `/docs/official/20_runtime_configuration.md`
+**Full documentation:** `/docs/reference/20_runtime_configuration.md`
 
 ### Caching (Stale-While-Revalidate)
 
@@ -549,7 +549,7 @@ A second parameter selects the mode: `set_cache_key(key, 'data' | 'html')`. Defa
 
 Components can override the cache key via a `cache_id()` method when `this.args` doesn't capture what matters.
 
-**Full documentation:** `docs/official/15_deduplication_and_caching.md`
+**Full documentation:** `docs/reference/15_deduplication_and_caching.md`
 
 ### Server Integration (jqhtml.boot)
 
@@ -557,7 +557,7 @@ Hydrate server-rendered placeholders into live components. The server outputs `<
 
 **SSR Preload APIs** on `window.jqhtml`: `start_data_capture()`, `get_captured_data()`, `stop_data_capture()`, `set_preload_data(entries)`, `clear_preload_data()`. See `packages/ssr/README.md`.
 
-**Full documentation:** `docs/official/18_boot.md`
+**Full documentation:** `docs/reference/18_boot.md`
 
 ---
 
@@ -601,7 +601,7 @@ packages/
 
 - **`packages/core`** — key files: `src/component.ts` (base class), `src/lifecycle-manager.ts` (5-stage orchestration), `src/index.ts` (entry)
 - **`packages/parser`** — key files: `src/lexer.ts`, `src/parser.ts`, `src/codegen.ts`; ships the `jqhtml-compile` CLI
-- **`docs/official/`** — detailed feature documentation (source of truth)
+- **`docs/reference/`** — detailed feature documentation (source of truth)
 - **`tests/`** — behavioral test suites
 
 ### Template Compilation

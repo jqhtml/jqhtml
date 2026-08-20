@@ -351,7 +351,7 @@ Both flags cascade from parent to children automatically.
 ## Documentation Notes
 
 ### References
-- `docs/official/15_deduplication_and_caching.md` - Complete deduplication and caching specification
+- `docs/reference/15_deduplication_and_caching.md` - Complete deduplication and caching specification
 
 ### Last Updated
 2026-08-19

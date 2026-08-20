@@ -75,7 +75,7 @@ emitter.on('my-event', (component, data) => {
 ## Related Files
 
 - `packages/core/src/component.ts` - `on()` and `trigger()` methods
-- `docs/official/14_lifecycle_complete_specification.md` - Event system documentation
+- `docs/reference/14_lifecycle_complete_specification.md` - Event system documentation
 
 ## Running the Test
 

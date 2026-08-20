@@ -46,4 +46,4 @@ This is a **critical template feature** - ensuring that:
 ## Related Documentation
 
 - CLAUDE.md: Template Syntax Reference
-- docs/official/01_template_syntax.md: Interpolation section
+- docs/reference/01_template_syntax.md: Interpolation section

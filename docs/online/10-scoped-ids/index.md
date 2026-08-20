@@ -306,8 +306,8 @@ this.$sid('row2').addClass('table-row');
 ## Documentation Notes
 
 ### References
-- `docs/official/03_dollar_attribute_system.md` - $sid attribute syntax
-- `docs/official/13_scoped_ids_and_element_access.md` - Complete element access guide
+- `docs/reference/03_dollar_attribute_system.md` - $sid attribute syntax
+- `docs/reference/13_scoped_ids_and_element_access.md` - Complete element access guide
 
 ### Last Updated
 2026-08-19

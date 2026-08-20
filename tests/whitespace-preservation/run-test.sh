@@ -11,7 +11,7 @@ echo "=================================================="
 echo ""
 
 # Run the test
-node ../../jqhtml-tester-10-23/test-runner.js "$TEST_DIR/test.jqhtml"
+node ../../jqhtml-render-harness/test-runner.js "$TEST_DIR/test.jqhtml"
 
 echo ""
 echo "=================================================="

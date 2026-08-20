@@ -477,7 +477,7 @@ class InvoiceEditor extends Jqhtml_Component {
 ## Documentation Notes
 
 ### References
-- `docs/official/14_lifecycle_complete_specification.md` - Complete lifecycle specification
+- `docs/reference/14_lifecycle_complete_specification.md` - Complete lifecycle specification
 
 ### Last Updated
 2026-08-07

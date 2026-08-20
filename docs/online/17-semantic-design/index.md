@@ -402,10 +402,10 @@ The unit of work is one page, end to end. Never convert half a page.
 ## Documentation Notes
 
 ### References
-- `docs/official/15_semantic_first_design_philosophy.md` — semantic-first premise, naming, the four component-creation triggers, argument rules, spacing ownership, empty states, the success test
-- `docs/official/17_semantic_iterative_design_methodology.md` — when a component earns its existence, the evidence bar, extract/lever/promote, granularity, conversion workflow, pitfalls
-- `docs/official/19_scss_styling_conventions.md` — one file per component, wrapper pattern
-- `docs/official/06_slot_system.md` — slot syntax used in examples
+- `docs/reference/15_semantic_first_design_philosophy.md` — semantic-first premise, naming, the four component-creation triggers, argument rules, spacing ownership, empty states, the success test
+- `docs/reference/17_semantic_iterative_design_methodology.md` — when a component earns its existence, the evidence bar, extract/lever/promote, granularity, conversion workflow, pitfalls
+- `docs/reference/19_scss_styling_conventions.md` — one file per component, wrapper pattern
+- `docs/reference/06_slot_system.md` — slot syntax used in examples
 - `docs/online/EDITS.md` — PascalCase-in-docs convention; `Jqhtml_Component` keeps its underscore
 
 ### Last Updated

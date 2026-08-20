@@ -137,7 +137,7 @@ $('#container').component('Card', {
 
 This bypasses the `content()` rendering and uses the provided HTML string directly.
 
-**Note**: In practice, `_inner_html` is normally set for you by the boot()/SSR hydration flow (see `/docs/official/18_boot.md`) rather than passed manually in application code - the server emits a `_Component_Init` placeholder carrying the pre-rendered HTML, and `jqhtml.boot()` wires it up via `_inner_html` when hydrating. The direct manual call shown above is the underlying mechanism, useful to understand but rarely written by hand.
+**Note**: In practice, `_inner_html` is normally set for you by the boot()/SSR hydration flow (see `/docs/reference/18_boot.md`) rather than passed manually in application code - the server emits a `_Component_Init` placeholder carrying the pre-rendered HTML, and `jqhtml.boot()` wires it up via `_inner_html` when hydrating. The direct manual call shown above is the underlying mechanism, useful to understand but rarely written by hand.
 
 **Important**: Only works with the default slot, not named slots.
 

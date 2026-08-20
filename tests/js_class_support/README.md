@@ -86,7 +86,7 @@ Component CID: c1
 
 ## Implementation Files
 
-- **Test runner**: `/jqhtml-tester-10-23/test-runner.js`
+- **Test runner**: `/jqhtml-render-harness/test-runner.js`
   - Checks for paired `.js` files (same basename as `.jqhtml`)
   - Inlines JS code with `register_component()` call
 - **Component registry**: `/packages/core/src/component-registry.ts`

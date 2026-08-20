@@ -37,7 +37,7 @@ See [Conventional Commits](https://conventionalcommits.org) for commit guideline
   While gated, the wait is released by whichever comes first — all gates settling,
   `reload()`, `refresh()`, or `stop()` — and any later settlement is a no-op. A no-op
   during SSR. jqhtml stays agnostic about what is awaited; timeout policy is the
-  caller's. See `docs/official/14_lifecycle_complete_specification.md` (§4a) and the
+  caller's. See `docs/reference/14_lifecycle_complete_specification.md` (§4a) and the
   `tests/gate_load/` behavioral test.
 
 ## 2.2.13 (2025-09-21)

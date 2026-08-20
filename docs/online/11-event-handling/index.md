@@ -290,9 +290,9 @@ This approach is often cleaner than event broadcasting when the parent-child rel
 ## Documentation Notes
 
 ### References
-- `docs/official/01_template_syntax.md` - @ event binding syntax
-- `docs/official/08_jquery_integration.md` - jQuery event handling
-- `docs/official/14_lifecycle_complete_specification.md` - Viewport Resize section
+- `docs/reference/01_template_syntax.md` - @ event binding syntax
+- `docs/reference/08_jquery_integration.md` - jQuery event handling
+- `docs/reference/14_lifecycle_complete_specification.md` - Viewport Resize section
 
 ### Last Updated
 2026-08-19

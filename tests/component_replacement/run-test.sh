@@ -23,7 +23,7 @@ fi
 # Run test using jqhtml-tester
 echo ""
 echo "Running test..."
-node /var/www/html/jqhtml/jqhtml-tester-10-23/test-runner.js \
+node /var/www/html/jqhtml/jqhtml-render-harness/test-runner.js \
   test_container.jqhtml \
   first_component.jqhtml \
   second_component.jqhtml \

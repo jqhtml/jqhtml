@@ -122,7 +122,7 @@ resolves and a `jqhtml:ready` `CustomEvent` fires on `document`:
 
 > The `data-cid` below is a debug attribute, shown here because this example is a development
 > render. It is absent when jqhtml runs with `mode: 'production'`, and nothing — including
-> `boot()` — resolves through it. See `docs/official/20_runtime_configuration.md`.
+> `boot()` — resolves through it. See `docs/reference/20_runtime_configuration.md`.
 
 ```html
 <div class="UserCard Component" data-cid="abc123xyz">

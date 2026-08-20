@@ -1551,8 +1551,8 @@ function generate_invocation_key(component_name, args) {
 
 ## Related Documentation
 
-- **Component Lifecycle:** `docs/official/14_lifecycle_complete_specification.md` - Full lifecycle including reload() behavior
-- **Debugging Tools:** `docs/official/09_debugging_tools.md` - Verbose mode and debugging
+- **Component Lifecycle:** `docs/reference/14_lifecycle_complete_specification.md` - Full lifecycle including reload() behavior
+- **Debugging Tools:** `docs/reference/09_debugging_tools.md` - Verbose mode and debugging
 - **Error Handling:** `docs/internal/11-13-ON_LOAD_ERROR_HANDLING.md` (design phase)
 
 ## Skipping Revalidation with use_cached_data

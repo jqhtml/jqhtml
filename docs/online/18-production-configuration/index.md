@@ -128,8 +128,8 @@ describes the environment your application is running in.
 ## Documentation Notes
 
 ### References
-- `docs/official/20_runtime_configuration.md` - full specification
-- `docs/official/15_deduplication_and_caching.md` - which args can be keyed
+- `docs/reference/20_runtime_configuration.md` - full specification
+- `docs/reference/15_deduplication_and_caching.md` - which args can be keyed
 
 ### Last Updated
 2026-08-19
