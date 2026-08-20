@@ -51,11 +51,11 @@ The extension highlights all JQHTML v2 syntax:
     <!-- Template expressions -->
     <h1><%= this.data.title %></h1>
     
-    <!-- Data binding -->
-    <input :value="this.data.name" :disabled="isLocked" />
+    <!-- Scoped IDs -->
+    <input $sid="name_field" />
     
-    <!-- Event handlers -->
-    <button @click="handleClick">Click Me</button>
+    <!-- Event handlers (unquoted, so the function reference is passed) -->
+    <button @click=this.handle_click>Click Me</button>
     
     <!-- Control flow (brace style) -->
     <% if (this.data.other) { %>

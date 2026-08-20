@@ -81,11 +81,11 @@ For template-specific control flow, colon style provides PHP-like syntax:
 
 ```jqhtml
 <!-- Colon style (requires endif/endfor) -->
-<% if (condition): %>
+<% if (condition) { %>
   <p>True branch</p>
-<% else: %>
+<% } else { %>
   <p>False branch</p>
-<% endif; %>
+<% } %>
 
 <% for (const item of items): %>
   <div><%= item.name %></div>
@@ -510,13 +510,13 @@ The following HTML tags are automatically treated as self-closing:
   <div class="dashboard">
     <Header $title="User Management">
       <Slot:actions>
-        <button $onclick=this.addUser>Add User</button>
+        <button @click=this.addUser>Add User</button>
       </Slot:actions>
     </Header>
     
-    <% if (this.data.loading): %>
+    <% if (this.data.loading) { %>
       <LoadingSpinner />
-    <% else: %>
+    <% } else { %>
       <UserTable $users=this.data.users>
         <Slot:header>
           <th>ID</th>
@@ -532,7 +532,7 @@ The following HTML tags are automatically treated as self-closing:
           </td>
         </Slot:row>
       </UserTable>
-    <% endif; %>
+    <% } %>
   </div>
 </Define:UserDashboard>
 ```

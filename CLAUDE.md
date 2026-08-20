@@ -84,7 +84,7 @@ You provide ONLY styling classes in the `class=""` attribute.
 
 ### Define Tag Attributes
 
-```jqhtml
+```jqhtml fragment
 <Define:Contacts_DataGrid
     extends="DataGrid_Abstract"
     $ajax_endpoint=Frontend_Contacts_Controller.datagrid_fetch
@@ -623,6 +623,13 @@ cd tests && ./run-all-tests.sh  # Full behavioral suite (78 scenarios × 3 cache
 ```
 
 Individual packages: `npm run build:core`, `npm run build:parser`, `npm run test:parser`, `npm run test:core`. The ssr and vscode-extension packages build/run independently.
+
+`npm run validate:docs` compiles every ```jqhtml example in the documentation, so a
+copy-pasted example is guaranteed to build. Fences may be tagged in the info string
+(after the language, invisible to Markdown renderers): `expect-error` for a deliberate
+counter-example, which is asserted to FAIL, and `fragment` for an incomplete snippet,
+which is skipped. A fence pairing a `<Define:>` with its usage markup needs no tag -
+each `<Define:>` region is compiled on its own.
 
 ### Debug System
 

@@ -173,9 +173,9 @@ When inheriting templates, child attributes can override parent defaults:
 | `tag` | **Not inherited** - each `<Define:>` must set its own `tag=""` or it defaults to `div`, regardless of the parent's `tag` |
 | Other attributes | Child overrides parent |
 
-```jqhtml
+```jqhtml fragment
 <!-- Parent -->
-<Define:BaseButton tag="button" class="btn" disabled>
+<Define:BaseButton tag="button" class="btn" disabled="disabled">
 
 <!-- Child - must repeat tag="button", it is NOT inherited from BaseButton -->
 <Define:PrimaryButton tag="button" extends="BaseButton" class="btn-primary">
