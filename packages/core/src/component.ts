@@ -43,6 +43,9 @@ export class Jqhtml_Component {
   static __jqhtml_component = true;       // Marker for unified register() detection
   static template?: any;                  // Template associated with this component class
 
+  // A bare component name, as accepted by closest() in place of a class selector
+  static readonly COMPONENT_NAME_PATTERN = /^[A-Z][A-Za-z0-9_]*$/;
+
   // Public properties
   $: any;                                 // Component's root jQuery element
   args: Record<string, any>;              // Arguments passed to component
@@ -1923,12 +1926,23 @@ export class Jqhtml_Component {
 
   /**
    * Find closest ancestor component matching selector
+   *
+   * A bare component name - a plain identifier starting with a capital letter,
+   * such as 'Parent_Dashboard' - is treated as the component-name class
+   * selector '.Parent_Dashboard'. Components carry a CSS class for every name
+   * in their prototype chain, so a base class name matches its subclasses too.
+   * Every other selector ('.Foo', '#id', '[attr]', 'div > .Component') is
+   * passed to jQuery unchanged.
    */
   closest(selector: string): Jqhtml_Component | null {
+    const search = Jqhtml_Component.COMPONENT_NAME_PATTERN.test(selector)
+      ? `.${selector}`
+      : selector;
+
     let current = this.$.parent();
 
     while (current.length > 0) {
-      if (current.is(selector)) {
+      if (current.is(search)) {
         const comp = current.data('_component');
         if (comp instanceof Jqhtml_Component) {
           return comp;
