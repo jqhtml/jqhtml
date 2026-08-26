@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/monorepo",
-  "version": "2.3.57",
+  "version": "2.3.58",
   "description": "JQHTML - A jQuery-first Component Framework",
   "private": true,
   "type": "module",
