@@ -27,7 +27,7 @@ This documentation set represents the complete, verified specification of JQHTML
 15. [Semantic Iterative Design Methodology](./17_semantic_iterative_design_methodology.md) - How to build with JQHTML
 16. [Boot - Server-Rendered Component Initialization](./18_boot.md) - Hydrating server-rendered placeholders
 17. [SCSS Styling Conventions](./19_scss_styling_conventions.md) - Recommended per-component SCSS organization
-18. [LLM Reference](./LLM_REFERENCE_OFFICIAL_07_26.md) - Condensed drop-in context for AI-assisted development
+18. [LLM Reference](./LLM_REFERENCE.md) - Condensed drop-in context for AI-assisted development
 
 **Internal / not in public release** (excluded from the public docs set):
 - `07_rspade_integration.md` - RSpade (internal Laravel framework) integration

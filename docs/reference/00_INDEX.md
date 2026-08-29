@@ -576,7 +576,7 @@ Orientation for the docs directory itself — what these documents are and how t
 to the tutorial-style chapters in `docs/online/`.
 
 ### LLM Reference
-**File**: `LLM_REFERENCE_OFFICIAL_07_26.md`
+**File**: `LLM_REFERENCE.md`
 
 A condensed, drop-in reference document intended to be pasted into an LLM's context
 window (or referenced by an AI coding agent) when working on a project that uses
