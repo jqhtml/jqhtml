@@ -13,8 +13,8 @@ const template = `
     <% endif; %>
     
     <div class="actions">
-      <button $onclick="edit_user">Edit</button>
-      <button $onclick="delete_user">Delete</button>
+      <button @click=this.edit_user>Edit</button>
+      <button @click=this.delete_user>Delete</button>
     </div>
   </div>
 </Define:UserCard>

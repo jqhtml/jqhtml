@@ -184,7 +184,7 @@ Parses conditional attribute syntax:
 3. Extracts condition from JavaScript token
 4. Recursively calls `parse_attributes()` for inner attributes
 5. Validates no nested conditionals
-6. Consumes closing `<% } %>` or `<% endif; %>`
+6. Consumes closing `<% } %>`
 
 ### Codegen Changes
 

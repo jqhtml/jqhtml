@@ -106,6 +106,14 @@ function showDiff(baseline, current, showFullDiff = false) {
   }
 }
 
+// Fixtures that are deliberately uncompilable, and why. Anything not listed here must
+// compile and carry a baseline.
+const EXPECTED_UNCOMPILABLE = (() => {
+  const p = path.join(__dirname, 'uncompilable-fixtures.json');
+  if (!fs.existsSync(p)) { return {}; }
+  return JSON.parse(fs.readFileSync(p, 'utf-8')).fixtures || {};
+})();
+
 // Parse arguments
 const args = process.argv.slice(2);
 const verbose = args.includes('--verbose');
@@ -130,12 +138,72 @@ const results = {
 for (const file of files) {
   const baselineFile = path.join(BASELINE_DIR, file.replace('.jqhtml', '.baseline.json'));
 
-  // Check if baseline exists
+  // A fixture with no baseline is a FAILURE, not a skip.
+  //
+  // generate-baseline.js only writes a baseline for a file that compiles, so "no
+  // baseline" means "this fixture does not compile" - the single most important thing
+  // a regression suite should report. Treating it as a skip let broken fixtures drop
+  // silently out of the run while the summary still said all tests passed.
+  //
+  // Fixtures that are uncompilable ON PURPOSE are listed in
+  // test-regression/uncompilable-fixtures.json, with a reason.
   if (!fs.existsSync(baselineFile)) {
-    if (verbose) {
-      console.log(colors.gray(`⏭️  Skipping ${file} (no baseline)`));
+    const expected = EXPECTED_UNCOMPILABLE[file];
+    if (expected) {
+      // An allowlist entry is an ASSERTION, not an exemption: these fixtures exist to
+      // exercise the parser's error reporting, so the error itself is the thing under
+      // test. Skipping them outright would let one start compiling - or start failing
+      // for an entirely different reason - without the suite noticing.
+      results.totalFiles++;
+      console.log(`Testing: ${file}`);
+
+      const attempt = compileTemplate(fs.readFileSync(path.join(CORPUS_DIR, file), 'utf-8'), file);
+
+      if (attempt.success) {
+        results.failed++;
+        console.log(colors.red('  ❌ Expected this fixture to fail, but it compiled!'));
+        console.log(colors.gray(`     ${expected.reason}`));
+        console.log(colors.gray('     Either the fixture changed, or the parser stopped reporting this error.'));
+        results.failures.push({ file, reason: 'expected to fail, but compiled' });
+        if (failFast) { break; }
+        continue;
+      }
+
+      const actual_error = String(attempt.error).split('\n')[0].trim();
+      if (!actual_error.startsWith(expected.error)) {
+        results.failed++;
+        console.log(colors.red('  ❌ Failed with the wrong error!'));
+        console.log(colors.red(`     expected: ${expected.error}`));
+        console.log(colors.green(`     actual:   ${actual_error}`));
+        results.failures.push({ file, reason: `wrong error: ${actual_error}` });
+        if (failFast) { break; }
+        continue;
+      }
+
+      results.passed++;
+      console.log(colors.green(`  ✅ Failed as expected (${actual_error})`));
+      continue;
     }
-    results.skipped++;
+
+    results.totalFiles++;
+    results.failed++;
+    console.log(`Testing: ${file}`);
+    console.log(colors.red('  ❌ No baseline!'));
+
+    // compileTemplate reports failure in its return value rather than throwing
+    const attempt = compileTemplate(fs.readFileSync(path.join(CORPUS_DIR, file), 'utf-8'), file);
+    let reason;
+    if (attempt.success) {
+      console.log(colors.gray(`     The fixture compiles - run: node test-regression/regenerate-one.js ${file}`));
+      reason = 'compiles but has no baseline';
+    } else {
+      const first_line = String(attempt.error).split('\n')[0];
+      console.log(colors.gray(`     Fixture does not compile: ${first_line}`));
+      reason = `does not compile: ${first_line}`;
+    }
+
+    results.failures.push({ file, reason });
+    if (failFast) { break; }
     continue;
   }
 

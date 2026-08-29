@@ -182,7 +182,7 @@
           <p>Previous: <StatusBadge status="offline" label="Away" /></p>
           <p>Busy Status: <StatusBadge status="busy" label="In Meeting" /></p>
         </Card>
-        <pre class="code-comment">// StatusBadge renders as &lt;span&gt; due to as="span" in Define tag
+        <pre class="code-comment">// StatusBadge renders as &lt;span&gt; due to tag="span" in Define tag
 // Nested components work seamlessly within slots
 // Each gets proper status-based styling</pre>
       </div>
@@ -200,9 +200,9 @@
             <h5>Python/Colon Style:</h5>
             <% const items1 = ['First', 'Second', 'Third']; %>
             <ul>
-              <% for (const item of items1): %>
+              <% for (const item of items1) { %>
                 <li><%= item %> (colon syntax)</li>
-              <% endfor; %>
+              <% } %>
             </ul>
           </div>
           
@@ -229,11 +229,11 @@
       <div class="example-group">
         <h4>Collision-Free Element IDs</h4>
         <Card $id="scoped-card" title="Card with Scoped ID">
-          <p $id="content">This paragraph has a scoped ID.</p>
-          <button $id="action-btn" onclick="alert('Scoped button clicked!')">Click Me</button>
+          <p $sid="content">This paragraph has a scoped ID.</p>
+          <button $sid="action-btn" onclick="alert('Scoped button clicked!')">Click Me</button>
         </Card>
-        <pre class="code-comment">// $id="name" becomes id="name:_cid" in DOM
-// this.$id('name') finds the scoped element
+        <pre class="code-comment">// $sid="name" becomes id="name:_cid" in DOM
+// this.$sid('name') finds the scoped element
 // Each component instance has unique _cid</pre>
       </div>
     </div>
@@ -283,80 +283,4 @@
       </div>
     </div>
   </div>
-
-  <style>
-    .feature-section {
-      margin: 2rem 0;
-      padding: 2rem;
-      background: #f8f9fa;
-      border-radius: 8px;
-      border: 1px solid #dee2e6;
-    }
-    
-    .feature-section h3 {
-      color: #2c3e50;
-      border-bottom: 2px solid #3498db;
-      padding-bottom: 0.5rem;
-      margin-bottom: 1.5rem;
-    }
-    
-    .example-group {
-      margin: 1.5rem 0;
-      padding: 1rem;
-      background: white;
-      border-radius: 4px;
-      border: 1px solid #e9ecef;
-    }
-    
-    .example-group h4 {
-      color: #495057;
-      margin-bottom: 1rem;
-    }
-    
-    .code-comment {
-      background: #263238;
-      color: #aed581;
-      padding: 1rem;
-      border-radius: 4px;
-      overflow-x: auto;
-      font-size: 0.85rem;
-      margin: 1rem 0 0 0;
-      white-space: pre-wrap;
-    }
-    
-    .syntax-comparison {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
-    }
-    
-    .syntax-example {
-      background: #f1f3f4;
-      padding: 1rem;
-      border-radius: 4px;
-    }
-    
-    .syntax-example h5 {
-      margin-top: 0;
-      color: #5f6368;
-    }
-    
-    .info-box {
-      background: #e3f2fd;
-      border: 1px solid #90caf9;
-      border-radius: 4px;
-      padding: 1rem;
-      color: #1565c0;
-    }
-    
-    .info-box p {
-      margin: 0.5rem 0;
-    }
-    
-    @media (max-width: 768px) {
-      .syntax-comparison {
-        grid-template-columns: 1fr;
-      }
-    }
-  </style>
 </Define:ComponentsRoute>

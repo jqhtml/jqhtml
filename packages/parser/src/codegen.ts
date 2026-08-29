@@ -267,7 +267,7 @@ export class CodeGenerator {
         lines[lines.length - 1] = '}}, this]; }';
       }
 
-      const render_function = lines.join('\n');
+      const render_function = lines.map(line => this.merge_output_pushes(line || '')).join('\n');
 
       // Store component with slot-only metadata
       this.components.set(node.name, {
@@ -304,7 +304,7 @@ export class CodeGenerator {
       lines[lines.length - 1] = 'return [_output, this]; }';
     }
 
-    const render_function = lines.join('\n');
+    const render_function = lines.map(line => this.merge_output_pushes(line || '')).join('\n');
     
     // Validate the generated function syntax using vm.Script for better error reporting
     try {
@@ -474,15 +474,15 @@ export class CodeGenerator {
                   this.sourceFile
                 );
                 error.suggestion =
-                  `\n\nAll content within <textarea> and <pre> tags must be plain text or expressions.\n` +
-                  `HTML tags and components are not allowed.\n\n` +
+                  `\n\nThe content of a <textarea> is text, so HTML tags and components\n` +
+                  `cannot be nested inside it.\n\n` +
                   `Allowed:\n` +
                   `  <textarea><%= this.data.value %></textarea>  ← expressions OK\n` +
                   `  <textarea>plain text</textarea>              ← plain text OK\n\n` +
                   `Not allowed:\n` +
                   `  <textarea><div>content</div></textarea>      ← HTML tags not OK\n` +
                   `  <textarea><MyComponent /></textarea>         ← components not OK\n\n` +
-                  `This ensures proper whitespace preservation.`;
+                  `(<pre> has no such restriction - its content is preserved verbatim.)`;
                 throw error;
               }
             }
@@ -490,14 +490,7 @@ export class CodeGenerator {
             // Generate rawtag instruction with raw content
             const attrs_obj = this.generate_attributes_with_conditionals(tag.attributes, tag.conditionalAttributes);
 
-            // Collect raw content from children (all validated as TEXT)
-            let rawContent = '';
-            for (const child of tag.children) {
-              rawContent += (child as TextNode).content;
-            }
-
-            // Escape the raw content for JavaScript string
-            const escapedContent = this.escape_string(rawContent);
+            const escapedContent = this.generate_raw_tag_content(tag);
 
             const rawtagInstruction = `_output.push({rawtag: ["${tag.name}", ${attrs_obj}, ${escapedContent}]});`;
             lines[lineIndex] = (lines[lineIndex] || '') + rawtagInstruction;
@@ -1016,6 +1009,188 @@ export class CodeGenerator {
     return code;
   }
   
+  /**
+   * Build the content string for a raw-content tag (<textarea>, <pre>).
+   *
+   * Children are concatenated into a single JavaScript expression rather than a
+   * literal, so <%= %> interpolation works inside raw tags. Text is emitted as a
+   * string literal; expressions are escaped (or not, for <%!= %>) exactly as they
+   * would be in normal output. A null or undefined expression contributes nothing
+   * rather than the string "undefined".
+   */
+  /**
+   * Merge consecutive _output.push() calls on a single line into one call.
+   *
+   *   _output.push(" ");_output.push({tag:[..]});_output.push("A");
+   *   -> _output.push(" ", {tag:[..]}, "A");
+   *
+   * Array.prototype.push takes varargs and evaluates its arguments left to right,
+   * so this is behaviour-preserving; it just trims call overhead and shortens the
+   * instruction array the runtime walks.
+   *
+   * Strictly within one line. Codegen is line-based so that generated line N maps to
+   * source line N; moving a statement across a newline would silently invalidate
+   * every sourcemap segment after it.
+   *
+   * Merging happens only at bracket depth 0, which is what keeps nested closures
+   * safe: a component's children are emitted inline as
+   * `function(C) { let _output = []; ... }`, and those inner pushes belong to a
+   * different _output binding. They sit inside parentheses, so they are never
+   * candidates here. Anything that is not a plain _output.push(...) statement -
+   * control flow, an IIFE, a return - ends the run and is emitted untouched.
+   */
+  private merge_output_pushes(line: string): string {
+    const PUSH = '_output.push(';
+    if (line.indexOf(PUSH) === -1) {
+      return line;
+    }
+
+    let result = '';
+    let pending: string[] = [];   // argument text of the run being accumulated
+    let gap = '';                 // whitespace between the previous statement and this one
+
+    const flush = () => {
+      if (pending.length > 0) {
+        result += `_output.push(${pending.join(', ')});`;
+        pending = [];
+      }
+    };
+
+    let i = 0;
+    while (i < line.length) {
+      // Preserve inter-statement whitespace
+      if (/\s/.test(line[i])) {
+        gap += line[i];
+        i++;
+        continue;
+      }
+
+      if (line.startsWith(PUSH, i)) {
+        const args_start = i + PUSH.length;
+        const args_end = this.find_matching_paren(line, args_start - 1);
+
+        // A complete `_output.push(...);` statement, and nothing else on its tail
+        if (args_end !== -1 && line[args_end + 1] === ';') {
+          if (pending.length === 0) {
+            result += gap;   // whitespace belongs before the merged call
+          }
+          gap = '';
+          pending.push(line.slice(args_start, args_end));
+          i = args_end + 2;
+          continue;
+        }
+      }
+
+      // Not a mergeable push: close the run and copy the rest of the statement
+      flush();
+      result += gap;
+      gap = '';
+
+      const stmt_end = this.find_statement_end(line, i);
+      result += line.slice(i, stmt_end);
+      i = stmt_end;
+    }
+
+    flush();
+    return result + gap;
+  }
+
+  /**
+   * Index of the ')' matching the '(' at open_index, or -1. String, template and
+   * comment aware, so a ')' inside "a)b" does not close the call.
+   */
+  private find_matching_paren(text: string, open_index: number): number {
+    let depth = 0;
+    let quote: string | null = null;
+
+    for (let i = open_index; i < text.length; i++) {
+      const ch = text[i];
+
+      if (quote) {
+        if (ch === '\\') { i++; continue; }
+        if (ch === quote) { quote = null; }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '(') { depth++; continue; }
+      if (ch === ')') {
+        depth--;
+        if (depth === 0) { return i; }
+      }
+    }
+
+    return -1;
+  }
+
+  /**
+   * End of the statement starting at index (one past its ';', or end of line),
+   * skipping over strings and any bracketed regions.
+   */
+  private find_statement_end(text: string, start: number): number {
+    let depth = 0;
+    let quote: string | null = null;
+
+    for (let i = start; i < text.length; i++) {
+      const ch = text[i];
+
+      if (quote) {
+        if (ch === '\\') { i++; continue; }
+        if (ch === quote) { quote = null; }
+        continue;
+      }
+
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
+      if (ch === '(' || ch === '[' || ch === '{') { depth++; continue; }
+      if (ch === ')' || ch === ']' || ch === '}') { depth--; continue; }
+      if (ch === ';' && depth <= 0) { return i + 1; }
+    }
+
+    return text.length;
+  }
+
+  private generate_raw_tag_content(node: HtmlTagNode): string {
+    const parts: string[] = [];
+
+    for (const child of node.children) {
+      if (child.type === NodeType.TEXT) {
+        parts.push(this.escape_string((child as TextNode).content));
+      } else if (child.type === NodeType.EXPRESSION) {
+        const expr = child as ExpressionNode;
+        const value = `(${expr.code.trim().replace(/;$/, '')})`;
+        if (expr.nl2br) {
+          parts.push(`jqhtml.escape_html_nl2br(${value} ?? '')`);
+        } else if (expr.escaped) {
+          parts.push(`jqhtml.escape_html(${value} ?? '')`);
+        } else {
+          parts.push(`String(${value} ?? '')`);
+        }
+      } else {
+        // CODE_BLOCK and anything else: a raw tag's content is one flat string, so
+        // there is nowhere for statements or control flow to push output to.
+        const error = new JQHTMLParseError(
+          `Invalid content in <${node.name}> tag`,
+          node.line,
+          node.column || 0,
+          this.sourceContent,
+          this.sourceFile
+        );
+        error.suggestion =
+          `\n\nThe content of <textarea> and <pre> is a single block of text, so ` +
+          `<% %> code blocks cannot be used inside it.\n\n` +
+          `Allowed:\n` +
+          `  <textarea><%= this.data.value %></textarea>  ← expressions OK\n` +
+          `  <textarea>plain text</textarea>              ← plain text OK\n\n` +
+          `Build the value in a code block before the tag and interpolate it:\n` +
+          `  <% const body = cond ? a : b; %>\n` +
+          `  <textarea><%= body %></textarea>`;
+        throw error;
+      }
+    }
+
+    return parts.length > 0 ? parts.join(' + ') : "''";
+  }
+
   private generate_tag_open(node: HtmlTagNode): string {
     // Generate just the opening tag
     const attrs = this.generate_attributes_with_conditionals(node.attributes, node.conditionalAttributes);
@@ -1040,15 +1215,15 @@ export class CodeGenerator {
             this.sourceFile
           );
           error.suggestion =
-            `\n\nAll content within <textarea> and <pre> tags must be plain text or expressions.\n` +
-            `HTML tags and components are not allowed.\n\n` +
+            `\n\nThe content of a <textarea> is text, so HTML tags and components\n` +
+            `cannot be nested inside it.\n\n` +
             `Allowed:\n` +
             `  <textarea><%= this.data.value %></textarea>  ← expressions OK\n` +
             `  <textarea>plain text</textarea>              ← plain text OK\n\n` +
             `Not allowed:\n` +
             `  <textarea><div>content</div></textarea>      ← HTML tags not OK\n` +
             `  <textarea><MyComponent /></textarea>         ← components not OK\n\n` +
-            `This ensures proper whitespace preservation.`;
+            `(<pre> has no such restriction - its content is preserved verbatim.)`;
           throw error;
         }
       }
@@ -1056,14 +1231,7 @@ export class CodeGenerator {
       // Generate rawtag instruction with raw content
       const attrs_obj = this.generate_attributes_with_conditionals(node.attributes, node.conditionalAttributes);
 
-      // Collect raw content from children (all validated as TEXT)
-      let rawContent = '';
-      for (const child of node.children) {
-        rawContent += (child as TextNode).content;
-      }
-
-      // Escape the raw content for JavaScript string
-      const escapedContent = this.escape_string(rawContent);
+      const escapedContent = this.generate_raw_tag_content(node);
 
       return `_output.push({rawtag: ["${node.name}", ${attrs_obj}, ${escapedContent}]});`;
     }

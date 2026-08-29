@@ -1,3 +1,3 @@
-<Define:TestComma as="div">
+<Define:TestComma tag="div">
   <div>Test comma bug</div>
 </Define:TestComma>

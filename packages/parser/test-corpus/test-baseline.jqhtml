@@ -3,18 +3,18 @@
     <%= foobar3() %> <%-- This is line 3 - baseline position --%>
 
     <div class="Counter_Widget">
-        <h4 $id="title" class="counter-title"><%= this.data.title || 'Counter Widget' %></h4>
+        <h4 $sid="title" class="counter-title"><%= this.data.title || 'Counter Widget' %></h4>
         <div class="counter-display">
-            <button $id="decrement" class="btn btn-danger counter-btn" $onclick="decrement">-</button>
-            <span $id="count" class="counter-value"><%=  this.data.initial_value || 0 %></span>
-            <button $id="increment" class="btn btn-success counter-btn" $onclick="increment">+</button>
+            <button $sid="decrement" class="btn btn-danger counter-btn" @click=this.decrement>-</button>
+            <span $sid="count" class="counter-value"><%=  this.data.initial_value || 0 %></span>
+            <button $sid="increment" class="btn btn-success counter-btn" @click=this.increment>+</button>
         </div>
         <div class="counter-controls">
-            <button $id="reset" class="btn btn-sm btn-secondary" $onclick="reset">Reset</button>
-            <button $id="random" class="btn btn-sm btn-info" $onclick="random">Random</button>
+            <button $sid="reset" class="btn btn-sm btn-secondary" @click=this.reset>Reset</button>
+            <button $sid="random" class="btn btn-sm btn-info" @click=this.random>Random</button>
         </div>
-        <div $id="history" $fark="Bob" class="counter-history" style="display:none;">
-            <small>History: <span $id="history_list"></span></small>
+        <div $sid="history" $fark="Bob" class="counter-history" style="display:none;">
+            <small>History: <span $sid="history_list"></span></small>
 
         </div>
 

@@ -402,11 +402,23 @@ function process_rawtag_to_html(
 
   html.push('>');
 
-  // Add raw content - escape HTML entities but preserve whitespace
-  const escaped_content = rawContent
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  // Add raw content, preserving whitespace.
+  //
+  // <textarea> holds text and nothing else, so everything is escaped.
+  //
+  // <pre> holds phrasing content - <pre><code> is the standard code-block idiom - so
+  // markup the author wrote is passed through. A '<' that does not begin a tag is
+  // still escaped, which is what the HTML tokenizer itself does with a stray '<' and
+  // keeps code samples such as "if (a < b)" rendering as written. Interpolated
+  // values are escaped by the compiler before they reach this point.
+  const is_raw_html_content = tagName.toLowerCase() === 'pre';
+
+  const escaped_content = is_raw_html_content
+    ? rawContent.replace(/<(?![a-zA-Z/!?])/g, '&lt;')
+    : rawContent
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
 
   html.push(escaped_content);
 

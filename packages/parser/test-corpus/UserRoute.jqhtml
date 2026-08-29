@@ -1,7 +1,7 @@
 <Define:UserRoute>
     <div class="route-content">
         <h2>User Profile</h2>
-        <% if (this.data.user): %>
+        <% if (this.data.user) { %>
             <div class="user-profile">
                 <div class="user-avatar"><%= this.data.user.avatar %></div>
                 <div class="user-info">
@@ -10,8 +10,8 @@
                     <p><%= this.data.user.bio %></p>
                 </div>
             </div>
-        <% else: %>
+        <% } else { %>
             <div class="loading">Loading user profile...</div>
-        <% endif; %>
+        <% } %>
     </div>
 </Define:UserRoute>

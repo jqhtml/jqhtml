@@ -84,15 +84,15 @@ class My_Component extends Jqhtml_Component {
     <h3 $sid="title"><%= this.data.title %></h3>
 
     <!-- Event handlers call component methods -->
-    <button $sid="save_btn" $onclick="save">Save</button>
+    <button $sid="save_btn" @click=this.save>Save</button>
     <button @click="delete_user">Delete</button>
 
     <!-- All standard events supported -->
-    <input $sid="search" $onkeyup="do_search" />
-    <select $sid="options" $onchange="option_changed">
-      <% for (let opt of this.data.options): %>
+    <input $sid="search" @keyup=this.do_search />
+    <select $sid="options" @change=this.option_changed>
+      <% for (let opt of this.data.options) { %>
         <option value="<%= opt.value %>"><%= opt.label %></option>
-      <% endfor; %>
+      <% } %>
     </select>
   </div>
 </Define:User_Card>
@@ -100,7 +100,7 @@ class My_Component extends Jqhtml_Component {
 
 ### Key Template Features
 - `$sid="name"` - Creates component-scoped ID (becomes `name:_cid123`)
-- `$onclick="method"` - Binds to component method
+- `@click=this.method` - Binds to component method
 - `@click="method"` - Alternative syntax (converts to `data-on-click`)
 - `<%= expr %>` - Output escaped JavaScript expression
 - `<%! expr %>` - Output unescaped (raw HTML)
@@ -202,7 +202,7 @@ class User_Card extends Jqhtml_Component {
         <div class="content" style="display:none;">
           <h3 $sid="name"></h3>
           <p $sid="email"></p>
-          <button $sid="edit_btn" $onclick="edit">Edit</button>
+          <button $sid="edit_btn" @click=this.edit>Edit</button>
           <button $sid="delete_btn" @click="delete_user">Delete</button>
         </div>
       </div>

@@ -73,26 +73,27 @@ Execute JavaScript code using `<% %>`. Regular JavaScript passes through unchang
 <% } %>
 ```
 
-**Design Rationale**: JavaScript code blocks pass through directly into the generated function. This allows developers to use any JavaScript construct without parser limitations. The parser only intervenes for template-specific syntax that isn't valid JavaScript (like the colon-style below).
+**Design Rationale**: JavaScript code blocks pass through directly into the generated function. This allows developers to use any JavaScript construct without parser limitations.
 
 ### 4. Template Control Flow
 
-For template-specific control flow, colon style provides PHP-like syntax:
+Control flow is written in ordinary JavaScript brace style, split across code blocks:
 
 ```jqhtml
-<!-- Colon style (requires endif/endfor) -->
 <% if (condition) { %>
   <p>True branch</p>
 <% } else { %>
   <p>False branch</p>
 <% } %>
 
-<% for (const item of items): %>
+<% for (const item of items) { %>
   <div><%= item.name %></div>
-<% endfor; %>
+<% } %>
 ```
 
-Note: The brace style shown in Code Blocks above is regular JavaScript, not special template syntax.
+This is regular JavaScript rather than special template syntax: the braces open and
+close in separate `<% %>` blocks, and the HTML between them is emitted on each pass.
+
 
 ## Component Invocation
 
@@ -528,7 +529,7 @@ The following HTML tags are automatically treated as self-closing:
           <td><%= row.id %></td>
           <td><%= row.name %></td>
           <td>
-            <button $onclick=this.editUser>Edit</button>
+            <button @click=this.editUser>Edit</button>
           </td>
         </Slot:row>
       </UserTable>

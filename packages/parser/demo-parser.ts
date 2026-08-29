@@ -25,7 +25,7 @@ const template = `
         <ul>
           <% for (let tag of post.tags): %>
             <li>
-              <a href="/tag/<%= tag %>" $onclick="handle_tag_click">
+              <a href="/tag/<%= tag %>" @click=this.handle_tag_click>
                 #<%= tag %>
               </a>
             </li>
@@ -45,7 +45,7 @@ const template = `
           </div>
         <% endfor; %>
         
-        <form $onsubmit="add_comment">
+        <form @submit=this.add_comment>
           <textarea $sid="comment_text" placeholder="Add a comment..."></textarea>
           <button type="submit">Post Comment</button>
         </form>

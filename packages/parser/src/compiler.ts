@@ -257,8 +257,15 @@ function generateSourcemapForWrappedCode(wrappedCode: string, sourceContent: str
   // First line of template maps to source line 1
   mappings.push('AAAA'); // Source line 1
 
-  // Remaining source lines map sequentially
-  for (let i = 1; i < sourceLines; i++) {
+  // Remaining source lines map sequentially, BOUNDED BY THE GENERATED OUTPUT.
+  // A template whose body renders nothing compiles to a one-line render function, so
+  // the source can be far longer than the code it produces - a comment-only header of
+  // 40 lines still emits the same handful of output lines. A segment naming a
+  // generated line that does not exist is a phantom line, and consumers that rebuild
+  // output from the map (source-map's SourceNode.fromStringWithSourceMap, which most
+  // bundlers use for concatenation) materialise each phantom as a bare `undefined`
+  // identifier. That is executable JavaScript, and at top level it throws.
+  for (let i = 1; i < sourceLines && mappings.length < outputLines; i++) {
     mappings.push('AACA'); // Each subsequent source line
   }
 
@@ -277,10 +284,16 @@ function generateSourcemapForWrappedCode(wrappedCode: string, sourceContent: str
     names: []
   };
 
-  // Verify we have the right count
+  // A map that disagrees with its own code is never safe to emit: downstream
+  // consumers trust the segment count and materialise whatever it claims. With the
+  // bound above in place this is an invariant, so treat a violation as a compiler
+  // bug rather than a warning to be scrolled past.
   const finalCount = mappings.length;
   if (finalCount !== outputLines) {
-    console.error(`Warning: Sourcemap line mismatch. Output has ${outputLines} lines, sourcemap has ${finalCount} mapping segments`);
+    throw new Error(
+      `Sourcemap line mismatch for ${filename}: output has ${outputLines} lines, ` +
+      `sourcemap has ${finalCount} mapping segments. This is a bug in the JQHTML compiler.`
+    );
   }
 
   return Buffer.from(JSON.stringify(sourcemap)).toString('base64');

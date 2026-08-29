@@ -64,22 +64,22 @@ ready()  // Fully initialized (bottom-up)
 Both colon and brace styles supported:
 
 ```jqhtml
-<% if (condition): %>
+<% if (condition) { %>
   content
-<% else: %>
+<% } else { %>
   other
-<% endif; %>
+<% } %>
 
-<% for (let item of items): %>
+<% for (let item of items) { %>
   <%= item %>
-<% endfor; %>
+<% } %>
 ```
 
 #### Component Attributes
 
 ```jqhtml
 $sid="name"           // Scoped ID (becomes name:_cid)
-$onclick="method"    // Bind to component method
+@click=this.method    // Bind to component method
 @click="method"      // Alternative syntax
 $class="dynamic"     // Dynamic class binding
 $data-foo="value"    // Data attributes
@@ -313,17 +313,14 @@ $(document).on('jqhtml:ready', (e, component) => {
 
 ```jqhtml
 <!-- Method name -->
-<button $onclick="handleClick">Click</button>
+<button @click=this.handleClick>Click</button>
 
-<!-- Inline function -->
-<button $onclick="() => this.toggle()">Toggle</button>
-
-<!-- With event parameter -->
-<button $onclick="(e) => this.handleEvent(e)">Event</button>
+<!-- With event parameter: the handler receives the event -->
+<button @click=this.handleEvent>Event</button>
 
 <!-- Other events -->
-<input $onchange="updateValue" />
-<form $onsubmit="handleSubmit" />
+<input @change=this.updateValue />
+<form @submit=this.handleSubmit />
 ```
 
 ## Advanced Features

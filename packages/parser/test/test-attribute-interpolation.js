@@ -24,7 +24,7 @@ const test_template = `
     </span>
     
     <!-- Expression binding vs interpolation -->
-    <button $onclick=this.handleClick 
+    <button @click=this.handleClick 
             class="btn <%= btnClass %>"
             title="Tooltip: <%= tooltip %>">
       Click me

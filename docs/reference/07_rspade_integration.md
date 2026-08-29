@@ -302,7 +302,7 @@ Use anywhere:
 
 ```blade
 <Card>
-  <Button $onclick="handleClick">Click Me</Button>
+  <Button @click=this.handleClick>Click Me</Button>
 </Card>
 ```
 

@@ -108,17 +108,17 @@ $('#container').component(Greeting, { name: 'World' });"
     <section class="updates-section">
       <h2>Latest from the Blog</h2>
       <div class="blog-preview">
-        <% if (this.data.latestPosts && this.data.latestPosts.length > 0): %>
-          <% for (const post of this.data.latestPosts): %>
+        <% if (this.data.latestPosts && this.data.latestPosts.length > 0) { %>
+          <% for (const post of this.data.latestPosts) { %>
             <div class="blog-preview-card">
               <h3><a href="/blog/<%= post.id %>"><%= post.title %></a></h3>
               <p class="meta">Published on <%= post.date %></p>
               <p><%= post.excerpt %></p>
             </div>
-          <% endfor; %>
-        <% else: %>
+          <% } %>
+        <% } else { %>
           <p>Loading latest posts...</p>
-        <% endif; %>
+        <% } %>
       </div>
       <p class="text-center mt-2">
         <a href="/blog" class="btn">View All Posts →</a>

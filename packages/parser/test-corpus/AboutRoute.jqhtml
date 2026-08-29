@@ -6,7 +6,7 @@
         <% console.log('[AboutRoute Template] this === null:', this === null); %>
         <% console.log('[AboutRoute Template] data param:', data); %>
         <% console.log('[AboutRoute Template] args param:', args); %>
-        <% if (this && this.data && this.data.content): %>
+        <% if (this && this.data && this.data.content) { %>
             <h2><%= this.data.content.title %></h2>
             <p><%= this.data.content.description %></p>
             <p>JQHTML Router provides:</p>
@@ -17,8 +17,8 @@
                 <li>Navigation guards</li>
                 <li>And much more!</li>
             </ul>
-        <% else: %>
+        <% } else { %>
             <div class="loading">Loading about page...</div>
-        <% endif; %>
+        <% } %>
     </div>
 </Define:AboutRoute>

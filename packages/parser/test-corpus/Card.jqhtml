@@ -3,18 +3,18 @@
         <% console.log('[Card Template] this:', this); %>
         <% console.log('[Card Template] args:', args); %>
         <% console.log('[Card Template] data:', data); %>
-        <% if (args.title): %>
+        <% if (args.title) { %>
             <div class="card-header">
                 <h3><%= args.title %></h3>
             </div>
-        <% endif; %>
+        <% } %>
         <div class="card-body">
             <%= content() %>
         </div>
-        <% if (args.footer): %>
+        <% if (args.footer) { %>
             <div class="card-footer">
                 <%= args.footer %>
             </div>
-        <% endif; %>
+        <% } %>
     </div>
 </Define:Card>

@@ -9,7 +9,7 @@
     <button @click='handleClick'>Wrong - String Not Function</button>
 
     <!-- Test $ attributes with unquoted values -->
-    <div $id="view_btn">Normal quoted $id</div>
+    <div $sid="view_btn">Normal quoted $id</div>
     <div $data=this.userData>Unquoted property access</div>
     <div $value=currentValue>Unquoted variable</div>
     <div $expr=(someExpression)>Expression syntax</div>

@@ -27,7 +27,7 @@ const test_template = `
     <Card $id="user-card" $theme="dark">
       <#header>
         <h2>Active Users</h2>
-        <button $onclick=this.refreshUsers>Refresh</button>
+        <button @click=this.refreshUsers>Refresh</button>
       </#header>
       
       <p>Total users: <%= this.data.userCount %></p>

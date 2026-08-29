@@ -9,21 +9,21 @@
          with proper offset handling --%>
 
     <% function testFunction() { %>
-      <p>Line 11: Inside test function</p>
+      <p>Line 12: Inside test function</p>
     <% } %>
 
     <% testFunction(); %>
 
-    <button $onclick="handleClick">
-      Click Me (Line 17)
+    <button @click=this.handleClick>
+      Click Me (Line 18)
     </button>
 
-    <script>
-      // Line 21
+    <%
+      // Line 22
       function handleClick() {
-        console.log('Button clicked at line 23');
-        barfoo(); // Line 24 - this should error
+        console.log('Button clicked at line 24');
+        barfoo(); // Line 25 - this should error
       }
-    </script>
+    %>
   </div>
 </Define:TestComponent>

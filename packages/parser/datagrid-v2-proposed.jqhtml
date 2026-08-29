@@ -70,11 +70,11 @@
       <td><%= record.name %></td>
       <td><%= record.email %></td>
       <td>
-        <% if (record.is_admin): %>
+        <% if (record.is_admin) { %>
           <span style="color: red; font-weight: bold">Admin</span>
-        <% else: %>
+        <% } else { %>
           User
-        <% endif; %>
+        <% } %>
       </td>
       <td>
         <a href="#" class="btn btn-xs">View</a>

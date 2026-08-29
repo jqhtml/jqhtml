@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/monorepo",
-  "version": "2.3.58",
+  "version": "2.3.59",
   "description": "JQHTML - A jQuery-first Component Framework",
   "private": true,
   "type": "module",
@@ -23,7 +23,11 @@
     "test": "cd tests && ./run-all-tests.sh",
     "test:core": "cd packages/core && npm test",
     "test:parser": "cd packages/parser && npm test",
-    "validate:docs": "node scripts/validate_doc_examples.js"
+    "validate:docs": "node scripts/validate_doc_examples.js",
+    "test:all": "./run-all-suites.sh",
+    "test:regression": "cd packages/parser && npm run test:regression",
+    "test:ssr": "cd packages/ssr && npm test",
+    "test:sourcemap": "cd packages/parser && npm run validate:sourcemap"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

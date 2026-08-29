@@ -260,7 +260,7 @@ if (args.length === 0) {
 
     <% testFunction(); %>
 
-    <button $onclick="handleClick">
+    <button @click=this.handleClick>
       Click Me
     </button>
 

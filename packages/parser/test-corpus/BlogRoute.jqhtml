@@ -1,13 +1,13 @@
 <Define:BlogRoute>
     <div class="route-content">
         <h2>Blog</h2>
-        <% for (const post of this.data.posts || []): %>
+        <% for (const post of this.data.posts || []) { %>
             <div class="blog-post">
                 <h3><%= post.title %></h3>
                 <div class="meta">Published on <%= post.date %></div>
                 <p><%= post.excerpt %></p>
                 <a href="/blog/<%= post.id %>">Read more →</a>
             </div>
-        <% endfor; %>
+        <% } %>
     </div>
 </Define:BlogRoute>

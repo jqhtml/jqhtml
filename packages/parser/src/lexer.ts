@@ -1128,8 +1128,118 @@ export class Lexer {
     
     // Scan attributes until > or />
     this.scan_attributes();
+
+    // <pre> is a raw-text element: everything up to </pre> is literal, including
+    // markup. Tokenizing it as tags is what destroys the whitespace <pre> exists to
+    // preserve, so the content never becomes tags in the first place. JQHTML
+    // delimiters still apply - the block is raw HTML, not an opaque blob.
+    if (name.toLowerCase() === 'pre' && this.last_token_type() === TokenType.GT) {
+      this.scan_raw_text_element('pre');
+    }
   }
-  
+
+  private last_token_type(): TokenType | undefined {
+    return this.tokens.length > 0 ? this.tokens[this.tokens.length - 1].type : undefined;
+  }
+
+  /**
+   * Scan the body of a raw-text element as literal text, stopping at its closing tag.
+   *
+   * Markup inside is emitted as TEXT rather than tags, so <pre><code>..</code></pre>
+   * round-trips exactly as written. JQHTML delimiters are still honoured, so
+   * <%= %> interpolation keeps working; the search for the closing tag skips those
+   * regions, so an expression may contain the literal string "</pre>".
+   *
+   * NEWLINE tokens are emitted as usual: codegen is line-based, and swallowing them
+   * here would desynchronise every downstream line number, including sourcemaps.
+   */
+  private scan_raw_text_element(tag_name: string) {
+    const close_seq = '</' + tag_name;
+    let text = '';
+    let text_start = this.position;
+
+    const flush = () => {
+      if (text.length > 0) {
+        this.add_token(TokenType.TEXT, text, text_start, this.position);
+        text = '';
+      }
+      text_start = this.position;
+    };
+
+    while (this.position < this.input.length) {
+      // Closing tag (case-insensitive, tolerating </pre  >)
+      if (this.current_char() === '<' &&
+          this.input.substr(this.position, close_seq.length).toLowerCase() === close_seq) {
+        const after = this.input.substr(this.position + close_seq.length).match(/^\s*>/);
+        if (after) {
+          flush();
+          return; // leave </pre> for the normal scanner
+        }
+      }
+
+      // JQHTML delimiters still apply inside raw text. scan_expression() and
+      // scan_code_block() stop at the closing %> without consuming it - in normal
+      // scanning the main loop emits that token, so emit it here too.
+      const consume_tag_end = () => {
+        if (this.current_char() === '%' && this.peek_ahead(1) === '>') {
+          const tag_end_start = this.position;
+          this.advance();
+          this.advance();
+          this.add_token(TokenType.TAG_END, '%>', tag_end_start, this.position);
+        }
+      };
+
+      const start = this.position;
+      if (this.match_sequence('<%!=')) {
+        flush();
+        this.add_token(TokenType.EXPRESSION_UNESCAPED, '<%!=', start, this.position);
+        this.scan_expression();
+        consume_tag_end();
+        text_start = this.position;
+        continue;
+      }
+      if (this.match_sequence('<%br=')) {
+        flush();
+        this.add_token(TokenType.EXPRESSION_BR, '<%br=', start, this.position);
+        this.scan_expression();
+        consume_tag_end();
+        text_start = this.position;
+        continue;
+      }
+      if (this.match_sequence('<%=')) {
+        flush();
+        this.add_token(TokenType.EXPRESSION_START, '<%=', start, this.position);
+        this.scan_expression();
+        consume_tag_end();
+        text_start = this.position;
+        continue;
+      }
+      if (this.match_sequence('<%')) {
+        flush();
+        this.add_token(TokenType.CODE_START, '<%', start, this.position);
+        this.scan_code_block();
+        consume_tag_end();
+        text_start = this.position;
+        continue;
+      }
+
+      // Newlines stay their own tokens so line accounting survives
+      if (this.current_char() === '\n') {
+        flush();
+        const nl_start = this.position;
+        this.advance();
+        this.add_token(TokenType.NEWLINE, '\n', nl_start, this.position);
+        text_start = this.position;
+        continue;
+      }
+
+      text += this.current_char();
+      this.advance();
+    }
+
+    flush(); // unterminated <pre>: hand what we have to the parser
+  }
+
   private scan_closing_tag() {
     const start = this.position;
     this.advance(); // consume <

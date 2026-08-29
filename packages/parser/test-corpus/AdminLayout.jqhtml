@@ -20,7 +20,7 @@
       </aside>
       
       <main class="admin-main">
-        <div $id="content">
+        <div $sid="content">
           <!-- Admin routes render here -->
         </div>
       </main>

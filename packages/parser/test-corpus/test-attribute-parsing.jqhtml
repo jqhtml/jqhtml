@@ -5,9 +5,12 @@
   <div $data=this.data.user>Good - Data reference</div>
   <div $active=isActive>Good - Variable reference</div>
 
-  <!-- Correct: quoted values as string literals -->
-  <button @click="handleClick">String literal "handleClick"</button>
+  <!-- Correct: quoted values as string literals on $ attributes -->
   <div $foo="bar">String literal "bar"</div>
+
+  <!-- Should throw error: quoted values on an event attribute pass a string,
+       not the function reference @ requires -->
+  <!-- <button @click="handleClick">BAD - String not function</button> -->
 
   <!-- Should throw error: function calls not allowed -->
   <!-- <button @click=this.handleClick()>BAD - Function call</button> -->

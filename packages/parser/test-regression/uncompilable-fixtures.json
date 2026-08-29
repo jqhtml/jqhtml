@@ -1,0 +1,28 @@
+{
+  "comment": [
+    "Corpus fixtures that are DELIBERATELY uncompilable.",
+    "",
+    "Every other corpus file must compile and must have a baseline; the harness fails on",
+    "any file missing from both. A fixture that quietly stops compiling used to lose its",
+    "baseline and drop out of the run while the suite still reported green - which is how",
+    "the <pre><code> defect went unnoticed for months.",
+    "",
+    "An entry here is not an exemption, it is an ASSERTION. Each fixture is compiled and",
+    "must fail with the recorded error. A fixture that starts compiling, or that fails",
+    "with a different message, is a regression in the parser's error reporting - which is",
+    "the only thing these fixtures exist to test.",
+    "",
+    "'error' is matched as a prefix of the first line of the thrown message.",
+    "To retire an entry, fix the fixture and generate its baseline."
+  ],
+  "fixtures": {
+    "test-error.jqhtml": {
+      "reason": "Malformed on purpose - exercises the parser's error reporting.",
+      "error": "Unbalanced bracket error in component \"TestError\": Unexpected token ':'"
+    },
+    "test-highlighting.jqhtml": {
+      "reason": "Syntax-highlighting fixture: deliberately pairs correct and incorrect forms so the VS Code grammar can be checked against both. Lines 8-9 carry quoted event handlers labelled \"Wrong - String Not Function\"; the parser stops at the first of them.",
+      "error": "Event attributes (@) must have unquoted values to pass function references."
+    }
+  }
+}

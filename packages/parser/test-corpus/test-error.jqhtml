@@ -4,6 +4,6 @@
     <p><%= this.data.message || 'default' %></p>
     <% if (this.data.show: %>
       <span>Show this</span>
-    <% endif; %>
+    <% } %>
   </div>
 </Define:TestError>

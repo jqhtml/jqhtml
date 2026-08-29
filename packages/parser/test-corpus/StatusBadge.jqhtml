@@ -1,13 +1,13 @@
-<Define:StatusBadge as="span">
+<Define:StatusBadge tag="span">
   <% 
     // Get status from args (supports both status and data-status)
     const status = this.args.status || this.args['data-status'] || 'offline';
   %>
-  <% if (status === 'online'): %>
+  <% if (status === 'online') { %>
     <span class="status-indicator online">●</span> Online
-  <% else if (status === 'busy'): %>
+  <% } else if (status === 'busy') { %>
     <span class="status-indicator busy">●</span> Busy
-  <% else: %>
+  <% } else { %>
     <span class="status-indicator offline">●</span> Offline
-  <% endif; %>
+  <% } %>
 </Define:StatusBadge>

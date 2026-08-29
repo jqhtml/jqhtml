@@ -44,14 +44,14 @@
       </tr>
     </thead>
     <tbody>
-      <% if (this.data && this.data.records): %>
-        <% for (const record of this.data.records): %>
+      <% if (this.data && this.data.records) { %>
+        <% for (const record of this.data.records) { %>
           <tr>
             <!-- Row template would go here -->
             <!-- In v2.1: <%= slot('row', { record: record }) %> -->
           </tr>
-        <% endfor; %>
-      <% endif; %>
+        <% } %>
+      <% } %>
     </tbody>
   </table>
 </Define:Datagrid>

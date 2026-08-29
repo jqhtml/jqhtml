@@ -1,4 +1,4 @@
-<Define:ComplexComponent as="div" class="my-component">
+<Define:ComplexComponent tag="div" class="my-component">
   <h1><%= this.title %></h1>
   <div class="content">
     <% if (this.showDetails) { %>

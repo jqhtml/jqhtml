@@ -9,16 +9,16 @@
     <p>Using that.data.name: <%= that.data.name || 'No name' %></p>
 
     <!-- Both should access same component -->
-    <button @click="this.emit('test-this')">Emit with 'this'</button>
-    <button @click="that.emit('test-that')">Emit with 'that'</button>
+    <button @click=this.emit_this>Emit with 'this'</button>
+    <button @click=that.emit_that>Emit with 'that'</button>
 
     <!-- Testing in loops -->
-    <% for (let i = 0; i < 3; i++): %>
+    <% for (let i = 0; i < 3; i++) { %>
       <div>
         Item <%= i %>:
         this._cid = <%= this._cid %>,
         that._cid = <%= that._cid %>
       </div>
-    <% endfor; %>
+    <% } %>
   </div>
 </Define:Test_Component>

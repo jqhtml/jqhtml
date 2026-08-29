@@ -10,7 +10,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { SourceMapConsumer } from 'source-map';
-import { Lexer, Parser, CodeGenerator } from '../dist/index.js';
+import { compileTemplate } from '../dist/compiler.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -23,39 +23,34 @@ const colors = {
   bold: (text) => `\x1b[1m${text}\x1b[0m`
 };
 
-// Function to compile with sourcemap
+// Compile through the SAME entry point the build tooling uses.
+//
+// This tool previously drove CodeGenerator directly and looked for an inline map on
+// each component's render_function. Nothing puts one there: compileTemplate() is what
+// generates the sourcemap, and it appends it to the WRAPPED module output. So every
+// run reported "No sourcemap generated" - the tool could not reach the code it was
+// meant to validate, and never once exercised it.
 function compileWithSourcemap(source, filename) {
   try {
-    const lexer = new Lexer(source);
-    const tokens = lexer.tokenize();
-    const parser = new Parser(tokens, source, filename);
-    const ast = parser.parse();
+    const { code } = compileTemplate(source, filename, { format: 'iife', sourcemap: true });
 
-    const generator = new CodeGenerator();
-    const result = generator.generateWithSourceMap(ast, filename, source);
-
-    // Extract inline sourcemap if present
+    // charset is part of the data URI compileTemplate emits; the old pattern omitted it
+    const match = code.match(/\/\/# sourceMappingURL=data:application\/json;(?:charset=[^;,]+;)?base64,([A-Za-z0-9+/=]+)/);
     let sourcemapData = null;
-    const code = result.code;
-
-    // Check for inline sourcemap in component render functions
-    const components = Array.from(result.components.values());
-    for (const comp of components) {
-      const match = comp.render_function.match(/\/\/# sourceMappingURL=data:application\/json;base64,(.+)/);
-      if (match) {
-        try {
-          const json = Buffer.from(match[1], 'base64').toString('utf8');
-          sourcemapData = JSON.parse(json);
-          break;
-        } catch (e) {
-          console.error('Failed to parse inline sourcemap:', e);
-        }
+    if (match) {
+      try {
+        sourcemapData = JSON.parse(Buffer.from(match[1], 'base64').toString('utf8'));
+      } catch (e) {
+        console.error('Failed to parse inline sourcemap:', e);
       }
     }
 
+    // The code the map describes, without the trailing sourceMappingURL comment
+    const generated = code.replace(/\n?\/\/# sourceMappingURL=.*$/, '');
+
     return {
       success: true,
-      code,
+      code: generated,
       sourcemap: sourcemapData,
       source,
       filename
@@ -94,12 +89,10 @@ function validateStructure(sourcemap) {
     issues.push(`Too many empty mappings: ${emptyCount}/${totalCount} (${Math.round(emptyCount/totalCount*100)}%)`);
   }
 
-  // Check for overly simple mappings (our current problem)
-  const uniqueMappings = new Set(segments.filter(s => s !== ''));
-  if (uniqueMappings.size < 3 && totalCount > 10) {
-    issues.push(`Suspiciously simple mappings: only ${uniqueMappings.size} unique patterns for ${totalCount} lines`);
-    issues.push(`Patterns: ${Array.from(uniqueMappings).join(', ')}`);
-  }
+  // NOTE: jqhtml's mappings are deliberately line-level - generated line N maps to
+  // source line N, which is why only the 'AAAA' and 'AACA' patterns appear. Codegen is
+  // built around that 1:1 property. A small number of distinct patterns is therefore
+  // the design working, not a defect, and is not reported as an issue.
 
   return issues;
 }
@@ -115,20 +108,15 @@ async function testMappingResolution(result) {
     const consumer = await new SourceMapConsumer(result.sourcemap);
 
     const tests = [];
-    const lines = result.source.split('\n');
 
-    // Test a few key positions
-    for (let line = 1; line <= Math.min(lines.length, 10); line++) {
-      const column = 0;
-
-      // Try to map a generated position back to source
-      const position = consumer.originalPositionFor({
-        line: line + 10, // Assume ~10 lines of boilerplate
-        column: column
-      });
-
+    // Probe every GENERATED line. The previous version probed `line + 10`, guessing at
+    // a fixed amount of wrapper boilerplate, which walked off the end of any short
+    // output and reported zero mappings for code that maps fine.
+    const generated_lines = result.code.split('\n').length;
+    for (let line = 1; line <= generated_lines; line++) {
+      const position = consumer.originalPositionFor({ line, column: 0 });
       tests.push({
-        generated: { line: line + 10, column },
+        generated: { line, column: 0 },
         original: position,
         hasMapping: position.source !== null
       });
@@ -165,15 +153,27 @@ async function main() {
     },
     {
       name: 'Complex component',
-      source: `<Define:ComplexTest as="section">
+      source: `<Define:ComplexTest tag="section">
   <h1><%= this.data.title %></h1>
-  <% for (let i = 0; i < 3; i++): %>
+  <% for (let i = 0; i < 3; i++) { %>
     <p>Item <%= i %></p>
-  <% endfor; %>
-  <% if (this.data.show): %>
+  <% } %>
+  <% if (this.data.show) { %>
     <span>Conditional</span>
-  <% endif; %>
+  <% } %>
 </Define:ComplexTest>`
+    },
+    {
+      // A body that renders nothing compiles to a one-line render function, so the
+      // source is far longer than the code. This is the shape that used to emit one
+      // mapping segment per SOURCE line - naming generated lines that do not exist,
+      // which bundlers materialise as bare `undefined` identifiers.
+      name: 'Comment header, empty body',
+      source: `<%--
+Two lines of comment
+is enough
+--%>
+<Define:EmptyBody tag="div"></Define:EmptyBody>`
     }
   ];
 
@@ -194,6 +194,20 @@ async function main() {
       console.log(colors.red(`  ❌ No sourcemap generated`));
       allPassed = false;
       continue;
+    }
+
+    // The map must name exactly as many generated lines as the code has. A segment for
+    // a line that does not exist is a phantom line: consumers that rebuild output from
+    // the map (SourceNode.fromStringWithSourceMap, used by bundlers to concatenate)
+    // materialise each one as a bare `undefined` identifier, which throws at top level
+    // when the bundle runs.
+    const output_lines = result.code.split('\n').length;
+    const segments = result.sourcemap.mappings.split(';').length;
+    if (segments !== output_lines) {
+      console.log(colors.red(`  ❌ Sourcemap describes ${segments} lines, output has ${output_lines}`));
+      allPassed = false;
+    } else {
+      console.log(colors.green(`  ✅ Segment count matches output (${segments} lines)`));
     }
 
     // Validate structure
@@ -236,10 +250,10 @@ async function main() {
     console.log(colors.green('\n✅ Sourcemap validation passed!'));
   } else {
     console.log(colors.red('\n❌ Sourcemap validation failed!'));
-    console.log('\nCurrent sourcemaps have known issues:');
-    console.log('- Overly simplistic mappings (AAAA repeated)');
-    console.log('- Not compatible with Firefox');
-    console.log('- Need to use proper source-map library');
+    console.log('\nA failure here means generated code and its map disagree, so DevTools');
+    console.log('and bundlers will resolve positions to the wrong place - or, when the map');
+    console.log('overruns the file, inject bare `undefined` into the bundle.');
+    process.exitCode = 1;
   }
 }
 

@@ -1,9 +1,9 @@
-<Define:TestComponent as="div">
+<Define:TestComponent tag="div">
   <h1>Line 2</h1>
   <p>Line 3</p>
-  <% if (this.data.show): %>
+  <% if (this.data.show) { %>
     <div>Line 5</div>
-  <% endif; %>
+  <% } %>
   <span>Line 7</span>
   <b>Line 8</b>
   <i>Line 9</i>

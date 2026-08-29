@@ -452,7 +452,7 @@ DATA:
 | `this.render()` in on_load | Let framework auto-render | Framework re-renders when this.data changes |
 | `this.reload()` unconditionally in on_ready | Guard with flag | reload() triggers on_ready again = infinite loop |
 | `refresh()` when a render is required | `reload()` | refresh() skips render when data unchanged |
-| `<% if (x): %>...<% endif %>` | `<% if (x) { %>...<% } %>` | Brace style only; colon/endif was removed |
+| `<% if (x) { %>...<% } %>` | `<% if (x) { %>...<% } %>` | Brace style only; colon/endif was removed |
 | `/* comment */` in .jqhtml | `<%-- comment --%>` | JQHTML uses template comment syntax |
 
 ## Orchestrator Pattern
