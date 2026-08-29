@@ -140,7 +140,12 @@ export class Load_Coordinator {
                     }
                     if (!uncacheable_property) {
                         uncacheable_property = key;
-                        uncacheable_reason = serialized.reason;
+                        // This package compiles with strictNullChecks off, and without it
+                        // TypeScript will not narrow a discriminated union by its boolean
+                        // discriminant - so `serialized` is still the full Serialize_Result
+                        // here even though `ok` has been ruled out above. The cast states
+                        // what the control flow already guarantees.
+                        uncacheable_reason = (serialized as { ok: false; reason: string }).reason;
                     }
                     return { key: null, uncacheable_property, uncacheable_reason };
                 }

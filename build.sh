@@ -45,6 +45,16 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$SCRIPT_DIR"
 LOG_FILE="$ROOT_DIR/build.log"
+
+# Prefer the VENDORED toolchain over anything installed globally.
+#
+# This repo commits its node_modules and distrusts npm, so the vendored compiler is
+# the one the code is known to build under. A globally installed TypeScript drifts
+# independently - a newer major removed moduleResolution=node10, which every
+# tsconfig here still uses, so a bare `tsc` failed the core build with TS5108 while
+# the vendored 5.9.2 compiled it fine. Putting node_modules/.bin first makes the
+# build reproducible regardless of what is installed on the host.
+export PATH="$ROOT_DIR/node_modules/.bin:$PATH"
 VERBOSE=false
 CLEAN=false
 
@@ -257,26 +267,21 @@ main() {
   log_step "Step 6: Building Core Package"
   
   cd "$ROOT_DIR/packages/core"
-  
-  # Compile TypeScript
-  log_info "Compiling TypeScript for core..."
-  run_command "tsc" "Compiling TypeScript"
-  
-  # Compile debug-entry.ts separately if it doesn't exist
-  if [ ! -f "$ROOT_DIR/packages/core/dist/debug-entry.js" ]; then
-    log_info "Compiling debug entry module..."
-    run_command "tsc src/debug-entry.ts --outDir dist --declaration --module esnext --target es2020 --moduleResolution node" "Compiling debug-entry.ts"
-  fi
-  
-  # Build ESM bundles using esbuild
-  log_info "Building ESM bundles..."
-  
-  # Core runtime bundle
-  run_command "esbuild dist/index.js --bundle --format=esm --external:jquery --sourcemap --target=es2020 --platform=browser --outfile=dist/jqhtml-core.esm.js" "Building core ESM bundle"
-  
-  # Debug module bundle
-  run_command "esbuild dist/debug-entry.js --bundle --format=esm --external:jquery --external:./index.js --sourcemap --target=es2020 --platform=browser --outfile=dist/jqhtml-debug.esm.js" "Building debug ESM bundle"
-  
+
+  # Build through the package's OWN build script (rollup), not a hand-rolled
+  # tsc + esbuild pipeline.
+  #
+  # rollup.config.js substitutes the __VERSION__ placeholder that src/index.ts and
+  # src/local-storage.ts carry; a bare tsc does not. This step used to compile with
+  # tsc and bundle with esbuild, which produced a dist/index.js - the package's
+  # `main` - still containing the literal string "__VERSION__". Core's own test
+  # suite has a tripwire for exactly that ("had its build-time placeholder
+  # substituted"), and it fires. rollup emits all four artifacts (dist/index.js,
+  # dist/index.cjs, dist/jqhtml-core.esm.js, dist/jqhtml-debug.esm.js), so there is
+  # nothing the old path did that this one does not.
+  log_info "Building core (rollup, via the package build script)..."
+  run_command "npm run build" "Building core package"
+
   log_success "Core package built ✓"
 
   # Step 7: Validate Compiled Outputs

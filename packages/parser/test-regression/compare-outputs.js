@@ -56,8 +56,17 @@ function compileTemplate(source, filename) {
 }
 
 // Function to normalize code for comparison (ignore whitespace differences)
+// The compiler stamps the package version into every component it emits. That is a
+// build-time constant, not codegen behaviour, so comparing it would fail all 48
+// fixtures on every version bump and push us back toward regenerating baselines
+// wholesale - the habit that let the corpus drift a release behind in the first place.
+// Normalise it away on both sides so the baselines assert what codegen DOES.
+function normalizeVersionStamp(code) {
+  return code.replace(/_jqhtml_version: '[^']*'/g, "_jqhtml_version: '<version>'");
+}
+
 function normalizeCode(code) {
-  return code
+  return normalizeVersionStamp(code)
     .split('\n')
     .map(line => line.trim())
     .filter(line => line.length > 0)
@@ -247,8 +256,13 @@ for (const file of files) {
   if (current.success) {
     const currentHash = generateHash(current.code);
 
-    // Quick hash comparison first
-    if (currentHash === baseline.codeHash) {
+    // Quick hash comparison first. A version bump changes the hash, so a miss here
+    // falls through to the normalised comparison below rather than being a failure.
+    if (currentHash === baseline.codeHash ||
+        normalizeVersionStamp(current.code) === normalizeVersionStamp(baseline.code)) {
+      // Identical once the build-time version stamp is set aside. Reported as identical
+      // rather than as a whitespace difference, because it is neither a difference in
+      // codegen nor in formatting.
       console.log(colors.green(`  ✅ Identical output (${currentHash.substring(0, 8)}...)`));
       results.passed++;
     } else {
