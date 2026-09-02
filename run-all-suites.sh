@@ -90,6 +90,7 @@ run_suite "parser: regression corpus" packages/parser npm run test:regression
 run_suite "parser: sourcemap"        packages/parser npm run validate:sourcemap
 run_suite "core: unit (jest)"        packages/core   npm test
 run_suite "ssr: protocol + render"   packages/ssr    npm test
+run_suite "vscode: formatter fixtures" packages/vscode-extension npm test
 
 run_suite "docs: example compilation" . npm run validate:docs
 
