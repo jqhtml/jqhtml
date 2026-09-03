@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/parser",
-  "version": "2.3.60",
+  "version": "2.3.61",
   "description": "JQHTML template parser - converts templates to JavaScript",
   "type": "module",
   "main": "dist/index.js",

@@ -923,6 +923,12 @@ export class Lexer {
     // Skip whitespace before attributes or closing
     this.skip_whitespace();
     
+    // Attributes (<Slot:row $params="record, index">) scan like a tag's
+    if (this.is_attribute_start_char(this.current_char())) {
+      this.scan_attributes();
+      return;
+    }
+
     // For self-closing slots, check for />
     if (this.current_char() === '/' && this.peek_ahead(1) === '>') {
       const slash_start = this.position;

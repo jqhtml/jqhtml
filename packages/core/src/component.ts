@@ -565,10 +565,10 @@ export class Jqhtml_Component {
             // Create a content function that invokes child slots
             // When parent calls content('slotName'), it invokes the child's slot function
             const childSlots = instructions._slots;
-            const contentFunction = (slotName: string, data?: any) => {
+            const contentFunction = (slotName: string, ...slotArgs: any[]) => {
               if (childSlots[slotName] && typeof childSlots[slotName] === 'function') {
-                // Invoke the slot function with data parameter
-                const [slotInstructions, slotContext] = childSlots[slotName](data);
+                // Invoke the slot function with everything content() was given
+                const [slotInstructions, slotContext] = childSlots[slotName](...slotArgs);
                 // Return in render function format: [instructions, context]
                 // The template expression handler expects this format
                 return [slotInstructions, slotContext];
@@ -598,13 +598,11 @@ export class Jqhtml_Component {
         }
       }
 
-      // Flatten any nested content instructions before processing
-      // Instructions may contain ['_content', [...]] markers from content() calls
-      const flattenedInstructions = this._flatten_instructions(instructions);
-
-      // Process instructions to generate DOM
+      // Process instructions to generate DOM. ['_content', ...] markers from
+      // content() are handled by the processor, which renders them in the
+      // component that wrote them.
       // This kicks off child component boots but doesn't wait for them
-      process_instructions(flattenedInstructions, this.$, this);
+      process_instructions(instructions, this.$, this);
     }
 
     // Don't update ready state here - let phases complete in order
@@ -2007,28 +2005,6 @@ export class Jqhtml_Component {
     return uid();
   }
 
-  /**
-   * Flatten instruction array - converts ['_content', [...]] markers to flat array
-   * Recursively flattens nested content from content() calls
-   */
-  private _flatten_instructions(instructions: any[]): any[] {
-    const result: any[] = [];
-
-    for (const instruction of instructions) {
-      // Check if this is a _content marker: ['_content', [...]]
-      if (Array.isArray(instruction) && instruction[0] === '_content' && Array.isArray(instruction[1])) {
-        // Recursively flatten the content instructions
-        const contentInstructions = this._flatten_instructions(instruction[1]);
-        result.push(...contentInstructions);
-      } else {
-        // Regular instruction - keep as is
-        result.push(instruction);
-      }
-    }
-
-    return result;
-  }
-  
   private _apply_css_classes(): void {
     const hierarchy = (this.constructor as typeof Jqhtml_Component).get_class_hierarchy();
 

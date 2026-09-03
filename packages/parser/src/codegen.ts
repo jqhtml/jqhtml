@@ -585,18 +585,18 @@ export class CodeGenerator {
 
           if (trimmedCode === 'content()') {
             // Default slot/content - check _inner_html first
-            code = `(() => { if (this.args._inner_html) { _output.push(this.args._inner_html); } else if (typeof content === 'function') { const [contentInstructions] = content.call(this); _output.push(['_content', contentInstructions]); } })();`;
+            code = `(() => { if (this.args._inner_html) { _output.push(this.args._inner_html); } else if (typeof content === 'function') { const [contentInstructions, contentContext] = content.call(this); _output.push(['_content', contentInstructions, contentContext]); } })();`;
           } else if (trimmedCode.match(/^content\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*(.+?))?\s*\)$/)) {
             // Named slot: content('header') or content('header', data) (function call with string parameter and optional data)
             // Use the standard result pattern for proper handling
-            code = `(() => { const result = ${trimmedCode};; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })();`;
+            code = `(() => { const result = ${trimmedCode};; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })();`;
           } else if (expr.nl2br) {
             // <%br= %> - escaped with newlines converted to <br />
-            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html_nl2br(result)); } })();`;
+            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html_nl2br(result)); } })();`;
           } else if (expr.escaped) {
-            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html(result)); } })();`;
+            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html(result)); } })();`;
           } else {
-            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(result); } })();`;
+            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(result); } })();`;
           }
 
           // Put the code on the starting line
@@ -683,7 +683,7 @@ export class CodeGenerator {
           const slotName = slot.name;
 
           // Start slot function on this line
-          lines[lineIndex] = (lines[lineIndex] || '') + ` ${slotName}: function(${slotName}) { const _output = [];`;
+          lines[lineIndex] = (lines[lineIndex] || '') + ` ${slotName}: function(${this.slot_params(slot)}) { const _output = [];`;
 
           // Process slot children on their respective lines
           if (slot.children && slot.children.length > 0) {
@@ -843,20 +843,20 @@ export class CodeGenerator {
 
     if (trimmedCode === 'content()') {
       // Default slot/content - check _inner_html first
-      output = `(() => { if (this.args._inner_html) { _output.push(this.args._inner_html); } else if (typeof content === 'function') { const [contentInstructions] = content.call(this); _output.push(['_content', contentInstructions]); } })();`;
+      output = `(() => { if (this.args._inner_html) { _output.push(this.args._inner_html); } else if (typeof content === 'function') { const [contentInstructions, contentContext] = content.call(this); _output.push(['_content', contentInstructions, contentContext]); } })();`;
     } else if (trimmedCode.match(/^content\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*(.+?))?\s*\)$/)) {
       // Named slot: content('header') or content('header', data) (function call with string parameter and optional data)
       // Use the standard result pattern for proper handling
-      output = `(() => { const result = ${trimmedCode};; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })();`;
+      output = `(() => { const result = ${trimmedCode};; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })();`;
     } else if (node.nl2br) {
       // <%br= %> - escaped with newlines converted to <br />
-      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html_nl2br(result)); } })();`;
+      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html_nl2br(result)); } })();`;
     } else if (node.escaped) {
       // Single-line expression handler for escaped output
-      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html(result)); } })();`;
+      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(jqhtml.escape_html(result)); } })();`;
     } else {
       // Single-line expression handler for unescaped output
-      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(...result[0]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(result); } })();`;
+      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(result); } })();`;
     }
 
     return output;
@@ -1286,8 +1286,7 @@ export class CodeGenerator {
             ? this.generate_function_body(slotNode.children)
             : '';
 
-          // Add slot name as parameter: function(slotName) { ... }
-          slotEntries.push(`${slotName}: function(${slotName}) { const _output = []; ${slot_code} return [_output, this]; }.bind(this)`);
+          slotEntries.push(`${slotName}: function(${this.slot_params(slotNode)}) { const _output = []; ${slot_code} return [_output, this]; }.bind(this)`);
         }
 
         // Everything on one line
@@ -1548,6 +1547,15 @@ export class CodeGenerator {
     return code.split('\n').map(line => line ? indent + line : line).join('\n');
   }
   
+  /**
+   * Parameter list of a slot's function. $params="record, index" names them;
+   * otherwise the single parameter is named after the slot, so a slot body can
+   * read the value passed by content('row', record) as `row`.
+   */
+  private slot_params(slot: SlotNode): string {
+    return slot.params && slot.params.length ? slot.params.join(', ') : slot.name;
+  }
+
   private extract_slots_from_children(children: ASTNode[]): Record<string, SlotNode> {
     const slots: Record<string, SlotNode> = {};
 

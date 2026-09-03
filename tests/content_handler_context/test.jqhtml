@@ -1,0 +1,24 @@
+<Define:Test_Content_Handler_Context>
+  <div>
+    <h1>Handler context in caller-written content</h1>
+
+    <Ctx_Box $sid="box" $records=this.state.records>
+      <Slot:header>
+        <button $sid="slot_btn" @click=this.on_slot_click>slot button</button>
+        <span id="slot_plain" @click=this.on_noop>plain id</span>
+        <Ctx_Marker $sid="slot_marker" />
+      </Slot:header>
+      <Slot:row $params="record, index">
+        <li class="row-line"><%= index %>:<%= record.name %></li>
+      </Slot:row>
+      <Slot:legacy>
+        <li class="legacy-line"><%= legacy.name %></li>
+      </Slot:legacy>
+    </Ctx_Box>
+
+    <Ctx_Box $sid="box2" $records=this.state.none>
+      <button $sid="default_btn" @click=this.on_default_click>default button</button>
+      <Ctx_Marker $sid="default_marker" />
+    </Ctx_Box>
+  </div>
+</Define:Test_Content_Handler_Context>

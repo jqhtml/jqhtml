@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.61 (2026-09-03)
+
+### Changed
+
+- Handler attributes (`@click`, `on*`), hand-written `id=` scoping and `instantiator()` in
+  slot bodies and default content now bind to the component whose template wrote the markup,
+  matching `<%= %>` and `$sid`. A handler that previously ran with `this` set to the receiving
+  component now runs against the defining one. See packages/core/CHANGELOG.md.
+
+### Added
+
+- `<Slot:name $params="a, b">` names the values a slot receives from `content('name', a, b)`.
+  See packages/parser/CHANGELOG.md.
+
 ## 2.3.54 (2026-08-19)
 
 ### Added

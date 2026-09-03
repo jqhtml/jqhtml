@@ -143,11 +143,14 @@ describe('Undefined/null expression output', () => {
       assert.deepStrictEqual(runExpressionWrapper(code, ['a', 'b']), ['a', 'b']);
     });
 
-    it('escaped path: [instructions, ctx] tuple spreads instructions only', () => {
+    it('escaped path: [instructions, ctx] tuple is wrapped as content in its own context', () => {
+      // A tuple is the shape a template or slot function returns. It is not
+      // spread flat: the runtime renders its instructions in ctx, the
+      // component that wrote them, so handler `this` matches <%= %> and $sid.
       const code = compile(`<Define:Test>\n  <div><%= this.data.parts %></div>\n</Define:Test>`).code;
       assert.deepStrictEqual(
         runExpressionWrapper(code, [['x', 'y'], { ctx: true }]),
-        ['x', 'y']
+        [['_content', ['x', 'y'], { ctx: true }]]
       );
     });
   });

@@ -28,7 +28,15 @@ export interface SlotInstruction {
   slot: [string, Record<string, any>, (context: any) => [any[], Jqhtml_Component]]; // [name, props, contentFn]
 }
 
-export type Instruction = TagInstruction | RawTagInstruction | ComponentInstruction | SlotInstruction | string;
+// ['_content', instructions, definer] - instructions written in another
+// component's template (a slot body, or default content between a component's
+// tags) and spliced in by content(). They render in `definer`, the component
+// whose template contains the markup, so this in handler attributes, id=
+// scoping and instantiator() agree with <%= %> and $sid, which are closures
+// over the definer already. `definer` is absent only for legacy callers.
+export type ContentInstruction = ['_content', Instruction[], Jqhtml_Component?];
+
+export type Instruction = TagInstruction | RawTagInstruction | ComponentInstruction | SlotInstruction | ContentInstruction | string;
 
 // Tracking data for second pass initialization
 interface TagData {
@@ -125,7 +133,9 @@ export function process_instructions(
     if (el) {
       const element = $(el);
       el.removeAttribute('data-tid');
-      apply_attributes(element, tagData.attrs, context);
+      // Bind to the component whose template wrote this element, which for
+      // spliced content is not the component being rendered.
+      apply_attributes(element, tagData.attrs, tagData.context);
     }
   }
 
@@ -159,6 +169,15 @@ function process_instruction_to_html(
   if (typeof instruction === 'string') {
     // Raw HTML/text - no escaping, as requested
     html.push(instruction);
+  } else if (Array.isArray(instruction)) {
+    if (instruction[0] !== '_content' || !Array.isArray(instruction[1])) {
+      return;
+    }
+    // Content written in another template renders in that template's component.
+    const definer = instruction[2] || context;
+    for (const item of instruction[1]) {
+      process_instruction_to_html(item, html, tagElements, components, definer, slots);
+    }
   } else if ('tag' in instruction) {
     // HTML tag
     process_tag_to_html(instruction, html, tagElements, components, context);

@@ -517,6 +517,57 @@ export class Parser {
     'arguments', 'eval'
   ]);
 
+  /**
+   * Validate a slot tag's attributes and return the declared parameter list.
+   *
+   *   <Slot:row $params="record, index">   -> ['record', 'index']
+   *   <Slot:row>                            -> undefined (function(row) {...})
+   */
+  private parse_slot_params(
+    name_token: Token,
+    attributes: Record<string, any>,
+    conditionalAttributes: ConditionalAttributeNode[]
+  ): string[] | undefined {
+    const fail = (message: string) => syntaxError(message, name_token.line, name_token.column, this.source, this.filename);
+
+    if (conditionalAttributes.length > 0) {
+      throw fail(`Slot "${name_token.value}" cannot have conditional attributes`);
+    }
+    for (const key of Object.keys(attributes)) {
+      if (key !== '$params') {
+        throw fail(
+          `Slot "${name_token.value}" does not accept the attribute "${key}". ` +
+          `The only slot attribute is $params="a, b", which names the values the slot receives from content('${name_token.value}', a, b).`
+        );
+      }
+    }
+    if (!('$params' in attributes)) {
+      return undefined;
+    }
+
+    // parse_attribute_value() returns { quoted: true, value } for a plain quoted string.
+    const raw = attributes['$params'];
+    if (!raw || typeof raw !== 'object' || raw.quoted !== true || typeof raw.value !== 'string') {
+      throw fail(`Slot "${name_token.value}": $params must be a quoted list of names, e.g. $params="record, index"`);
+    }
+    const params = raw.value.split(',').map((p: string) => p.trim()).filter((p: string) => p.length > 0);
+    if (params.length === 0) {
+      throw fail(`Slot "${name_token.value}": $params is empty`);
+    }
+    for (const param of params) {
+      if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(param)) {
+        throw fail(`Slot "${name_token.value}": $params entry "${param}" is not a valid JavaScript identifier`);
+      }
+      if (Parser.JAVASCRIPT_RESERVED_WORDS.has(param.toLowerCase())) {
+        throw fail(`Slot "${name_token.value}": $params entry "${param}" is a JavaScript reserved word`);
+      }
+    }
+    if (new Set(params).size !== params.length) {
+      throw fail(`Slot "${name_token.value}": $params has a duplicate name`);
+    }
+    return params;
+  }
+
   // Parse slot <Slot:name>content</Slot:name> or <Slot:name />
   private parse_slot(): SlotNode {
     const start_token = this.previous(); // SLOT_START
@@ -533,17 +584,24 @@ export class Parser {
       );
     }
 
-    // TODO: Parse attributes for let:prop syntax in future
-    const attributes: Record<string, any> = {};
-    
-    // Check for self-closing slot
-    if (this.match(TokenType.SLASH)) {
-      const end_token = this.consume(TokenType.GT, 'Expected >');
+    // The only attribute a slot takes is $params="a, b" - the names its
+    // function receives from content('name', a, b). Without it the function
+    // has one parameter named after the slot.
+    const { attributes, conditionalAttributes } = this.parse_attributes();
+    const params = this.parse_slot_params(name_token, attributes, conditionalAttributes);
+
+    // Check for self-closing slot. With no attributes the lexer emits SLASH GT;
+    // after attributes it emits a single SELF_CLOSING token.
+    if (this.check(TokenType.SLASH) || this.check(TokenType.SELF_CLOSING)) {
+      const end_token = this.match(TokenType.SELF_CLOSING)
+        ? this.previous()
+        : (this.advance(), this.consume(TokenType.GT, 'Expected >'));
       return createNode(
         NodeType.SLOT,
         {
           name: name_token.value,
           attributes,
+          params,
           children: [],
           selfClosing: true
         },
@@ -603,6 +661,7 @@ export class Parser {
       {
         name: name_token.value,
         attributes,
+        params,
         children,
         selfClosing: false
       },

@@ -303,6 +303,20 @@ as an in-scope variable **named after the slot** — no parameter is declared.
 This is the only way to build a per-record slot, and therefore the only way to build a
 datagrid.
 
+`$params="a, b"` — the only attribute a `<Slot:>` accepts — names the parameters instead,
+and allows more than one: `<%= content('row', record, i) %>` pairs with
+`<Slot:row $params="record, index">`. A slot without `$params` behaves as above.
+
+### Slot content belongs to the component that wrote it
+
+Everything in a `<Slot:>` body, or between a component's tags, is compiled as a closure over
+the component whose template contains it. `this` in `<%= %>`, `this` inside a `@click`
+handler, `$sid` and hand-written `id=` scoping, and `instantiator()` of any component written
+there all resolve to that defining component — never to the component the content is
+rendered inside. In `<Detail_Sidebar><Slot:actions><button @click=this.save /></Slot:actions>
+</Detail_Sidebar>` written in `Engagement_View`, the click runs `Engagement_View.save` with
+`this === Engagement_View`. The receiver only decides where the content appears.
+
 ### What is and is not inherited
 
 | Attribute | Through `extends=` / the class chain |

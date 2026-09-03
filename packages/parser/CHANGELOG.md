@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.61 (2026-09-03)
+
+### Features
+
+* **slots:** `<Slot:name $params="a, b">` declares the parameters a slot function
+  receives from `content('name', a, b)`. Without it the function takes a single
+  parameter named after the slot, as before. `$params` is the only attribute a
+  `<Slot:>` accepts; other attributes, unquoted values, empty lists, non-identifiers,
+  reserved words and duplicates are compile errors.
+
+### Bug Fixes
+
+* **codegen:** `content()`, `content('name', ...)`, and any expression that yields a
+  `[instructions, component]` tuple now emit `['_content', instructions, component]`
+  instead of spreading the instructions flat, so the runtime can render the content
+  in the component whose template wrote it. See @jqhtml/core.
+
 ## 2.3.59 (2026-08-29)
 
 ### Performance

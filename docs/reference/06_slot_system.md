@@ -211,6 +211,59 @@ Slot definitions receive data as a parameter matching the slot name:
 
 The parameter name matches the slot name, allowing child templates to access parent data directly.
 
+### Declaring slot parameters with `$params`
+
+By default a slot function has one parameter named after the slot, so `content('row', record)`
+is read as `row` inside `<Slot:row>`. Declare `$params` to name the parameters yourself, or to
+receive more than one value:
+
+```jqhtml
+<Define:Data_Grid>
+  <table>
+    <% for (let i = 0; i < this.data.records.length; i++) { %>
+      <tr><%= content('row', this.data.records[i], i) %></tr>
+    <% } %>
+  </table>
+</Define:Data_Grid>
+```
+
+```jqhtml
+<Define:Users_Grid extends="Data_Grid">
+  <Slot:row $params="record, index">
+    <td><%= index + 1 %></td>
+    <td><%= record.name %></td>
+  </Slot:row>
+</Define:Users_Grid>
+```
+
+`$params` takes a quoted, comma-separated list of JavaScript identifiers. It is the only
+attribute a `<Slot:>` tag accepts. A slot without `$params` behaves exactly as before, so a
+slot named `empty` no longer has to shadow a global `empty()` helper — declare
+`$params="_"` and the forced name is gone.
+
+### Which component slot content belongs to
+
+Everything written inside a `<Slot:>` body, or between a component's opening and closing
+tags, belongs to the component whose template contains it — the **defining** component —
+not the component it is rendered inside. `this`, template locals, `$sid`, `@click`
+handlers, hand-written `id=` scoping and `instantiator()` all resolve to the definer:
+
+```jqhtml
+<Define:Engagement_View>
+  <Detail_Sidebar>
+    <Slot:actions>
+      <%-- this === Engagement_View in the expression AND in the handler --%>
+      <button $sid="view_as_client" @click=this.view_as_client>View as client</button>
+    </Slot:actions>
+  </Detail_Sidebar>
+</Define:Engagement_View>
+```
+
+Clicking the button runs `Engagement_View.view_as_client` with `this` bound to the
+`Engagement_View` instance; `this.$sid('view_as_client')` finds it from `Engagement_View`;
+`Detail_Sidebar.$sid('view_as_client')` does not. The receiving component decides
+*where* the content renders, never *what it means*.
+
 ## Slot-Based Template Inheritance
 
 When a component template contains **ONLY slots at the top level** (no HTML), it automatically inherits the parent class template:

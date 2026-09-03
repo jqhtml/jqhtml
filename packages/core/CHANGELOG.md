@@ -3,6 +3,23 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.61 (2026-09-03)
+
+### Bug Fixes
+
+* **rendering:** markup written in one component's template and rendered inside another
+  (a `<Slot:>` body, or default content between a component's tags) now binds its
+  `@`/`on*` handlers, scopes its hand-written `id=`, and sets `instantiator()` of
+  components written in it to the DEFINING component, matching `<%= %>` and `$sid`.
+  Previously the receiving component was used, so a handler written in A next to
+  `$sid` and `this.args` that resolved to A silently ran with `this === B`. The
+  compiler now splices content as `['_content', instructions, definer]`; the
+  instruction processor renders that block in `definer`, and the per-element
+  context it already recorded is honoured when attributes are applied. The
+  `_flatten_instructions` step that discarded the context is removed.
+* **inheritance:** a slot-only template's slot functions receive every argument
+  passed to `content('name', ...)`, not just the first.
+
 ## 2.3.54 (2026-08-19)
 
 ### Features

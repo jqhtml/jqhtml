@@ -1,0 +1,11 @@
+<Define:Ctx_Box>
+  <div class="box-header"><%= content('header') %></div>
+  <ul class="box-rows">
+    <% for (let i = 0; i < this.args.records.length; i++) { %>
+      <%= content('row', this.args.records[i], i) %>
+    <% } %>
+    <%= content('legacy', {name: 'L'}) %>
+  </ul>
+  <div class="box-default"><%= content() %></div>
+  <button $sid="own_btn" @click=this.on_own_click>own button</button>
+</Define:Ctx_Box>

@@ -458,6 +458,13 @@ $('#my-component').component().once('loaded', (component) => { ... });
 </Card_Layout>
 ```
 
+Slot content belongs to the component that wrote it: `this` — in expressions, in `@click`
+handlers, for `$sid` scoping, and as `instantiator()` of components written there — is the
+component whose template contains the markup, not the component receiving it.
+
+`content('row', record, i)` passes values into a slot; the slot reads them as one parameter
+named after the slot, or as the names declared with `<Slot:row $params="record, index">`.
+
 **Passing data to slots:** `content('row', record)` in the parent template; the slot body receives the value as a variable named after the slot (`row`). Slot names cannot be JavaScript reserved words.
 
 **All-or-nothing rule:** once an invocation uses any `<Slot:name>`, put ALL content in slots — mixing slotted and unslotted content is unsupported.

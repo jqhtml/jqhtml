@@ -66,11 +66,18 @@ JQHTML components can be nested within other components. The `content()` functio
 
 ## How content() Works
 
-### Instruction Flattening
+### Content Markers
 
-Templates compile to instruction arrays. When `<%= content() %>` is called, it returns a `['_content', instructions]` marker.
+Templates compile to instruction arrays. Content written between a component's tags is
+compiled as a function closed over the component whose template contains it. When
+`<%= content() %>` runs, that function's instructions are spliced into the receiving
+component's stream as a `['_content', instructions, definer]` marker, and the instruction
+processor renders them in `definer` — so `this` in a `@click` handler, the scoping of a
+hand-written `id=`, and `instantiator()` of a component written in the content all name the
+component that wrote the markup, exactly as `<%= this.x %>` and `$sid` already do.
 
-The `_flatten_instructions()` function recursively flattens these markers before processing, preserving the instruction structure instead of converting to strings.
+The receiving component controls where the content appears; it is never the `this` of
+anything written in it.
 
 ### Template Compilation
 
@@ -80,7 +87,7 @@ The `_flatten_instructions()` function recursively flattens these markers before
 </Panel>
 ```
 
-This compiles to instructions that get flattened and inserted where `<%= content() %>` appears in the Panel template.
+This compiles to instructions that are inserted where `<%= content() %>` appears in the Panel template, and rendered in the component that wrote them.
 
 ## Nested Components with content()
 

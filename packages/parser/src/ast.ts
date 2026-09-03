@@ -100,7 +100,10 @@ export interface FragmentNode extends BaseNode {
 export interface SlotNode extends BaseNode {
   type: NodeType.SLOT;
   name: string;
-  attributes?: Record<string, any>;  // For let:prop syntax
+  attributes?: Record<string, any>;
+  // Parameter names declared with $params="a, b". When absent the slot
+  // function takes a single parameter named after the slot.
+  params?: string[];
   children: ASTNode[];
   selfClosing: boolean;
 }
