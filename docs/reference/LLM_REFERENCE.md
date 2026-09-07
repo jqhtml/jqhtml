@@ -985,6 +985,15 @@ window.jqhtml.debug.verbose = true;   // detailed lifecycle logging
 Or add `?debug=true` to the URL. Use verbose mode for lifecycle-ordering questions —
 double renders, hook order, slow renders — which a single static render cannot show.
 
+```javascript
+jqhtml.debug_overlay.enable();        // hover: outline + name/args tab for the component chain
+jqhtml.debug_overlay.disable();       // click: inspector modal (args, data, state, ancestry,
+                                      //        instantiator, log to console); Alt+click passes through
+```
+
+The overlay is non-invasive - its UI lives in a shadow root and it only ever adds
+outline styling to page elements - and covers components created after it is enabled.
+
 ## Runtime configuration
 
 ```javascript

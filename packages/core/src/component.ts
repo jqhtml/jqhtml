@@ -53,6 +53,7 @@ export class Jqhtml_Component {
   data: Record<string, any>;              // Component's data store (initialized via defineProperty in constructor)
   state: Record<string, any>;             // Arbitrary component state (convention, no special framework behavior)
   _cid: string;                           // Component instance ID for scoping
+  _component_name: string;                // The name this instance was invoked as: <Tag_Name>, .component('Tag_Name'), boot placeholder, or the class name
   _ready_state: number = 0;               // 0=created, 1=init, 2=loaded, 3=rendered, 4=ready
 
   // Private properties
@@ -171,6 +172,15 @@ export class Jqhtml_Component {
     // Merge in order: defineArgs (defaults from Define tag) < dataAttrs < args (invocation overrides)
     const defineArgs = template_for_args?.defineArgs || {};
     this.args = { ...defineArgs, ...dataAttrs, ...args };
+
+    // The name this instance was invoked as. Every invocation path passes it
+    // in args._component_name (template tag, $(el).component('Name'), boot
+    // placeholder); a class handed directly to $(el).component(Class) has
+    // only its own name to offer.
+    const ctor = this.constructor as typeof Jqhtml_Component;
+    this._component_name = (typeof args._component_name === 'string' && args._component_name)
+      || (ctor as any).component_name
+      || ctor.name;
 
     // Set lifecycle truncation flags from args
     if (this.args._load_only === true) {
@@ -1791,8 +1801,15 @@ export class Jqhtml_Component {
   /**
    * Get component name for debugging
    */
+  /**
+   * The name this component was invoked as - the tag written in the template
+   * (<User_Card> -> 'User_Card'), the name given to $(el).component('User_Card'),
+   * or the boot placeholder's data-component-init-name. For a template-only
+   * component this is the template name, not 'Jqhtml_Component'. Falls back to
+   * the class's static component_name, then its JS class name.
+   */
   component_name(): string {
-    return this.constructor.name;
+    return this._component_name;
   }
 
   /**

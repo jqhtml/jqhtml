@@ -663,13 +663,10 @@ async function initialize_component(
     options._slots = slots;
   }
 
-  // Always pass _component_name when component name differs from class name
-  // This happens when:
-  // 1. No class registered for component (uses Jqhtml_Component)
-  // 2. Class inherited from parent via extends chain (uses parent class but child template)
-  if (ComponentClass.name !== name) {
-    options._component_name = name;
-  }
+  // Always pass the invocation name: it is what component_name() reports, it
+  // selects the template when the class is inherited via an extends chain or
+  // is the bare Jqhtml_Component, and it is the class the element carries.
+  options._component_name = name;
 
   // Pass lifecycle truncation flags via options (not DOM attributes, since _ prefix is filtered).
   // Accept both the plain key (cascaded/programmatic) and the '$'-prefixed key (template-authored).

@@ -216,8 +216,11 @@ export function init_jquery_plugin(jQuery: any): void {
         ComponentClass = found;
       }
     } else {
-      // Direct class reference
+      // Direct class reference. The invocation name is the class's own; it is
+      // recorded for component_name() but does not drive the template tag
+      // check below, which is for named (template-backed) invocations.
       ComponentClass = componentOrName;
+      args = { ...args, _component_name: (componentOrName as any).component_name || componentOrName.name };
     }
 
     // Check if element tag matches expected tag from template

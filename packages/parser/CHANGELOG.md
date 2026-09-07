@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.65 (2026-09-07)
+
+### Bug Fixes
+
+* **codegen:** markup written on the `<Define>` line itself was dropped, so a one-line
+  component such as `<Define:Badge tag="span">new</Define:Badge>` rendered empty. The
+  1:1 line mapper buffered body lines from source line 2; it now starts at line 1 and
+  emits that line's code on the render header line, keeping the mapping intact. Every
+  close-tag, child and return line index moved with it. Test:
+  `test/define-line-content.test.js`.
+
 ## 2.3.62 (2026-09-07)
 
 ### Features

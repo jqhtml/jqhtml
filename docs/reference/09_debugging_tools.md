@@ -105,6 +105,37 @@ class Dashboard extends Jqhtml_Component {
 }
 ```
 
+## Component Debug Overlay
+
+An in-page inspector built into `@jqhtml/core`. Turn it on from the console or from a
+host framework's debug mode:
+
+```javascript
+jqhtml.debug_overlay.enable();      // on
+jqhtml.debug_overlay.disable();     // off
+jqhtml.debug_overlay.is_enabled();  // true / false
+jqhtml.debug_overlay.inspect(x);    // open the inspector for a component, element or jQuery object
+```
+
+While enabled:
+
+- **Hover** outlines the component under the pointer and every component above it, each
+  with a tab showing the component name and its simple args (strings, numbers, booleans;
+  objects and functions are skipped). Outlines are drawn inside the element's box, so
+  nothing on the page moves.
+- **Click** opens an inspector for the innermost component instead of running the
+  page's click handlers: name and class chain, `_cid`, lifecycle state, args, data and
+  state with types, the DOM ancestry (click an ancestor to inspect it), the instantiator
+  (the component whose template wrote the tag, which differs from the DOM parent for
+  slot content), and a **Log to console** button that hands the live instance to DevTools.
+- **Alt+click** passes through to the page. **Escape** closes the inspector.
+
+Components created after `enable()` are covered automatically. `disable()` removes the
+listeners, outlines and inspector; the overlay's stylesheets stay installed but match
+nothing. The overlay's own UI renders in a shadow root and applies only outline
+properties to page elements, so it neither inherits from nor alters the application's
+CSS. `enable()` returns `false` and does nothing where there is no DOM (server-side).
+
 ## Visual Component Debugging
 
 ### Highlighting Component Boundaries

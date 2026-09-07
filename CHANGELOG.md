@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.65 (2026-09-07)
+
+### Fixed
+
+- `component_name()` returns the invocation name (template tag, `.component('Name')`, boot
+  placeholder) rather than the JS class name; template-only components no longer report
+  `Jqhtml_Component`. See packages/core/CHANGELOG.md.
+- A component whose whole body sits on the `<Define>` line compiled to an empty render
+  function. See packages/parser/CHANGELOG.md.
+
+### Added
+
+- `jqhtml.debug_overlay` - an in-page component inspector in `@jqhtml/core`. `enable()`
+  outlines the hovered component and its ancestors with name/args tabs and turns clicks into
+  an inspector modal (identity, args, data, state, ancestry, instantiator, log to console);
+  `disable()` removes it. Non-invasive by construction: the UI lives in a shadow root and
+  page elements only receive outline classes. See packages/core/CHANGELOG.md.
+
 ## 2.3.62 (2026-09-07)
 
 ### Added

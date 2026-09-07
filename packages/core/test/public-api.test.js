@@ -42,6 +42,14 @@ describe('named exports', () => {
     'init',
   ];
 
+  it('exports debug_overlay with enable/disable/is_enabled/inspect', async () => {
+    const { debug_overlay } = await import('../dist/index.js');
+    for (const method of ['enable', 'disable', 'is_enabled', 'inspect']) {
+      expect(typeof debug_overlay[method]).toBe('function');
+    }
+    expect(debug_overlay.is_enabled()).toBe(false);
+  });
+
   it.each(expected_functions)('exports %s as a function', (name) => {
     expect(typeof core[name]).toBe('function');
   });

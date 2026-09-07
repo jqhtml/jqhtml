@@ -245,11 +245,12 @@ export class CodeGenerator {
       // Build the render function with line preservation
       const lines: string[] = [];
 
-      // Line 1: function declaration returning slots object
-      lines.push(`function render(data, args, content, jqhtml) { return [{_slots: {`);
+      // Line 1: function declaration returning slots object, plus anything
+      // written on the Define line itself (bodyLines[0] is source line 1)
+      lines.push(`function render(data, args, content, jqhtml) { return [{_slots: {` + (bodyLines[0] ? ' ' + bodyLines[0] : ''));
 
       // Lines 2-N: Body lines with slot functions
-      lines.push(...bodyLines);
+      lines.push(...bodyLines.slice(1));
 
       // Fix trailing comma on last slot function
       // Find the last line that contains '.bind(this),' and remove the comma
@@ -291,11 +292,12 @@ export class CodeGenerator {
     // Line 1 of input (Define tag) becomes the function declaration
     const lines: string[] = [];
 
-    // First line: function declaration and initial setup (corresponds to Define line)
-    lines.push(`function render(data, args, content, jqhtml) { let _output = []; const _cid = this._cid; const that = this;`);
+    // First line: function declaration and initial setup (corresponds to the
+    // Define line) followed by any markup written on that same line
+    lines.push(`function render(data, args, content, jqhtml) { let _output = []; const _cid = this._cid; const that = this;` + (bodyLines[0] ? ' ' + bodyLines[0] : ''));
 
     // Body lines: each corresponds to a source line
-    lines.push(...bodyLines);
+    lines.push(...bodyLines.slice(1));
 
     // Last line: closing (corresponds to closing Define tag)
     if (lines[lines.length - 1]) {
@@ -338,9 +340,9 @@ export class CodeGenerator {
           const bodyLineIndex = generatedLine - headerOffset - 1; // Convert to 0-based
 
           if (bodyLineIndex >= 0 && bodyLineIndex < bodyLines.length) {
-            // Map to actual source line (bodyLines starts at source line 2)
+            // Map to actual source line (bodyLines starts at source line 1)
             // Subtract 1 because syntax errors typically get detected on the line AFTER the problem
-            sourceLine = Math.max(1, bodyLineIndex + 2 - 1);
+            sourceLine = Math.max(1, bodyLineIndex + 1 - 1);
           }
         }
       }
@@ -408,9 +410,10 @@ export class CodeGenerator {
     };
     nodes.forEach(findMaxLine);
 
-    // Initialize lines array with empty strings for each source line
+    // Initialize lines array with empty strings for each source line, from
+    // line 1 (the <Define> line itself - markup may sit on it) to the last.
     const lines: string[] = [];
-    for (let i = 2; i <= maxLine; i++) {
+    for (let i = 1; i <= maxLine; i++) {
       lines.push('');
     }
 
@@ -449,7 +452,7 @@ export class CodeGenerator {
         }
       }
 
-      const lineIndex = node.line - 2; // Adjust for array index (line 2 = index 0)
+      const lineIndex = node.line - 1; // Adjust for array index (line 1 = index 0)
       if (lineIndex < 0 || lineIndex >= lines.length) return;
 
       // Generate code based on node type
@@ -516,7 +519,7 @@ export class CodeGenerator {
               const closeLine = tag.children && tag.children.length > 0
                 ? (tag.children[tag.children.length - 1].line || node.line)
                 : node.line;
-              const closeIndex = closeLine - 2;
+              const closeIndex = closeLine - 1;
               if (closeIndex >= 0 && closeIndex < lines.length) {
                 lines[closeIndex] = (lines[closeIndex] || '') + ' ' + closeTag;
               }
@@ -651,8 +654,8 @@ export class CodeGenerator {
                   // Multi-line children - process on their respective lines
                   comp.children.forEach(child => {
                     const origLine = child.line;
-                    if (origLine && origLine >= 2) {
-                      const childIndex = origLine - 2;
+                    if (origLine && origLine >= 1) {
+                      const childIndex = origLine - 1;
                       if (childIndex >= 0 && childIndex < lines.length) {
                         const childCode = this.generate_node(child);
                         if (childCode) {
@@ -664,7 +667,7 @@ export class CodeGenerator {
 
                   // Return statement and closing on the last child's line
                   const returnLine = comp.children[comp.children.length - 1].line || node.line;
-                  const returnIndex = returnLine - 2;
+                  const returnIndex = returnLine - 1;
                   if (returnIndex >= 0 && returnIndex < lines.length) {
                     lines[returnIndex] = (lines[returnIndex] || '') + '  return [_output, this]; }.bind(this)]});';
                   }
@@ -689,8 +692,8 @@ export class CodeGenerator {
           if (slot.children && slot.children.length > 0) {
             slot.children.forEach(child => {
               const childLine = child.line;
-              if (childLine && childLine >= 2) {
-                const childIndex = childLine - 2;
+              if (childLine && childLine >= 1) {
+                const childIndex = childLine - 1;
                 if (childIndex >= 0 && childIndex < lines.length) {
                   const childCode = this.generate_node(child);
                   if (childCode) {
@@ -703,7 +706,7 @@ export class CodeGenerator {
             // Close slot function on the last child's line
             const lastChild = slot.children[slot.children.length - 1];
             const closeLine = lastChild.line || node.line;
-            const closeIndex = closeLine - 2;
+            const closeIndex = closeLine - 1;
             if (closeIndex >= 0 && closeIndex < lines.length) {
               lines[closeIndex] = (lines[closeIndex] || '') + ' return [_output, this]; }.bind(this),';
             }

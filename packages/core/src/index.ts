@@ -24,6 +24,7 @@ export {
   list_components
 } from './component-registry.js';
 export type { ComponentConstructor, TemplateFunction, TemplateDefinition } from './component-registry.js';
+export { debug_overlay } from './debug-overlay/index.js';
 export { COMPONENT_NAME_PATTERN, COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
 
 // Instruction processing
@@ -107,6 +108,7 @@ import {
   get_registered_templates,
   list_components
 } from './component-registry.js';
+import { debug_overlay } from './debug-overlay/index.js';
 import {
   process_instructions,
   extract_slots
@@ -213,6 +215,10 @@ const jqhtml = {
   // Integration configuration - see config.ts
   configure,
   get_config,
+
+  // Component debug overlay: hover outlines + click-to-inspect modal.
+  // jqhtml.debug_overlay.enable() / .disable() / .is_enabled() / .inspect(x)
+  debug_overlay,
 
   // Debug settings
   debug: {

@@ -3,6 +3,31 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.65 (2026-09-07)
+
+### Bug Fixes
+
+* **component_name():** now returns the name the component was invoked as - the
+  template tag (`<User_Card>`), the name given to `$(el).component('User_Card')` or the
+  boot placeholder - instead of the JS class name, which reported `Jqhtml_Component`
+  for every template-only component. The name is carried on the new
+  `_component_name` property; every invocation path now passes it, including
+  `$(el).component(Class)`, which records the class's static `component_name` or its
+  own name.
+
+### Features
+
+* **debug overlay:** `jqhtml.debug_overlay.enable()` / `disable()` / `is_enabled()` /
+  `inspect(x)` - an in-page component inspector. Hovering outlines the component under
+  the pointer and every ancestor (inset outline, no layout effect) with a tab naming the
+  component and its string/number/boolean args; clicking opens a modal with identity,
+  args, data, state, DOM ancestry, instantiator and a log-to-console button instead of
+  running the page's handlers (Alt+click passes through, Esc closes). The overlay's UI
+  renders in a shadow root and page elements only ever receive outline classes gated
+  behind `html[data-jqhtml-debug]`; stylesheets are SCSS compiled at build time,
+  audited against that convention, and injected on first enable. Components created
+  after enable are covered automatically; `enable()` is a no-op without a DOM.
+
 ## 2.3.62 (2026-09-07)
 
 ### Features

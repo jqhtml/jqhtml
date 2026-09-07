@@ -1,0 +1,17 @@
+// Shared values for the debug overlay stylesheets. Not compiled on its own.
+// Every class emitted by light.scss and shadow.scss carries this prefix; the
+// audit (audit.js) rejects any selector that does not.
+$prefix: 'jqhtml-debug';
+
+// One colour per nesting depth, innermost component first. Depth classes cycle
+// through this list (see DEPTH_COLORS in index.ts - keep the two in step).
+$depth-colors: (#e5322d, #2f6fe4, #1f9d55, #d97706, #7c3aed, #0e7490);
+
+$font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+$font-size: 12px;
+$line-height: 1.4;
+$ink: #1c1c1c;
+$paper: #ffffff;
+$rule: #d0d0d0;
+$muted: #666666;
+$z-top: 2147483647;

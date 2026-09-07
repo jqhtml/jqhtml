@@ -1,0 +1,24 @@
+// LIGHT-DOM RULES - the only stylesheet that touches application elements.
+//
+// These rules paint the hover outline on the application's own component
+// elements, so they are held to the strictest convention (see CLAUDE.md here):
+//   * every selector begins with html[data-jqhtml-debug] and otherwise contains
+//     only .jqhtml-debug-* classes, so nothing matches unless the overlay is on
+//     AND the element was tagged by index.ts;
+//   * only outline properties, which never affect layout;
+//   * outline-offset is negative so the ring is drawn INSIDE the box and is not
+//     clipped by an overflow:hidden ancestor.
+@use 'sass:list';
+@use 'tokens' as t;
+
+html[data-jqhtml-debug] .#{t.$prefix}-hit {
+  outline: 2px solid list.nth(t.$depth-colors, 1);
+  outline-offset: -2px;
+}
+
+@each $color in t.$depth-colors {
+  $i: list.index(t.$depth-colors, $color) - 1;
+  html[data-jqhtml-debug] .#{t.$prefix}-hit.#{t.$prefix}-depth-#{$i} {
+    outline-color: $color;
+  }
+}

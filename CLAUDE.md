@@ -374,6 +374,7 @@ this.data         // Loaded data (from on_load)
 this.state        // Component-local state (convention)
 this.$            // jQuery element reference (root element)
 this._cid         // Component instance ID (unique, used for $sid scoping)
+this.component_name() // The name this instance was invoked as (<User_Card>, .component('User_Card'), boot placeholder); the template name for template-only components
 this.$sid('name') // Find element by scoped ID (returns jQuery object)
 this.sid('name')  // Get child component instance by scoped ID
 ```
@@ -643,7 +644,15 @@ each `<Define:>` region is compiled on its own.
 ```javascript
 jqhtml.debug.verbose = true;                        // Cache/dedup/SSR logging
 jqhtml.setDebugSettings({ logFullLifecycle: true }) // Per-lifecycle-phase tracing
+jqhtml.debug_overlay.enable();                      // In-page inspector: hover outlines the component
+jqhtml.debug_overlay.disable();                     // chain with name/args tabs; click opens a modal
+                                                    // (args, data, state, ancestry, instantiator).
+                                                    // Alt+click passes through; Esc closes.
 ```
+
+`jqhtml.debug_overlay` also has `is_enabled()` and `inspect(component | element | $el)`.
+It is non-invasive: its UI renders in a shadow root and page elements only ever receive
+outline styling. Full description: `docs/reference/09_debugging_tools.md`.
 
 ---
 

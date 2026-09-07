@@ -2,8 +2,30 @@ import resolve from '@rollup/plugin-node-resolve';
 import typescript from '@rollup/plugin-typescript';
 import replace from '@rollup/plugin-replace';
 import { readFileSync } from 'fs';
+import path from 'path';
+import { compile as compile_scss } from 'sass';
+import { audit_debug_css } from './src/debug-overlay/audit.js';
 
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'));
+
+// `import css from './x.scss'` -> the compiled stylesheet as a string, after
+// the debug-overlay convention audit. A violation fails the build. The only
+// consumer is src/debug-overlay/, which injects the strings at runtime; see
+// src/debug-overlay/CLAUDE.md.
+function debug_scss() {
+  return {
+    name: 'jqhtml-debug-scss',
+    transform(_code, id) {
+      if (!id.endsWith('.scss')) return null;
+      const css = compile_scss(id, { style: 'expanded' }).css;
+      const violations = audit_debug_css(path.basename(id, '.scss'), css);
+      if (violations.length) {
+        this.error(`debug overlay stylesheet convention violated in ${path.relative(process.cwd(), id)}:\n  - ${violations.join('\n  - ')}`);
+      }
+      return { code: `export default ${JSON.stringify(css)};`, map: { mappings: '' } };
+    }
+  };
+}
 
 export default [
   // Standard CommonJS/ES module output for npm packages
@@ -23,6 +45,7 @@ export default [
     ],
     external: ['jquery'],
     plugins: [
+      debug_scss(),
       replace({
         preventAssignment: true,
         values: {
@@ -53,6 +76,7 @@ export default [
     },
     external: ['jquery'],
     plugins: [
+      debug_scss(),
       replace({
         preventAssignment: true,
         values: {
@@ -77,6 +101,7 @@ export default [
     },
     external: ['jquery'],
     plugins: [
+      debug_scss(),
       replace({
         preventAssignment: true,
         values: {
