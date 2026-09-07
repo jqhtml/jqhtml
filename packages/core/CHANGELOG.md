@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.62 (2026-09-07)
+
+### Features
+
+* **naming:** `register_component()`, `register_template()`, `closest('_Name')`, the
+  component-name classes applied to the rendered root, and the class stripping done when
+  `$(el).component()` replaces a component all accept a single leading underscore
+  (`_Root_Layout`). `src/component-name.ts` holds the one rule
+  (`^_?[A-Z][A-Za-z0-9_]*$`), exported as `is_component_name` and
+  `COMPONENT_NAME_PATTERN`; `Jqhtml_Component.COMPONENT_NAME_PATTERN` now aliases it.
+  The root-element class filter still drops mangled `_`-prefixed class names that do not
+  match the rule. `__Foo` and `_foo` are rejected with "must start with a capital letter,
+  optionally preceded by a single underscore".
+
+
 ## 2.3.61 (2026-09-03)
 
 ### Bug Fixes

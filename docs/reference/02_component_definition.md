@@ -485,8 +485,9 @@ Use `this.$sid(id)` for jQuery/DOM access and `this.sid(id)` when you need to ca
 
 ### Requirements
 
-1. **Component names must start with a capital letter** - This is how the parser distinguishes `<UserCard>` (component) from `<div>` (HTML element)
+1. **Component names must start with a capital letter, optionally preceded by a single underscore** - This is how the parser distinguishes `<UserCard>` (component) from `<div>` (HTML element). The full rule is `^_?[A-Z][A-Za-z0-9_]*$`.
 2. **JS class name must match template name exactly** - `UserCard` class pairs with `<Define:UserCard>`
+3. **The single leading underscore is a reserved prefix for framework-provided components** - A host framework that ships its own components names them `_RootLayout`, `_SidebarNav`, so they can never collide with application components. `<_RootLayout>` is a component; `<_rootLayout>` is an HTML tag; `<Define:__RootLayout>` (two underscores) is rejected with the naming error. Everything else - `$sid`, `closest('_RootLayout')`, `register_component('_RootLayout', cls)`, the `_RootLayout` class on the rendered element - works exactly as for an unprefixed name.
 
 ### Recommended Convention
 
@@ -503,7 +504,7 @@ class ProductListItem extends Jqhtml_Component { }
 </Define:UserProfileCard>
 ```
 
-Any naming convention works as long as the first letter is capitalized and JS class matches template name.
+Any naming convention works as long as the first letter is capitalized (after the optional single underscore) and JS class matches template name.
 
 ## Using Components
 

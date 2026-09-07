@@ -5,7 +5,7 @@
 Tests that calling `$(selector).component("Component_Name")` on an element that already has a component properly:
 
 1. **Stops the existing component** - Calls `.stop()` with error handling
-2. **Removes component classes** - Strips all classes starting with capital letters
+2. **Removes component classes** - Strips all classes starting with capital letters (and `_Prefixed` component names)
 3. **Removes component data** - Cleans up `_component` data
 4. **Creates new component** - Instantiates and boots the new component
 
@@ -52,8 +52,9 @@ this.$sid('target').component('Second_Component');
 
 ### Class Removal Logic
 
-Only classes starting with capital letters are removed (component classes):
+Only classes starting with capital letters, or component names with the reserved single-underscore prefix, are removed (component classes):
 - `First_Component` → REMOVED
+- `_Framework_Component` → REMOVED
 - `Component` → REMOVED
 - `my-custom-class` → KEPT
 - `active` → KEPT

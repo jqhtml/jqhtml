@@ -71,7 +71,7 @@ Every component automatically gets TWO classes:
 You provide ONLY styling classes in the `class=""` attribute.
 
 **Basic syntax:**
-- `<Define:Component_Name>` — Component name (PascalCase required)
+- `<Define:Component_Name>` — Component name: a capital letter first, optionally preceded by a single underscore (`_Root_Layout` — a prefix reserved for framework-provided components so they cannot collide with application components; `__Foo` is rejected)
 - `tag="div"` — Root element type (default: `div`)
 - `class="..."` — Styling classes added to root
 - Any HTML attributes — Passed through to element

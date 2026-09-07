@@ -6,6 +6,7 @@
  */
 
 import { Jqhtml_Component } from './component.js';
+import { COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
 
 // Template function signature matching parser output
 export type TemplateFunction = (
@@ -85,10 +86,10 @@ export function register_component(
       throw new Error('Component class is required when registering by name');
     }
 
-    // Validate component name starts with capital letter
-    if (!/^[A-Z]/.test(name)) {
+    // Validate component name against the shared rule
+    if (!is_component_name(name)) {
       throw new Error(
-        `Component name '${name}' must start with a capital letter. Convention is First_Letter_With_Underscores.`
+        `Component name '${name}' ${COMPONENT_NAME_RULE}. Convention is First_Letter_With_Underscores.`
       );
     }
 
@@ -169,10 +170,10 @@ export function register_template(template_def: TemplateDefinition): boolean {
     throw new Error('Template must have a name property');
   }
 
-  // Validate template name starts with capital letter
-  if (!/^[A-Z]/.test(name)) {
+  // Validate template name against the shared rule
+  if (!is_component_name(name)) {
     throw new Error(
-      `Template name '${name}' must start with a capital letter. Convention is First_Letter_With_Underscores.`
+      `Template name '${name}' ${COMPONENT_NAME_RULE}. Convention is First_Letter_With_Underscores.`
     );
   }
 

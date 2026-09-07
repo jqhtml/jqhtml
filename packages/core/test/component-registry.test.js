@@ -51,6 +51,26 @@ describe('register_component', () => {
     expect(() => register_component('lowercase_name', R_Bad)).toThrow(/must start with a capital letter/);
   });
 
+  it('accepts a single leading underscore (reserved framework prefix)', () => {
+    class R_Framework {}
+    register_component('_R_Framework', R_Framework);
+    expect(has_component('_R_Framework')).toBe(true);
+    expect(get_component_class('_R_Framework')).toBe(R_Framework);
+  });
+
+  it('registers a class whose own name has the underscore prefix', () => {
+    class _R_Own {}
+    register_component(_R_Own);
+    expect(get_component_class('_R_Own')).toBe(_R_Own);
+  });
+
+  it('rejects two leading underscores and an underscore before a lower-case letter', () => {
+    class R_Bad2 {}
+    const rule = /must start with a capital letter, optionally preceded by a single underscore/;
+    expect(() => register_component('__R_Bad', R_Bad2)).toThrow(rule);
+    expect(() => register_component('_r_bad', R_Bad2)).toThrow(rule);
+  });
+
   it('rejects registration by name with no class', () => {
     expect(() => register_component('R_NoClass')).toThrow(/Component class is required/);
   });
@@ -89,6 +109,13 @@ describe('register_template', () => {
 
   it('rejects a lowercase template name', () => {
     expect(() => register_template(make_template('lowercase'))).toThrow(/must start with a capital letter/);
+  });
+
+  it('accepts a template named with the single-underscore prefix and rejects a double one', () => {
+    expect(register_template(make_template('_R_Tpl_Prefixed'))).toBe(true);
+    expect(get_template('_R_Tpl_Prefixed').name).toBe('_R_Tpl_Prefixed');
+    expect(() => register_template(make_template('__R_Tpl_Bad')))
+      .toThrow(/Template name '__R_Tpl_Bad' must start with a capital letter, optionally preceded by a single underscore/);
   });
 
   it('attaches tag and defaultAttributes metadata to an already-registered class', () => {

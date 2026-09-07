@@ -24,6 +24,7 @@ import {
   getSuggestion
 } from './errors.js';
 import { CodeGenerator, VOID_ELEMENTS } from './codegen.js';
+import { COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
 
 export class Parser {
   private tokens: Token[];
@@ -161,10 +162,10 @@ export class Parser {
     const start_token = this.consume(TokenType.DEFINE_START, 'Expected <Define:');
     const name_token = this.consume(TokenType.COMPONENT_NAME, 'Expected component name');
 
-    // Validate component name starts with capital letter
-    if (!/^[A-Z]/.test(name_token.value)) {
+    // Validate component name against the shared rule
+    if (!is_component_name(name_token.value)) {
       throw syntaxError(
-        `Component name '${name_token.value}' must start with a capital letter. Convention is First_Letter_With_Underscores.`,
+        `Component name '${name_token.value}' ${COMPONENT_NAME_RULE}. Convention is First_Letter_With_Underscores.`,
         name_token.line,
         name_token.column,
         this.source,
@@ -695,8 +696,8 @@ export class Parser {
       );
     }
 
-    // Determine if this is a component (starts with capital letter) or HTML tag
-    let is_component = tag_name[0] >= 'A' && tag_name[0] <= 'Z';
+    // Determine if this is a component or an HTML tag (see component-name.ts)
+    let is_component = is_component_name(tag_name);
 
     // Check if this is an HTML5 void element (only for HTML tags, not components)
     const is_void_element = !is_component && VOID_ELEMENTS.has(tag_lower);

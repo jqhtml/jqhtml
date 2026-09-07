@@ -34,8 +34,11 @@ Either may be omitted:
   name as a class. A page can therefore be scaffolded out of names before a single one
   exists, and nothing breaks in the meantime.
 
-Component names must start with a capital letter, and the JS class name must match the
-template name exactly. **A tag is a component only if its first letter is uppercase** —
+Component names must start with a capital letter, optionally preceded by a single underscore,
+and the JS class name must match the template name exactly. The underscore prefix (`_RootLayout`)
+is reserved for framework-provided components so they cannot collide with application ones;
+`__Foo` is rejected. **A tag is a component only if its first letter (after that optional
+underscore) is uppercase** —
 `<user_card>` is never a component no matter what is registered; it renders as a literal
 unknown HTML element with no scoping, lifecycle or `Component` class.
 

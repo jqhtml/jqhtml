@@ -563,11 +563,11 @@ export class Lexer {
       // Peek ahead to see if this is an HTML tag
       if (this.peek_ahead(1) === '/') {
         // Closing tag
-        if (this.is_tag_name_char(this.peek_ahead(2))) {
+        if (this.is_tag_start_at(2)) {
           this.scan_closing_tag();
           return;
         }
-      } else if (this.is_tag_name_char(this.peek_ahead(1))) {
+      } else if (this.is_tag_start_at(1)) {
         // Opening tag
         this.scan_opening_tag();
         return;
@@ -631,10 +631,10 @@ export class Lexer {
           break;
         }
         // Also stop for HTML tags
-        if (this.peek_ahead(1) === '/' && this.is_tag_name_char(this.peek_ahead(2))) {
+        if (this.peek_ahead(1) === '/' && this.is_tag_start_at(2)) {
           break; // Closing tag
         }
-        if (this.is_tag_name_char(this.peek_ahead(1))) {
+        if (this.is_tag_start_at(1)) {
           break; // Opening tag
         }
       }
@@ -1104,6 +1104,15 @@ export class Lexer {
     if (!char) return false;
     return (char >= 'a' && char <= 'z') || 
            (char >= 'A' && char <= 'Z');
+  }
+  
+  // A tag may also begin with a single underscore followed by a letter: the
+  // reserved component prefix (<_Root_Layout>). Whether such a name IS a
+  // component is the parser's call (component-name.ts); "<_ " and "<__" stay text.
+  private is_tag_start_at(pos: number): boolean {
+    const char = this.peek_ahead(pos);
+    return this.is_tag_name_char(char) ||
+           (char === '_' && this.is_tag_name_char(this.peek_ahead(pos + 1)));
   }
   
   private is_tag_name_continue_char(char: string): boolean {

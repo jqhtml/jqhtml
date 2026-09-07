@@ -1,0 +1,18 @@
+<Define:Test_Underscore_Component_Name>
+  <div>
+    <h1>Single leading underscore in component names</h1>
+
+    <_Framework_Box $sid="fbox" $label="from template">
+      <Plain_Marker $sid="plain_in_fw" />
+      <_Framework_Marker $sid="fw_in_fw" />
+    </_Framework_Box>
+
+    <Plain_Box $sid="pbox">
+      <_Framework_Marker $sid="fw_in_plain" />
+    </Plain_Box>
+
+    <_Framework_Marker $sid="self_closed" />
+
+    <div $sid="mount"></div>
+  </div>
+</Define:Test_Underscore_Component_Name>

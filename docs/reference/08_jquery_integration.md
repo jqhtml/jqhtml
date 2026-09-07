@@ -164,7 +164,7 @@ $('#target').component('SecondComponent', {id: 2});
 **Replacement process:**
 
 1. **Stop existing component** - Calls `.stop()` with try/catch error handling
-2. **Remove component classes** - Strips all classes starting with capital letters
+2. **Remove component classes** - Strips all classes starting with capital letters, and component names with the reserved single-underscore prefix (`_RootLayout`)
 3. **Remove component data** - Cleans up `_component` data
 4. **Create new component** - Instantiates and boots the new component
 
@@ -191,9 +191,10 @@ class Dashboard extends Jqhtml_Component {
 
 **Class removal logic:**
 
-Only classes starting with capital letters are removed (component classes), with one exception - BEM-style classes containing double underscores (`__`) are always preserved:
+Only classes starting with capital letters, or matching a component name with the reserved single-underscore prefix, are removed (component classes), with one exception - BEM-style classes containing double underscores (`__`) are always preserved:
 
 - `FirstComponent` → REMOVED
+- `_RootLayout` → REMOVED
 - `Component` → REMOVED
 - `MyComponent__header` → KEPT (BEM class)
 - `Card__footer` → KEPT (BEM class)

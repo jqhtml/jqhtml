@@ -1,0 +1,16 @@
+<%--
+_Root_Layout - a framework-reserved component name: one leading underscore,
+then a capital letter. <_Foo> is a component; <_foo> is an HTML tag; <__Foo> is
+not a tag at all and passes through as text.
+--%>
+<Define:_Root_Layout class="layout">
+  <_Sidebar_Nav $items=this.data.items />
+  <_Main_Region>
+    <Panel $title="inner">
+      <_Widget />
+    </Panel>
+    <%= content() %>
+  </_Main_Region>
+  <_foo>html, not a component</_foo>
+  <__Not_A_Component>html, not a component</__Not_A_Component>
+</Define:_Root_Layout>

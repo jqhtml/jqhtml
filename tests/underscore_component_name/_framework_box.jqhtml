@@ -1,0 +1,4 @@
+<Define:_Framework_Box class="fw-box">
+  <span class="fw-label"><%= this.args.label %></span>
+  <div class="fw-content"><%= content() %></div>
+</Define:_Framework_Box>

@@ -20,6 +20,7 @@ import { event_on, event_once, event_trigger, event_on_registered, event_invalid
 import { setup_data_property, execute_on_load_detached } from './data-proxy.js';
 import { read_cache_in_create, check_cache_on_reload, write_html_cache_snapshot, write_cache_on_loaded } from './component-cache.js';
 import { debug_attributes_enabled } from './config.js';
+import { COMPONENT_NAME_PATTERN, is_component_name } from './component-name.js';
 import { Component_Queue } from './component-queue.js';
 import { capture_component_data, is_capture_enabled, consume_preload_data, has_preload_data } from './preload-data.js';
 import { get_viewport_width } from './viewport.js';
@@ -44,7 +45,7 @@ export class Jqhtml_Component {
   static template?: any;                  // Template associated with this component class
 
   // A bare component name, as accepted by closest() in place of a class selector
-  static readonly COMPONENT_NAME_PATTERN = /^[A-Z][A-Za-z0-9_]*$/;
+  static readonly COMPONENT_NAME_PATTERN = COMPONENT_NAME_PATTERN;
 
   // Public properties
   $: any;                                 // Component's root jQuery element
@@ -1926,7 +1927,8 @@ export class Jqhtml_Component {
    * Find closest ancestor component matching selector
    *
    * A bare component name - a plain identifier starting with a capital letter,
-   * such as 'Parent_Dashboard' - is treated as the component-name class
+   * optionally preceded by a single underscore, such as 'Parent_Dashboard' or
+   * '_Root_Layout' - is treated as the component-name class
    * selector '.Parent_Dashboard'. Components carry a CSS class for every name
    * in their prototype chain, so a base class name matches its subclasses too.
    * Every other selector ('.Foo', '#id', '[attr]', 'div > .Component') is
@@ -2018,14 +2020,16 @@ export class Jqhtml_Component {
       classesToAdd.unshift(this.args._component_name);
     }
 
-    // Filter out private classes (starting with _) and invalid class names
+    // Filter out private/mangled classes (starting with _) and invalid class names.
+    // A component name with the reserved single-underscore prefix (_Root_Layout)
+    // is public and is kept - see component-name.ts.
     const publicClasses = classesToAdd.filter(className => {
       // Guard against undefined, null, or non-string values
       if (!className || typeof className !== 'string') {
         console.warn('[JQHTML] Filtered out invalid class name:', className);
         return false;
       }
-      return !className.startsWith('_');
+      return !className.startsWith('_') || is_component_name(className);
     });
 
     if (publicClasses.length > 0) {

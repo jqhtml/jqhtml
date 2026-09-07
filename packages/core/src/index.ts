@@ -24,6 +24,7 @@ export {
   list_components
 } from './component-registry.js';
 export type { ComponentConstructor, TemplateFunction, TemplateDefinition } from './component-registry.js';
+export { COMPONENT_NAME_PATTERN, COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
 
 // Instruction processing
 export {

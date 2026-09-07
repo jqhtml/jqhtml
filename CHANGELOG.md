@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.62 (2026-09-07)
+
+### Added
+
+- Component names may carry a single leading underscore: `_Root_Layout`, `_Sidebar_Nav`.
+  The rule is now `^_?[A-Z][A-Za-z0-9_]*$`, held in one place per package
+  (`component-name.ts`, exported as `is_component_name` / `COMPONENT_NAME_PATTERN`) and used
+  for the tag-vs-component decision, `<Define:>` validation, `register_component()` /
+  `register_template()` validation, `closest()` bare-name selectors, the component-name
+  classes on the rendered element, and class stripping on replacement. The prefix is a
+  namespace reserved for framework-provided components so they cannot collide with
+  application components. `__Foo` is rejected with the naming error; `_foo` is an HTML tag.
+  Every previously valid name is unchanged.
+
+
 ## 2.3.61 (2026-09-03)
 
 ### Changed

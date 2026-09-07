@@ -3,6 +3,21 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.62 (2026-09-07)
+
+### Features
+
+* **naming:** a component name may begin with a single underscore (`<_Root_Layout>`,
+  `<Define:_Root_Layout>`, `<_Foo />`). `src/component-name.ts` holds the one rule
+  (`^_?[A-Z][A-Za-z0-9_]*$`) and is exported as `is_component_name` and
+  `COMPONENT_NAME_PATTERN`. The lexer opens a tag on `<_` only when a letter follows, so
+  `<_foo>` lexes as an HTML element while `<_ ` and `<__Foo>` remain literal text exactly
+  as before. `<Define:__Foo>` and `<Define:_foo>` fail with
+  "must start with a capital letter, optionally preceded by a single underscore".
+  New corpus fixture `UnderscorePrefixedComponent.jqhtml`; tests in
+  `test/component-name.test.js`.
+
+
 ## 2.3.61 (2026-09-03)
 
 ### Features

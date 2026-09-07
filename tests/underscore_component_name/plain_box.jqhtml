@@ -1,0 +1,3 @@
+<Define:Plain_Box class="plain-box">
+  <%= content() %>
+</Define:Plain_Box>

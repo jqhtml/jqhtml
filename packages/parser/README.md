@@ -21,7 +21,7 @@ The parser handles the template syntax - `<Define:>` blocks, `<%= %>` expression
 
 ## Status
 
-Alpha release. Works well enough that I use it daily, but you might hit edge cases.
+Beta release. It compiles production templates daily and the syntax is stable; report any template it mishandles.
 
 Full documentation: **[docs.jqhtml.org](https://docs.jqhtml.org/)**
 

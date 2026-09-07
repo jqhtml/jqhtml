@@ -437,7 +437,7 @@ An attribute cannot be assigned directly to a `<%= %>` block - the interpolation
 
 ## Key Syntax Rules
 
-1. **Component names**: Must start with capital letter (e.g., `UserCard`, `ProductList`)
+1. **Component names**: Must start with a capital letter, optionally preceded by a single underscore (e.g., `UserCard`, `ProductList`, `_RootLayout`). The underscore prefix is reserved for framework-provided components; `__Foo` is not a component name and `_foo` is an HTML tag
 2. **Escaped output**: `<%= expression %>` (HTML-escaped - default, safe)
 3. **Unescaped output**: `<%!= expression %>` (Raw HTML - use with caution)
 4. **Control flow**: `<% code %>` (no output) - Use JavaScript brace style `{ }`

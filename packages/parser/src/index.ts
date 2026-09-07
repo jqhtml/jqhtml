@@ -5,6 +5,7 @@ import { Parser } from './parser.js';
 
 export { Lexer, Token, TokenType } from './lexer.js';
 export { Parser } from './parser.js';
+export { COMPONENT_NAME_PATTERN, COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
 export { CodeGenerator, generate } from './codegen.js';
 export { compileTemplate, CompileOptions, CompiledOutput } from './compiler.js';
 export {

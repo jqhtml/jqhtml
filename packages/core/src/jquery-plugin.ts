@@ -9,6 +9,7 @@
 // Use global jQuery
 declare const $: any;
 import { Jqhtml_Component } from './component.js';
+import { is_component_name } from './component-name.js';
 import type { ComponentConstructor } from './component-registry.js';
 import {
   get_component_class,
@@ -171,16 +172,19 @@ export function init_jquery_plugin(jQuery: any): void {
         console.warn('[JQHTML] Error stopping existing component during replacement:', error);
       }
 
-      // Remove component classes (any class starting with capital letter, except BEM classes)
+      // Remove component classes (any class starting with a capital letter, or a
+      // component name with the reserved underscore prefix - except BEM classes)
       const classes = element.attr('class');
       if (classes) {
         const classList = classes.split(/\s+/);
         const nonComponentClasses = classList.filter((cls: string) => {
           // Keep class if:
           // 1. It's empty
-          // 2. It doesn't start with a capital letter
+          // 2. It is neither capital-first nor a component name (see component-name.ts)
           // 3. It's a BEM-style class (contains __) - these persist across reinitialization
-          return !cls || cls[0] !== cls[0].toUpperCase() || cls[0] === cls[0].toLowerCase() || cls.includes('__');
+          if (!cls || cls.includes('__')) return true;
+          const capital_first = cls[0] === cls[0].toUpperCase() && cls[0] !== cls[0].toLowerCase();
+          return !capital_first && !is_component_name(cls);
         });
         element.attr('class', nonComponentClasses.join(' '));
       }

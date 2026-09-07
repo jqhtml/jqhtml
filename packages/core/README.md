@@ -15,7 +15,7 @@ Components have a simple lifecycle: `on_load()` fetches data, `on_render()` sets
 
 ## Status
 
-Alpha release. It works and I use it daily, but expect rough edges.
+Beta release. It runs in production daily and the API is stable; report anything that behaves unexpectedly.
 
 Full documentation: **[docs.jqhtml.org](https://docs.jqhtml.org/)**
 
