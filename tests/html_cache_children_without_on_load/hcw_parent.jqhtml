@@ -1,0 +1,4 @@
+<Define:Hcw_Parent>
+  <span $sid="title"><%= this.data.title %></span>
+  <Hcw_Leaf $sid="leaf" $mark="in parent" />
+</Define:Hcw_Parent>

@@ -1,0 +1,10 @@
+<%--
+Rs_Parent - a parent with one $redrawable child (addressed by render('counter'))
+and one real child component the parent must wait for in _wait_for_children_ready().
+--%>
+<Define:Rs_Parent class="rs-parent">
+  <div $redrawable $sid="counter" class="rs-counter">
+    Counter: <%= this.data.counter %>
+  </div>
+  <Rs_Poller $sid="poller" />
+</Define:Rs_Parent>

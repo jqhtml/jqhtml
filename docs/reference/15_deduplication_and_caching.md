@@ -83,20 +83,30 @@ INVOCATION_KEY = component_name::serialized_args
 
 ### Error Handling
 
-If the leader's `on_load()` throws an error:
-- All follower components receive the same error
-- Error propagates to each component individually
-- Coordination entry is cleared
-- Future requests with same INVOCATION_KEY become new leaders (retry)
+If the leader's `on_load()` throws, the coordinator rejects the promise every follower is
+waiting on, then deletes the coordination entry:
 
-**Note:** Comprehensive error handling for `on_load()` is planned but not yet implemented. See `docs/internal/11-13-ON_LOAD_ERROR_HANDLING.md` for design considerations.
+- Each follower's load fails with the leader's error, exactly as if its own `on_load()`
+  had thrown - the failure reaches the same boot error handling either way
+- No follower is left waiting: a leader that fails settles its group
+- The entry is removed, so the next component with that INVOCATION_KEY becomes a new
+  leader and calls `on_load()` again (the failure is not cached)
+
+A component's key is captured when it joins the group, not recomputed when the leader
+finishes. `this.args` may legally change while `on_load()` runs - a parent can set
+`child.args.filter` in its own `on_render()` - and a recomputed key would address a
+different entry than the one the component actually joined.
 
 ### Important Behaviors
 
 **Request deduplication is temporary:**
 - Coordination only lasts during active loading
-- Once leader completes, entry is cleared immediately
+- Once the leader completes, the entry is cleared: immediately if nobody is waiting,
+  otherwise as soon as the last follower has collected the data
 - New components with same INVOCATION_KEY trigger new requests
+
+**Each component gets its own data:** the leader's result is stored as JSON text and
+parsed once per follower, so no two components in a group share an object graph.
 
 **Why not cache?**
 - Ensures fresh data on page state changes
@@ -239,6 +249,16 @@ cost of staying strict is redundant concurrent requests — the cheaper failure.
 it, always takes precedence over content serialization. A component whose identity is not
 derivable from its args at all — one that legitimately takes a function — should define
 `cache_id()` on the component itself.
+
+**One derivation, three uses.** The key the cache is READ with in `create()`, the key
+`load()` WRITES the cache under, and the key an SSR preload entry is matched against all
+come from a single helper, `generate_cache_key()` in
+`packages/core/src/component-cache.ts`. Each of them once had its own copy: the copies
+in `load()` and in `set_preload_data()` omitted content serialization, so an object-arg
+component never wrote the cache it later read from and never matched a preload entry, and
+a `cache_id()` component's key shape (`<Name>::<cache_id()>`) could not be reproduced from
+args at all. Captured preload entries now carry the key they were captured under (see
+`21_server_side_rendering.md`).
 
 **What happens when an arg cannot be keyed:**
 1. Component still functions normally; `on_load()` executes as expected
@@ -545,11 +565,16 @@ this.data.contact.get_display_name()        // "John <john@example.com>"
 - **Stale-while-revalidate** - Instant render with cached data, background refresh
 - **Smart re-rendering** - Only re-renders if data actually changed
 
-### Hot/Cold Cache Parity (Data Mode)
+### `this.data` Is A Serialized Copy (Every Cache Mode)
 
 **Purpose:** Ensure "hot" data (fresh from `on_load()`) behaves identically to "cold" data (restored from cache).
 
-In data mode, after `on_load()` completes, `this.data` is automatically passed through a serialize/deserialize round-trip—the same process that occurs when data is written to and read from localStorage cache. This normalization happens on every `on_load()`, regardless of whether caching is enabled.
+Whatever `on_load()` returns is passed through the cache serializer's serialize/deserialize round-trip BEFORE it is assigned to `this.data`—the same process that occurs when data is written to and read from localStorage. This happens in **every cache mode**, including `'none'` and `'html'`, and whether or not `set_cache_key()` was ever called.
+
+Two properties follow, and the rest of the framework depends on both:
+
+- **`this.data` is jqhtml's own copy.** The object graph `on_load()` returned is never aliased into `this.data`, so nothing an author still holds a reference to can mutate frozen data behind the framework's back.
+- **`this.data` is by construction what the cache stores and what a cache hit returns.** Hot and cold are the same shape because they are produced by the same code. Turning caching on cannot change what a component sees.
 
 **Why this matters:**
 
@@ -583,22 +608,63 @@ jqhtml.register_cache_class(Contact_Model);
 
 **Technical behavior:**
 
-1. After `on_load()` completes, `this.data` is serialized to JSON
+1. After `on_load()` completes, its result is serialized to JSON
 2. The JSON is immediately deserialized back to an object
 3. Registered classes are restored with their prototype chain
 4. Unregistered classes become plain objects (properties preserved, methods lost)
-5. The normalized data replaces `this.data`
+5. The round-tripped copy becomes `this.data`
 
 **This guarantees:**
 - Fresh data behaves exactly like cached data
 - Missing class registrations are caught immediately, not on page reload
 - No "works in dev, breaks in prod" surprises from cache behavior
 
+#### What Survives, What Is Stripped
+
+| Value in the `on_load()` result | Result in `this.data` |
+|---|---|
+| primitives, plain objects, arrays | preserved |
+| `Date`, `Map`, `Set` | reconstructed, no registration needed |
+| instance of a class passed to `jqhtml.register_cache_class()` | reconstructed, methods callable |
+| instance of an unregistered class | plain object of its own enumerable properties; methods lost |
+| function (a callback) | **STRIPPED** |
+| promise | **STRIPPED** |
+| DOM node, jQuery object, `Jqhtml_Component` | **STRIPPED** |
+| symbol, bigint | **STRIPPED** |
+| a reference back to an ancestor (a cycle) | **CUT** — the rest of the graph still serializes |
+
+A stripped value is omitted from an object and becomes `null` in an array, matching JSON's
+own semantics. Nothing is passed through unconverted: a value that cannot be cached cannot
+be in `this.data`, because otherwise the first cache hit would silently change the
+component's behaviour.
+
+#### Where Those Values Belong
+
+| Stripped value | Where it goes instead |
+|---|---|
+| callbacks, handlers passed down from a parent | `this.args` |
+| DOM nodes, jQuery objects, timers, files, sockets, component references | `this.state` |
+| model instances whose methods you need | keep them in `this.data`, and register the class with `jqhtml.register_cache_class(Model)` at startup |
+
+#### The Development Warning
+
+In `development` mode (the default — see `20_runtime_configuration.md`) each stripped value
+prints exactly ONE `console.warn` per **component name + dotted path**, for the life of the
+page. Not once per instance, not once per load — a list of 50 rows each carrying an
+`on_select` callback prints one warning, and a `reload()` or a second instance prints none.
+
+The message names the component, the path (`this.data.rows[3].on_select`), what kind of
+value was dropped, and which of the destinations above it belongs in.
+
+`jqhtml.configure({ mode: 'production' })` converts silently — the conversion itself is
+identical, only the warning is suppressed. Serialization never throws; a value it cannot
+express is dropped, never raised.
+
 **Shared (non-circular) references between `this.data` keys:**
 
 If the same object or array is assigned to two different `this.data` keys (e.g. `this.data.selected = this.data.items[0]`), that's a shared reference (a DAG), not a circular reference—it's fully supported and does NOT disable caching. Both keys serialize successfully and both come back with their values intact after a cache round-trip.
 
-**What is lost:** Object identity between the two keys. Before caching, `this.data.selected === this.data.items[0]` would be `true` in memory. After a serialize/deserialize round-trip (hot/cold parity normalization, or an actual cache write/restore), each occurrence is serialized independently, so `this.data.selected === this.data.items[0]` becomes `false`—they're now two separate objects with the same contents, not the same object. Only genuine circular references (an object that (in)directly contains itself) disable serialization; shared references without a cycle serialize fine, just without preserved identity.
+**What is lost:** Object identity between the two keys. Before caching, `this.data.selected === this.data.items[0]` would be `true` in memory. After the round trip (which now happens on every load in every cache mode, as well as on an actual cache write/restore), each occurrence is serialized independently, so `this.data.selected === this.data.items[0]` becomes `false`—they're now two separate objects with the same contents, not the same object. A genuine circular reference (an object that (in)directly contains itself) is cut at the back-edge — that one property is dropped and the rest of the data survives; shared references without a cycle serialize fine, just without preserved identity.
 
 ---
 
@@ -631,6 +697,29 @@ This ensures:
 - All nested content is present
 - Snapshot captures complete DOM tree
 
+### What the Entry Stores
+
+An HTML-cache entry is not a bare string. It is `{cid, html}` — the component's inner
+HTML plus the `_cid` it was rendered under:
+
+```json
+{ "cid": "ab", "html": "<span id=\"name:ab\">card 1</span>…" }
+```
+
+The cid is load-bearing. Scoped ids (`$sid`) are written into the markup as
+`id="<name>:<cid>"`, so a snapshot contains the snapshotting component's own ids AND the
+ids of everything its children rendered, and only the owner's cid distinguishes them.
+
+**Scoped ids are re-scoped on replay.** When the entry is injected, every
+`id="<name>:<cid>"` is rewritten: the snapshot owner's cid becomes the injecting
+component's `_cid`, and every other cid becomes a freshly generated one, consistently
+within that injection. The debug-only `data-cid` mirrors are rewritten with the same
+mapping. Ids without a `:` are not scoped ids and are left alone.
+
+Without this, two components hydrated from one entry would carry identical ids, and
+`$sid()` — which resolves through `document.getElementById()` — could hand one instance
+the other instance's element.
+
 ### HTML Mode Behaviors
 
 **`this.data` is accessible in `on_render()` — but not on the very first cache-hit call**
@@ -662,7 +751,17 @@ HTML mode only caches components that modify `this.data` during `on_load()` (dyn
 
 **Synchronization:**
 
-Before caching HTML, parent components wait for all children's `on_render()` to complete. This ensures the cached snapshot includes fully rendered child content.
+Before caching HTML, parent components wait for all children's `on_render()` to complete.
+This ensures the cached snapshot includes fully rendered child content. The wait is
+event-driven: each child resolves it when it fires `render` having completed its post-load
+render (or when it fires `stop`). A child with no `on_load()` has no post-load render at
+all - its data cannot change, so its first render is its final one and it satisfies the
+wait immediately.
+
+**A `reload()` that injects cached HTML always re-renders.** The injected snapshot is
+markup only: the children it replaced were stopped, and nothing in it is live. The
+re-render after `on_load()` therefore happens whether or not the freshly loaded data
+differs, and whether the call was `reload()` or `refresh()`.
 
 **Other considerations:**
 - Larger cache size (full HTML vs JSON data)
@@ -705,13 +804,15 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
    - If component implements cache_id(): use that instead
 3. Store cache_key in this._cache_key for later use
 4. Get cache_mode from Jqhtml_Local_Storage.get_cache_mode()
-5. IF cache_mode is 'data':
+5. Snapshot this.data for on_load() restoration BEFORE any cache read:
+   __initial_data_snapshot = deep_clone(this.data)
+   (the restore point is the on_create() state, never cached data)
+6. IF cache_mode is 'data':
    a. Read cached_data from localStorage using cache_key
    b. IF cached_data exists AND is object:
       - Deserialize with ES6 class restoration (registered classes)
-      - Assign to this.data (REPLACES on_create defaults)
+      - Assign to this.data (REPLACES on_create defaults for the first render only)
    c. ELSE: cache miss, continue with on_create() defaults
-6. Snapshot this.data for on_load() restoration: __initial_data_snapshot = deep_clone(this.data)
 7. Freeze this.data (__data_frozen = true)
 8. Trigger 'create' event
 ```
@@ -759,13 +860,14 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 6. IF follower:
    a. Wait for leader's promise
    b. Copy leader's this.data to own this.data
-7. IF cache_mode is 'data':
-   —— HOT/COLD CACHE PARITY NORMALIZATION ——
-   a. Serialize this.data to JSON (with class-aware serialization)
-   b. Deserialize JSON back to object (restoring registered classes)
-   c. Replace this.data with normalized result
+7. ALWAYS (every cache mode, including 'none'):
+   —— SERIALIZED-COPY NORMALIZATION ——
+   a. Serialize the on_load() result to JSON (with class-aware serialization)
+   b. Deserialize JSON back to object (restoring Date/Map/Set and registered classes)
+   c. Assign that copy to this.data — the author's object graph is never aliased
    d. Unregistered class instances become plain objects
-   e. This ensures fresh data behaves identically to cached data
+   e. Functions, promises, DOM/jQuery/component values are stripped; cycles are cut
+   f. Development warns once per (component, path); production converts silently
 8. Freeze this.data (__data_frozen = true)
 9. Compare data_after_load = JSON.stringify(this.data)
 10. IF data changed AND data is not empty '{}':
@@ -780,8 +882,9 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 ```
 
 **Key behaviors:**
-- Data mode normalizes `this.data` after `on_load()` via serialize/deserialize round-trip
-- This ensures "hot" data behaves identically to "cold" cached data
+- EVERY cache mode normalizes the `on_load()` result via the serialize/deserialize round-trip
+- This ensures "hot" data behaves identically to "cold" cached data, and that turning caching
+  on cannot change what a component sees
 - Unregistered classes lose methods immediately (not just after page reload)
 - Data mode writes cache immediately after `on_load()`. HTML mode defers to `_ready()`.
 
@@ -843,7 +946,7 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 4. Get cache_mode from Jqhtml_Local_Storage.get_cache_mode()
 5. IF cache_mode is 'html':
    a. Read cached_html from localStorage using cache_key + '::html'
-   b. IF cached_html exists AND is string:
+   b. IF the entry is a well-formed {cid, html} snapshot:
       - Store in this._cached_html (DO NOT inject yet)
    c. ELSE: cache miss
 6. Snapshot this.data for on_load() restoration
@@ -863,17 +966,22 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 
 ```
 1. Increment _render_count
-2. IF this._cached_html is NOT null:
-   a. Inject directly: this.$[0].innerHTML = this._cached_html
-   b. Set flag: this._used_cached_html = true
-   c. Clear: this._cached_html = null
-   d. Mark: this._did_first_render = true
+2. Shared prologue (both the cached and the template path):
+   a. Decide the child-finding strategy (_use_dom_fallback)
+   b. IF this is a re-render: stop every child component in the subtree, then clear the DOM
+   c. Clear _dom_children
+3. IF this._cached_html is NOT null:
+   a. Re-scope every id="<name>:<cid>" in the snapshot - the snapshot owner's cid
+      becomes this._cid, every other cid becomes a fresh one
+   b. Inject: this.$[0].innerHTML = <re-scoped html>
+   c. Set flag: this._used_cached_html = true
+   d. Clear: this._cached_html = null
    e. Skip template execution entirely
    f. Call on_render() (this.data has on_create() defaults at this point)
    g. Trigger 'render' event
    h. Store args/data snapshots
    i. Return early
-3. ELSE: Execute template normally, then call on_render()
+4. ELSE: Execute template normally, then call on_render()
 ```
 
 **Key behavior:** After cached HTML injection, `_used_cached_html` flag triggers forced re-render after `on_load()`. This ensures `on_render()` is called again with populated `this.data`.

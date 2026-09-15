@@ -1,0 +1,9 @@
+<Define:Test_Attribute_Quote_Escaping>
+  <div>
+    <p $sid="plain" title="<%= this.state.evil %>">plain tag</p>
+    <p $sid="tracked" title="<%= this.state.evil %>" @click=this.on_click>tracked tag</p>
+    <p id="label" title="<%= this.state.evil %>" @click=this.on_click>plain id</p>
+    <label id="plain_label" for="x" @click=this.on_click>plain label</label>
+    <Aqe_Child $sid="child" title="<%= this.state.evil %>" />
+  </div>
+</Define:Test_Attribute_Quote_Escaping>

@@ -65,6 +65,9 @@ present in development only — the scoped `id` is what `$sid()` resolves agains
 
 **ID Format**: `original_name:component_id`
 
+**A plain `id` is never rewritten.** `id="save"` is emitted exactly as written, whatever
+other attributes the element carries — use `$sid` when you need a per-instance id.
+
 **Component ID Generation**: Each component instance gets a unique `_cid` (component ID), assigned once at construction time from a monotonically increasing counter shared across the page. This value is **stable for the life of that instance** (it never changes across re-renders), and unique between instances - but it is not derived from the component's DOM position or parent context.
 
 ## Accessing Scoped IDs with this.$sid()

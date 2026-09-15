@@ -1,0 +1,7 @@
+<Define:Queue_Collapse_And_Ordering>
+  <div>
+    <h1>Lifecycle queue: collapse, ordering and rejection</h1>
+    <Queue_Probe $sid="probe" />
+    <div $sid="results"></div>
+  </div>
+</Define:Queue_Collapse_And_Ordering>

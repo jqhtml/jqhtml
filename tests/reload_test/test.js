@@ -1,59 +1,63 @@
 class Reload_Test extends Jqhtml_Component {
-  on_ready() {
-    console.log('[Reload_Test] Setting up test buttons');
+  async on_ready() {
+    if (this.state.test_ran) return;
+    this.state.test_ran = true;
 
-    // Test 1: Basic reload with same args
-    const test1_component = $('<div />').component('Data_Component', {data_id: 100}).appendTo('#test1-container').component();
-    $('#test1-reload').on('click', async () => {
-      console.log('\n[Test 1] Reloading with same args...');
-      await test1_component.reload();
-      console.log('[Test 1] Reload complete');
-    });
+    let passed = 0;
+    let failed = 0;
+    const assert = (name, condition) => {
+      if (condition) { console.log('   PASS: ' + name); passed++; }
+      else { console.log('   FAIL: ' + name); failed++; }
+    };
+    const loads = () => window.__reload_test_loads;
+    const loads_of = (id) => loads().filter((v) => v === id).length;
 
-    // Test 2: Reload with args change (cache should exist from Test 1)
-    const test2_component = $('<div />').component('Data_Component', {data_id: 100}).appendTo('#test2-container').component();
-    $('#test2-change-args').on('click', async () => {
-      console.log('\n[Test 2] Changing args to 200 and reloading (should hit cache from previous load)...');
-      // Simulate changing args (in real app, this would be done differently)
-      test2_component.args.data_id = 200;
-      await test2_component.reload();
-      console.log('[Test 2] Reload complete with changed args');
-    });
+    const mount = (selector, args) =>
+      $('<div />').component('Data_Component', args).appendTo(selector).component();
 
-    // Test 3: Reload with args change to uncached value
-    const test3_component = $('<div />').component('Data_Component', {data_id: 300}).appendTo('#test3-container').component();
-    $('#test3-change-args').on('click', async () => {
-      console.log('\n[Test 3] Changing args to 999 and reloading (cache miss - fresh load)...');
-      test3_component.args.data_id = 999;
-      await test3_component.reload();
-      console.log('[Test 3] Reload complete with uncached args');
-    });
+    const c1 = mount('#test1-container', { data_id: 100 });
+    const c2 = mount('#test2-container', { data_id: 100 });
+    const c3 = mount('#test3-container', { data_id: 300 });
+    await Promise.all([c1.ready(), c2.ready(), c3.ready()]);
 
-    // Pre-load some data into cache by creating a component with data_id: 200
-    console.log('[Reload_Test] Pre-loading data_id=200 into cache...');
-    setTimeout(() => {
-      $('<div />').component('Data_Component', {data_id: 200}).appendTo('body').component();
-    }, 500);
+    console.log('');
+    console.log('1. BOOT LOADED EACH COMPONENT ONCE:');
+    assert('c1 loaded data_id 100', c1.data.data_id === 100);
+    assert('c1 rendered its value', c1.$.text().includes('Data for ID 100'));
+    assert('c3 loaded data_id 300', c3.data.data_id === 300);
 
-    // Auto-trigger tests after delays
-    setTimeout(async () => {
-      console.log('\n=== AUTO-TRIGGERING TEST 1 ===');
-      await test1_component.reload();
-      console.log('[Test 1] Auto-reload complete');
-    }, 1500);
+    console.log('');
+    console.log('2. reload() WITH UNCHANGED ARGS RE-RUNS on_load():');
+    const before = loads_of(100);
+    await c1.reload();
+    assert('on_load() ran again for data_id 100', loads_of(100) === before + 1);
+    assert('data still reflects data_id 100', c1.data.data_id === 100);
+    assert('timestamp is a string from the new load', typeof c1.data.timestamp === 'string');
 
-    setTimeout(async () => {
-      console.log('\n=== AUTO-TRIGGERING TEST 2 ===');
-      test2_component.args.data_id = 200;
-      await test2_component.reload();
-      console.log('[Test 2] Auto-reload complete with changed args');
-    }, 2500);
+    console.log('');
+    console.log('3. reload() AFTER AN ARGS CHANGE LOADS THE NEW ARGS:');
+    c2.args.data_id = 200;
+    await c2.reload();
+    assert('on_load() ran with data_id 200', loads_of(200) >= 1);
+    assert('this.data follows the new args', c2.data.data_id === 200);
+    assert('DOM follows the new args', c2.$.text().includes('Data for ID 200'));
+    assert('the other instance is untouched', c1.data.data_id === 100);
 
-    setTimeout(async () => {
-      console.log('\n=== AUTO-TRIGGERING TEST 3 ===');
-      test3_component.args.data_id = 999;
-      await test3_component.reload();
-      console.log('[Test 3] Auto-reload complete with uncached args');
-    }, 3500);
+    console.log('');
+    console.log('4. reload() TO AN UNCACHED VALUE FETCHES FRESH DATA:');
+    c3.args.data_id = 999;
+    await c3.reload();
+    assert('on_load() ran with data_id 999', loads_of(999) === 1);
+    assert('this.data follows the new args', c3.data.data_id === 999);
+    assert('DOM follows the new args', c3.$.text().includes('Data for ID 999'));
+
+    console.log('');
+    console.log('========================================');
+    console.log('SUMMARY: ' + passed + ' passed, ' + failed + ' failed');
+    console.log('========================================');
+    console.log('');
+
+    window.testPassed = (failed === 0);
+    window.testReady = true;
   }
 }

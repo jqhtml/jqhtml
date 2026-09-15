@@ -1,0 +1,8 @@
+<%--
+Lrn_Prod - the same payload under a DIFFERENT component name, booted after
+jqhtml.configure({mode:'production'}). A different name means the once-only
+warning set cannot be what silences it.
+--%>
+<Define:Lrn_Prod class="lrn-prod">
+  <span class="marker">prod</span>
+</Define:Lrn_Prod>

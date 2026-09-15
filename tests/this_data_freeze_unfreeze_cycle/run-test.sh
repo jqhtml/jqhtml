@@ -7,12 +7,19 @@ echo ""
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_FILE="$SCRIPT_DIR/test.jqhtml"
+OUTPUT_LOG="$(mktemp)"
 
 node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/data_freeze_test.jqhtml" \
   "$SCRIPT_DIR/data_freeze_test.js" \
-  --delay=2
+  --delay=2 | tee "$OUTPUT_LOG"
+
+STATUS=${PIPESTATUS[0]}
+
+# The assertions are the gate: without the final line the run never got that far.
+if ! grep -q "ALL FREEZE/UNFREEZE TESTS PASSED" "$OUTPUT_LOG"; then STATUS=1; fi
+rm -f "$OUTPUT_LOG"
 
 echo ""
 echo "=========================================="
@@ -35,3 +42,9 @@ echo "4. AFTER ON_LOAD():"
 echo "   this.data is FROZEN again"
 echo "   Attempting modifications throws error"
 echo ""
+echo "5. THE FREEZE IS DEEP:"
+echo "   Nested mutation (push, nested assignment, delete) throws too"
+echo "   Nested mutation is legal in on_create() and on_load()"
+echo ""
+
+exit $STATUS

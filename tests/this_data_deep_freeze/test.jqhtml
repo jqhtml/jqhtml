@@ -1,0 +1,17 @@
+<%--
+This_Data_Deep_Freeze - the this.data freeze is DEEP
+
+Audit bug 15: the freeze trapped only top-level set/deleteProperty, so
+this.data.items.push(x) and this.data.user.name = 'x' mutated silently in on_ready()
+while the documentation promised ANY modification throws.
+Audit LOW (data-proxy.ts ~:136): the read-only this.args proxy built a fresh Proxy on
+every nested read, so this.args.filter !== this.args.filter inside on_load().
+--%>
+<Define:This_Data_Deep_Freeze>
+  <div>
+    <h1>this.data deep freeze</h1>
+    <Deep_Freeze_Target $sid="frozen" />
+    <Load_Mutation_Target $sid="loader" $filter=this.state.filter />
+    <div $sid="results"></div>
+  </div>
+</Define:This_Data_Deep_Freeze>

@@ -111,7 +111,9 @@ export interface SlotNode extends BaseNode {
 // Component invocation: <ComponentName prop="value">...</ComponentName>
 export interface ComponentInvocationNode extends BaseNode {
   type: NodeType.COMPONENT_INVOCATION;
-  name: string;
+  name: string;               // literal tag name, or the normalized expression text for a dynamic tag
+  dynamic?: boolean;          // <{expression}>: the name is computed at render time
+  expression?: string;        // the raw expression text of a dynamic tag
   attributes: Record<string, any>;
   conditionalAttributes?: ConditionalAttributeNode[];  // Optional conditional attributes
   children: ASTNode[];

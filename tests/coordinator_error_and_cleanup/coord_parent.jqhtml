@@ -1,0 +1,15 @@
+<%--
+Coord_Parent - four Coord_Cards that share one deduplication key.
+
+ARGS:
+    $user_id - passed to every card
+--%>
+<Define:Coord_Parent class="coord-parent">
+  <%-- No $sid here on purpose: $sid lands in this.args and would give each card
+       its own deduplication key, which is the opposite of what this test needs.
+       The cards are addressed by position instead. --%>
+  <Coord_Card $user_id=this.args.user_id />
+  <Coord_Card $user_id=this.args.user_id />
+  <Coord_Card $user_id=this.args.user_id />
+  <Coord_Card $user_id=this.args.user_id />
+</Define:Coord_Parent>

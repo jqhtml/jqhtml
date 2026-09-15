@@ -1,0 +1,19 @@
+<%--
+Slot_Inheritance_Errors_Surface - a broken slot-only template inheritance is an ERROR.
+
+Audit bug 20: both failure modes of the slot-only branch in component.ts _render() were
+swallowed into `instructions = []` plus a console.warn, so the component rendered as an
+empty div and the real defect (a throwing parent template, or a parent template that was
+never registered) was invisible.
+
+Both children below are declared IN THIS TEMPLATE on purpose: if a failing child wedged
+its parent, this component would never reach on_ready() and the run would produce no
+SUMMARY at all.
+--%>
+<Define:Slot_Inheritance_Errors_Surface>
+  <div>
+    <h1>Slot-only inheritance failures surface as errors</h1>
+    <Sie_Child $sid="child" />
+    <Sie_Orphan $sid="orphan" />
+  </div>
+</Define:Slot_Inheritance_Errors_Surface>

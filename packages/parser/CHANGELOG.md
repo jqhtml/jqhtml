@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.67 (2026-09-14)
+
+### Features
+
+* **dynamic component tags:** `<{expression} ...>` / `</{expression}>`. The lexer emits a
+  `DYNAMIC_TAG_NAME` token carrying the expression (read to its matching brace, so `>`
+  inside it is fine); the parser marks the invocation `dynamic` and matches the closing
+  expression textually (trimmed, whitespace collapsed), reporting both expressions and
+  lines on mismatch; codegen emits
+  `{comp: [jqhtml.dynamic_component_name(expr), props, content]}`. Content and slots
+  compile as for a literal tag. Tests: `test/dynamic-tags.test.js`.
+* **object interpolation:** the non-null branch of `<%= %>`, `<%!= %>` and `<%br= %>`
+  now routes a non-array object to `jqhtml.print_object(result, mode)`; primitives keep
+  the existing call, arrays keep the existing splice. All 47 regression baselines
+  regenerated for this one substitution. Tests: `test/object-printer-gate.test.js`.
+
 ## 2.3.65 (2026-09-07)
 
 ### Bug Fixes

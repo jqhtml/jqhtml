@@ -1,0 +1,6 @@
+<%--
+Ce_Probe - a minimal component whose only job is to be created and counted.
+--%>
+<Define:Ce_Probe class="ce-probe">
+  <span>probe</span>
+</Define:Ce_Probe>

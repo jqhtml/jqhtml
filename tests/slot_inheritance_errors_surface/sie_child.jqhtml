@@ -1,0 +1,10 @@
+<%--
+Sie_Child - slot-only template. Its class extends Sie_Bad_Parent, so the framework
+resolves Sie_Bad_Parent's template through the JS prototype chain and invokes it with
+these slots. That parent template throws.
+--%>
+<Define:Sie_Child>
+  <Slot:body>
+    <span>child slot content</span>
+  </Slot:body>
+</Define:Sie_Child>

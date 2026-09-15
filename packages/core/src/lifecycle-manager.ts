@@ -17,6 +17,7 @@
  */
 
 import type { Jqhtml_Component } from './component.js';
+import { handleComponentError } from './debug.js';
 
 export type LifecyclePhase = 'render' | 'create' | 'load' | 'ready';
 
@@ -57,8 +58,9 @@ export class LifecycleManager {
       // Check if stopped during create
       if ((component as any)._stopped) return;
 
-      // Trigger create event
-      component.trigger('create');
+      // NOTE: no trigger('create') here. component.create() already fires it exactly
+      // once - its `_ready_state >= 1` guard makes a second create() a no-op, so this
+      // duplicate trigger only ever double-fired the event for subscribers.
 
       // Check for lifecycle truncation flags
       const load_only = (component as any)._load_only;
@@ -197,8 +199,29 @@ export class LifecycleManager {
       if ((component as any)._stopped) return;
 
     } catch (error) {
-      console.error(`Error booting component ${component.component_name()}:`, error);
-      throw error;
+      // A boot that throws must leave a STOPPED component behind, not a half-booted
+      // one. The component never reaches 'ready', so an ancestor parked in
+      // _wait_for_children_ready() can only be released by the child's 'stop' event;
+      // nothing else stops it, so the whole subtree above it would hang forever.
+      //
+      // And the throw must stop here: _boot() is called unawaited by
+      // instruction-processor.initialize_component() and by the jQuery plugin, so a
+      // rethrow surfaces as an unhandled promise rejection instead of an error report.
+      // The error object stays a console.error argument so callers (and tests) that
+      // grep the console for the thrown message still see it.
+      try {
+        handleComponentError(component, 'boot', error as Error);
+      } catch {
+        // handleComponentError needs the global jqhtml object and throws without it.
+        // Never lose the original error to a failure in the reporting path.
+        console.error(`Error booting component ${component.component_name()}:`, error);
+      }
+
+      try {
+        (component as any)._stop();
+      } catch (stop_error) {
+        console.error(`[JQHTML] on_stop() threw while unwinding a failed boot:`, stop_error);
+      }
     }
   }
 
@@ -207,24 +230,5 @@ export class LifecycleManager {
    */
   unregister_component(component: Jqhtml_Component): void {
     this.active_components.delete(component);
-  }
-
-  /**
-   * Wait for all active components to reach ready state
-   */
-  async wait_for_ready(): Promise<void> {
-    const ready_promises: Promise<void>[] = [];
-
-    for (const component of this.active_components) {
-      if (component._ready_state < 4) {
-        ready_promises.push(
-          new Promise<void>((resolve) => {
-            component.on('ready', () => resolve());
-          })
-        );
-      }
-    }
-
-    await Promise.all(ready_promises);
   }
 }

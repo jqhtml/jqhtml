@@ -60,20 +60,23 @@ class Test_Scaffold extends Jqhtml_Component {
     }
     console.log('');
 
-    // TEST 3: Jqhtml_Component class added
-    console.log('TEST 3: Jqhtml_Component marker class added');
+    // TEST 3: framework marker class added. The marker is `Component`, not
+    // `Jqhtml_Component` - see component.ts, which normalizes the base class name to
+    // `Component` for the CSS class. This assertion named the JS class and had never
+    // passed; nothing gated on it.
+    console.log('TEST 3: Component marker class added');
 
-    const header_has_marker = header.hasClass('Jqhtml_Component');
-    const logo_has_marker = logo.hasClass('Jqhtml_Component');
+    const header_has_marker = header.hasClass('Component');
+    const logo_has_marker = logo.hasClass('Component');
 
-    console.log(`  Undefined_Header has Jqhtml_Component: ${header_has_marker}`);
-    console.log(`  Undefined_Logo has Jqhtml_Component: ${logo_has_marker}`);
+    console.log(`  Undefined_Header has Component: ${header_has_marker}`);
+    console.log(`  Undefined_Logo has Component: ${logo_has_marker}`);
 
     if (header_has_marker && logo_has_marker) {
-      console.log('✅ PASS: Jqhtml_Component marker class added');
+      console.log('✅ PASS: Component marker class added');
       tests.push(true);
     } else {
-      console.log('❌ FAIL: Jqhtml_Component marker class missing');
+      console.log('❌ FAIL: Component marker class missing');
       tests.push(false);
     }
     console.log('');
@@ -128,6 +131,11 @@ class Test_Scaffold extends Jqhtml_Component {
       this.$sid('results').html('<span style="color: red;">❌ Some tests failed</span>');
     }
     console.log('========================================');
+    console.log(`SUMMARY: ${tests.filter(t => t).length} passed, ${tests.filter(t => !t).length} failed`);
+    console.log('========================================');
     console.log('');
+
+    window.testPassed = all_passed;
+    window.testReady = true;
   }
 }

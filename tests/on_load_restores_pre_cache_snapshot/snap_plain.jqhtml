@@ -1,0 +1,7 @@
+<%--
+Snap_Plain - a template-only component: it sets defaults in on_create() and never
+overrides on_load(). Calling load() on it must run nothing and change nothing.
+--%>
+<Define:Snap_Plain class="snap-plain">
+  <span class="label"><%= this.data.label %></span>
+</Define:Snap_Plain>

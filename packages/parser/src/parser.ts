@@ -679,13 +679,28 @@ export class Parser {
   // Parse HTML tag or component invocation
   private parse_tag(): ASTNode {
     const start_token = this.previous(); // TAG_OPEN
-    const name_token = this.consume(TokenType.TAG_NAME, 'Expected tag name');
-    let tag_name = name_token.value;
+
+    // <{expression}>: a component whose name is computed at render time. The
+    // node's name is the normalized expression text, used only to match the
+    // closing tag and to describe the tag in errors.
+    const is_dynamic = this.check(TokenType.DYNAMIC_TAG_NAME);
+    const name_token = this.consume(is_dynamic ? TokenType.DYNAMIC_TAG_NAME : TokenType.TAG_NAME, 'Expected tag name');
+    const dynamic_expression = is_dynamic ? name_token.value : null;
+    if (is_dynamic && name_token.value.trim() === '') {
+      throw syntaxError(
+        `Dynamic component tag <{}> has an empty expression`,
+        name_token.line,
+        name_token.column,
+        this.source,
+        this.filename
+      );
+    }
+    let tag_name = is_dynamic ? Parser.normalize_expression(name_token.value) : name_token.value;
     let original_tag_name: string | null = null;  // Track original for $redrawable
 
     // Check for forbidden tags
     const tag_lower = tag_name.toLowerCase();
-    if (tag_lower === 'script' || tag_lower === 'style') {
+    if (!is_dynamic && (tag_lower === 'script' || tag_lower === 'style')) {
       throw syntaxError(
         `<${tag_name}> tags are not allowed in JQHTML templates. ` +
         `Use external files or inline styles via attributes instead.`,
@@ -697,7 +712,7 @@ export class Parser {
     }
 
     // Determine if this is a component or an HTML tag (see component-name.ts)
-    let is_component = is_component_name(tag_name);
+    let is_component = is_dynamic || is_component_name(tag_name);
 
     // Check if this is an HTML5 void element (only for HTML tags, not components)
     const is_void_element = !is_component && VOID_ELEMENTS.has(tag_lower);
@@ -733,6 +748,8 @@ export class Parser {
           NodeType.COMPONENT_INVOCATION,
           {
             name: tag_name,
+            dynamic: is_dynamic || undefined,
+            expression: dynamic_expression || undefined,
             attributes,
             conditionalAttributes: conditionalAttributes.length > 0 ? conditionalAttributes : undefined,
             children: [],
@@ -801,18 +818,37 @@ export class Parser {
 
     // Keep parsing content until we hit the closing tag
     // For $redrawable transforms, accept either original or transformed name
-    while (!this.check_closing_tag(tag_name) &&
+    while (!(is_dynamic ? this.check_closing_dynamic_tag(tag_name) : this.check_closing_tag(tag_name)) &&
            !(original_tag_name && this.check_closing_tag(original_tag_name))) {
       if (this.is_at_end()) {
         const error = unclosedError(
           is_component ? 'component' : 'tag',
-          tag_name,
+          is_dynamic ? `{${dynamic_expression}}` : tag_name,
           start_token.line,
           start_token.column,
           this.source,
           this.filename
         );
         throw error;
+      }
+
+      // A dynamic closing tag whose expression text differs from the opening
+      // one is a mismatch, reported with both expressions and both lines. The
+      // comparison is textual (trimmed, internal whitespace collapsed); the
+      // closing expression is never evaluated.
+      if (is_dynamic && this.check(TokenType.TAG_CLOSE)) {
+        const next = this.tokens[this.current + 1];
+        if (next && next.type === TokenType.DYNAMIC_TAG_NAME) {
+          throw syntaxError(
+            `Mismatched dynamic component tags: <{${dynamic_expression!.trim()}}> opened on line ${start_token.line} ` +
+            `is closed by </{${next.value.trim()}}> on line ${next.line}. ` +
+            `The closing expression must match the opening one textually (whitespace aside).`,
+            next.line,
+            next.column,
+            this.source,
+            this.filename
+          );
+        }
       }
 
       const child = this.parse_content();
@@ -823,7 +859,8 @@ export class Parser {
 
     // Consume closing tag
     this.consume(TokenType.TAG_CLOSE, 'Expected </');
-    const close_name = this.consume(TokenType.TAG_NAME, 'Expected tag name');
+    const close_name = this.consume(is_dynamic ? TokenType.DYNAMIC_TAG_NAME : TokenType.TAG_NAME, 'Expected tag name');
+    if (is_dynamic) close_name.value = Parser.normalize_expression(close_name.value);
 
     // For $redrawable transforms, accept either original or transformed tag name
     const is_valid_closing = close_name.value === tag_name ||
@@ -849,6 +886,8 @@ export class Parser {
         NodeType.COMPONENT_INVOCATION,
         {
           name: tag_name,
+          dynamic: is_dynamic || undefined,
+          expression: dynamic_expression || undefined,
           attributes,
           conditionalAttributes: conditionalAttributes.length > 0 ? conditionalAttributes : undefined,
           children,
@@ -1138,6 +1177,20 @@ export class Parser {
   }
   
   // Check if we're at a closing tag for the given name
+  /** Trim and collapse internal whitespace: the textual identity of a dynamic tag expression. */
+  static normalize_expression(expression: string): string {
+    return expression.trim().replace(/\s+/g, ' ');
+  }
+
+  private check_closing_dynamic_tag(normalized_expression: string): boolean {
+    if (!this.check(TokenType.TAG_CLOSE)) {
+      return false;
+    }
+    const next = this.tokens[this.current + 1];
+    return !!next && next.type === TokenType.DYNAMIC_TAG_NAME &&
+      Parser.normalize_expression(next.value) === normalized_expression;
+  }
+
   private check_closing_tag(tag_name: string): boolean {
     if (!this.check(TokenType.TAG_CLOSE)) {
       return false;

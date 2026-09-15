@@ -1,0 +1,8 @@
+<%--
+Bf_Plain - the common case: no on_stop(), no 'stop' listeners, no on_load().
+_stop() used to take a fast path for exactly this component, which skipped the
+_Component_Stopped class and the parent de-registration (audit bug 22).
+--%>
+<Define:Bf_Plain class="bf-plain">
+  <span>plain</span>
+</Define:Bf_Plain>

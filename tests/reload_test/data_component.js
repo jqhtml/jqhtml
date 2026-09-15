@@ -1,17 +1,22 @@
+// Loads are counted on a window-level tally rather than on the instance: on_load()
+// runs behind a proxy that blocks every property except this.args/this.data, so the
+// component cannot record anything on itself (reading this._cid here is what used to
+// kill every instance of this component at boot).
+window.__reload_test_loads = window.__reload_test_loads || [];
+
 class Data_Component extends Jqhtml_Component {
   async on_load() {
-    console.log(`[Data_Component ${this._cid}] on_load() called with data_id: ${this.args.data_id}`);
+    const data_id = this.args.data_id;
+    window.__reload_test_loads.push(data_id);
+    console.log(`[Data_Component] on_load() called with data_id: ${data_id}`);
 
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Simulate fetching data
     this.data = {
-      data_id: this.args.data_id,
-      value: `Data for ID ${this.args.data_id}`,
+      data_id,
+      value: `Data for ID ${data_id}`,
       timestamp: new Date().toISOString()
     };
-
-    console.log(`[Data_Component ${this._cid}] on_load() completed:`, this.data);
   }
 }

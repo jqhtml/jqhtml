@@ -126,31 +126,33 @@ export function process_instructions(
   // Use native innerHTML for better performance
   target[0].innerHTML = html.join('');
 
-  // Second pass: initialize special attributes and events
-  for (const [tid, tagData] of Object.entries(tagElements)) {
-    // Use native querySelector for better performance
-    const el = target[0].querySelector(`[data-tid="${tid}"]`);
-    if (el) {
-      const element = $(el);
-      el.removeAttribute('data-tid');
+  // Second pass: initialize special attributes and events.
+  // One querySelectorAll over the freshly injected subtree, in document
+  // order, rather than one querySelector per tracked element: a scan per
+  // element made this pass quadratic in the size of the template. Child
+  // components have not rendered yet (their elements are empty), so every
+  // data-tid here belongs to this level.
+  const root: Element = target[0];
+  for (const el of Array.from(root.querySelectorAll('[data-tid]'))) {
+    const tagData = tagElements[el.getAttribute('data-tid')!];
+    el.removeAttribute('data-tid');
+    if (tagData) {
       // Bind to the component whose template wrote this element, which for
       // spliced content is not the component being rendered.
-      apply_attributes(element, tagData.attrs, tagData.context);
+      apply_attributes($(el), tagData.attrs, tagData.context);
     }
   }
 
   // Third pass: initialize and boot components in parallel
   // Like v1, all sibling components at this level boot simultaneously
   // DO NOT await - let children boot in background while parent continues
-  for (const [cid, compData] of Object.entries(components)) {
-    // Use native querySelector for better performance
-    const el = target[0].querySelector(`[data-cid="${cid}"]`);
-    if (el) {
-      const element = $(el);
-      el.removeAttribute('data-cid');
+  for (const el of Array.from(root.querySelectorAll('[data-cid]'))) {
+    const compData = components[el.getAttribute('data-cid')!];
+    el.removeAttribute('data-cid');
+    if (compData) {
       // Boot this component (which will render and boot its children recursively)
       // Fire and forget - don't wait for boot to complete
-      initialize_component(element, compData);
+      initialize_component($(el), compData);
     }
   }
 }
@@ -231,19 +233,13 @@ function process_tag_to_html(
     if (!key.startsWith('$') && !key.startsWith('on') && !key.startsWith('@') &&
         !key.startsWith('data-bind-') && !key.startsWith('data-__-on-') &&
         (typeof value === 'string' || typeof value === 'number')) {
-      if (key === 'id' && tid) {
-        // Special handling for id attribute - scope to parent component's _cid
-        // This is for regular id="foo" attributes that need scoping (rare case)
-        // Most scoping happens via $sid attribute which becomes data-sid
-        // Don't double-scope if already scoped (contains :)
-        if (typeof value === 'string' && value.includes(':')) {
-          html.push(` id="${value}"`);
-        } else {
-          html.push(` id="${value}:${context._cid}"`);
-        }
-      } else {
-        html.push(` ${key}="${value}"`);
-      }
+      // A hand-written `id` is emitted exactly as written - including on a tracked
+      // element. It used to be rewritten to `<value>:<cid>` whenever the element
+      // happened to carry some OTHER tracked attribute, so `<label id="x" @click=…>`
+      // and `<label id="x">` disagreed. Per-instance ids are what $sid is for, and
+      // the compiler emits those already scoped (codegen.ts), so they arrive here as
+      // ordinary values and pass straight through.
+      html.push(` ${key}="${escape_attribute(value)}"`);
     }
   }
   
@@ -254,6 +250,18 @@ function process_tag_to_html(
     html.push('>');
   }
 }
+
+/**
+ * A double quote inside an attribute value would end the attribute in the
+ * HTML string this pass builds; an interpolated value can never legitimately
+ * do that, so it is encoded. Nothing else is touched - the value is otherwise
+ * emitted exactly as the template produced it.
+ */
+function escape_attribute(value: string | number): string {
+  const s = typeof value === 'string' ? value : String(value);
+  return s.indexOf('"') === -1 ? s : s.replace(/"/g, '&quot;');
+}
+
 
 /**
  * Process a component instruction to HTML

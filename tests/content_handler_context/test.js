@@ -47,9 +47,15 @@ class Test_Content_Handler_Context extends Jqhtml_Component {
     assert("receiver.$sid('slot_btn') does not", box.$sid('slot_btn').length === 0);
 
     console.log('');
-    console.log('3. HAND-WRITTEN id= IN A SLOT BODY SCOPES TO THE DEFINER CID:');
-    assert('id="slot_plain" became slot_plain:<definer cid>', document.getElementById('slot_plain:' + definer._cid) !== null);
-    assert('...and not slot_plain:<receiver cid>', document.getElementById('slot_plain:' + box._cid) === null);
+    console.log('3. HAND-WRITTEN id= IN A SLOT BODY IS EMITTED VERBATIM:');
+    // A plain id is never rewritten, in a slot body or anywhere else. It used to be
+    // scoped to `<value>:<cid>` here only because the element also carries @click;
+    // the identical span without a handler kept its id. $sid is the per-instance id.
+    assert('id="slot_plain" is still exactly slot_plain', document.getElementById('slot_plain') !== null);
+    const scoped_plain = Array.from(document.querySelectorAll('[id]'))
+      .filter(el => el.id.indexOf('slot_plain:') === 0);
+    assert('no element carries a scoped slot_plain:<cid> id -> ' + scoped_plain.map(el => el.id).join(','),
+           scoped_plain.length === 0);
 
     console.log('');
     console.log('4. A COMPONENT WRITTEN IN A SLOT BODY REPORTS THE DEFINER AS INSTANTIATOR:');

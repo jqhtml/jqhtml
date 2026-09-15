@@ -1,0 +1,10 @@
+<%--
+Da_Base - the parent <Define>. Its class/role/tabindex/title are the default attributes
+that must reach every subclass, however the subclass inherits the TEMPLATE.
+
+title="define default" exists for the empty-string case: an invocation title="" is SET,
+and the old falsy test (`if (!this.$.attr(key))`) could not tell it from absent.
+--%>
+<Define:Da_Base class="card" role="region" tabindex="-1" title="define default">
+  <div class="da-body"><%= content('body') %></div>
+</Define:Da_Base>

@@ -24,6 +24,17 @@ class UserCard extends Jqhtml_Component {
 }
 ```
 
+### $(component) - A Component IS a Valid jQuery Argument
+
+Passing a component instance to `$()` returns that component's root element, so
+`$(component)` and `component.$` are interchangeable:
+
+```javascript
+$(child).addClass('active');        // same element as child.$
+$(child).find('.item').hide();      // traverses the child's DOM
+$(child)[0] === child.$[0];         // true
+```
+
 ### All jQuery Methods Available
 
 ```javascript
@@ -163,8 +174,8 @@ $('#target').component('SecondComponent', {id: 2});
 
 **Replacement process:**
 
-1. **Stop existing component** - Calls `.stop()` with try/catch error handling
-2. **Remove component classes** - Strips all classes starting with capital letters, and component names with the reserved single-underscore prefix (`_RootLayout`)
+1. **Stop existing component** - Calls `.stop()`. A throwing `stop()` is **not** swallowed: it propagates out of `.component()` and the element is left untouched (see *Error handling* below)
+2. **Remove component classes** - Strips all classes starting with capital letters, and component names with the reserved single-underscore prefix (`_RootLayout`). If nothing survives the strip, the `class` attribute is removed entirely rather than left as `class=""`
 3. **Remove component data** - Cleans up `_component` data
 4. **Create new component** - Instantiates and boots the new component
 
@@ -203,16 +214,30 @@ Only classes starting with capital letters, or matching a component name with th
 
 **Error handling:**
 
-The `stop()` call is wrapped in try/catch to ensure replacement continues even if the old component's cleanup fails:
+If the old component's `stop()` throws, the error propagates out of `.component()` and
+**no replacement happens** - the element keeps its existing component:
 
 ```javascript
 try {
-  existingComponent.stop();
+  $('#target').component('SecondComponent');
 } catch (error) {
-  console.warn('[JQHTML] Error stopping existing component during replacement:', error);
-  // Continue with replacement anyway
+  // FirstComponent's on_stop() failed. It is still on #target, and its timers and
+  // listeners are still running - nothing was overwritten behind your back.
 }
 ```
+
+Overwriting a component whose cleanup failed would leave its intervals, timers and event
+listeners running against DOM that is about to be destroyed, so the failure is surfaced
+instead of being logged and ignored.
+
+**Tag correction:**
+
+When the element's tag does not match the component's expected tag (`_tag` on the
+invocation, else `tag` on the template, else `div`), the element is replaced with one of
+the correct tag. The replacement carries over the original element's attributes, its inner
+HTML and its jQuery `.data()`, and this happens whether or not there was any server-rendered
+content to carry. A `<body>` element, and an element that is not in the document (so
+`replaceWith()` would be a no-op), are left alone with a warning instead.
 
 **Use cases:**
 

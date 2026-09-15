@@ -440,6 +440,9 @@ calling any method or reaching the DOM from it throws
 - **`this.args`** — component arguments. Read-only in `on_load()`, modifiable everywhere else.
 - **`this.data`** — the MAYBE-CACHED result of `on_load()`. Writable ONLY in `on_create()`
   and `on_load()`; frozen everywhere else, and the framework THROWS on any other write.
+  The freeze is DEEP: `this.data.items.push(x)` and `this.data.user.name = 'x'` throw just
+  like a top-level write. Reads (`JSON.stringify`, `for..of`, `.map`, `Object.keys`,
+  identity) are unaffected.
 - **`this.state`** — developer-owned scratch, initialized `{}`. No framework semantics, no
   caching, writable anywhere EXCEPT inside `on_load()`.
 
@@ -543,7 +546,7 @@ server actually stored.
   `render()` → `on_ready()`. Use when `this.args` changed or data must be refetched.
   Debounced: rapid repeated calls coalesce into ONE execution.
 - **`refresh()`** — a `reload()` that SKIPS the re-render and `on_ready()` when
-  `this.data` came back unchanged. The right tool for polling or interval refresh; it is
+  `this.data` came back unchanged (the `ready` event still fires). The right tool for polling or interval refresh; it is
   what prevents flicker on every tick.
 - **`load()`** — re-runs `on_load()` only: no render, no `on_ready()`. Returns
   `true`/`false` for whether `this.data` changed, so you decide what to redraw next.
@@ -556,7 +559,9 @@ server actually stored.
 
 `render()` and `reload()` invalidate the sticky `ready` state first, so a `.ready()` or
 `.on('ready')` registered mid-cycle waits for the NEW render instead of resolving against
-the old one.
+the old one. `render('sid')` invalidates only the redrawable child it delegates to, and a
+`refresh()` that finds unchanged data still fires `ready` at the end (skipping only
+`on_ready()`) - so `.ready()` never hangs on either path.
 
 **`render()` destroys child DOM**: all child elements and child components are recreated,
 and DOM handlers on them are lost. Re-register in `on_render()` (namespaced, idempotent) or
@@ -899,7 +904,8 @@ Remedies included. Most of these are silent, not thrown — the exceptions are m
    element; do not wrap it in another div. `tag=""` is **never inherited** — every
    `<Define:>` extending a base must repeat it or silently render a `div`.
 2. **`this.data` starts as `{}`.** Set defaults in `on_create()`; it is writable ONLY in
-   `on_create()` and `on_load()` and frozen everywhere else. *(Throws.)*
+   `on_create()` and `on_load()` and frozen everywhere else — deeply, so nested `push()`
+   and nested assignment throw too. *(Throws.)*
 3. **`on_load()` may read `this.args` and write `this.data`, and nothing else.** DOM
    access, `this.state` and modifying `this.args` all throw at runtime. *(Throws.)*
 4. **NEVER call `this.render()` in `on_load()`** — the automatic re-render already happens
@@ -966,6 +972,7 @@ Remedies included. Most of these are silent, not thrown — the exceptions are m
 | `<Define:Button><div class="btn">` | `<Define:Button class="btn">` | Define IS the element |
 | `<Define:Button><button>` | `<Define:Button tag="button">` | Use the tag attribute |
 | `this.data.x = y` in `on_ready` | Set it in `on_load` | `this.data` frozen outside `on_create`/`on_load` |
+| `this.data.items.push(x)` in `on_ready` | `this.state.items.push(x)` | the freeze is deep — nested mutation throws |
 | `this.$sid()` in `on_load` | Move to `on_ready` | `on_load` has no DOM access |
 | `await fetch()` in `on_create` | Move to `on_load` | `on_create` must be sync |
 | `this.render()` in `on_load` | Let the framework auto-render | It re-renders when `this.data` changes |
@@ -993,6 +1000,32 @@ jqhtml.debug_overlay.disable();       // click: inspector modal (args, data, sta
 
 The overlay is non-invasive - its UI lives in a shadow root and it only ever adds
 outline styling to page elements - and covers components created after it is enabled.
+
+## Advanced: value printers and dynamic component tags
+
+Off by default and rarely needed; literal tags and primitive interpolation remain the rule.
+
+```javascript
+jqhtml.add_object_printer((value) => {                 // how <%= %> renders an OBJECT
+  if (value instanceof Money) return value.format();   // string: escaped like a literal
+  if (value instanceof RichText) return { component: { name: 'RichTextDisplay', args: { value: value.html } } };
+  // undefined: decline, next printer is tried
+});
+```
+
+Primitives and arrays never reach the chain; an unhandled object throws. Attribute
+position (`title="<%= v %>"`) never uses printers. A descriptor mounts the named component
+with `args` (component arguments, no `$`) and `attrs` (HTML attributes) and carries no content.
+
+```jqhtml fragment
+<{this.args.editor} $name="title" />              <!-- component name from an expression -->
+<{this.args.layout}>content</{this.args.layout}>  <!-- closing expression must match textually -->
+```
+
+The value must be a valid component name string at render time; an undefined-but-valid
+name renders the placeholder a literal undefined tag would. Prefer a literal tag when the
+name is known, and `<% if %>` around two literal tags over a dynamic tag with two outcomes.
+Reference: `22_value_printers_and_dynamic_tags.md`.
 
 ## Runtime configuration
 

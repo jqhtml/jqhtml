@@ -9,7 +9,11 @@ class Data_Restore_Test extends Jqhtml_Component {
     // Set initial defaults
     this.data.initial_value = 'from_create';
     this.data.counter = 0;
-    this.data.test_results = [];
+    // this.state, not this.data: results are appended from on_ready(), where this.data is
+    // frozen - and the freeze is DEEP, so pushing into a nested array throws too.
+    // Keeping them in this.state also means they survive the reload() this test performs,
+    // which restores this.data to the on_create() snapshot.
+    this.state.test_results = [];
 
     console.log('on_create() - Initial this.data:', JSON.stringify(this.data, null, 2));
     console.log('');
@@ -33,13 +37,13 @@ class Data_Restore_Test extends Jqhtml_Component {
     // TEST 1: First on_load() should have counter = 1
     if (this.data.counter === 1 && this.data.loaded_value === 'load_1') {
       console.log('✅ TEST 1 PASS: First on_load() counter = 1');
-      this.data.test_results.push({
+      this.state.test_results.push({
         test: 'First on_load() counter = 1',
         status: 'PASS'
       });
     } else {
       console.log('❌ TEST 1 FAIL: First on_load() counter =', this.data.counter, 'loaded_value =', this.data.loaded_value);
-      this.data.test_results.push({
+      this.state.test_results.push({
         test: 'First on_load() counter = 1',
         status: 'FAIL',
         details: `counter=${this.data.counter}, loaded_value=${this.data.loaded_value}`
@@ -48,7 +52,7 @@ class Data_Restore_Test extends Jqhtml_Component {
     console.log('');
 
     // Only run reload test on first ready
-    if (this.data.test_results.length === 1) {
+    if (this.state.test_results.length === 1) {
       console.log('Calling reload()...');
       console.log('');
 
@@ -61,13 +65,13 @@ class Data_Restore_Test extends Jqhtml_Component {
       // Because this.data was restored to on_create() state before second on_load()
       if (this.data.counter === 1 && this.data.loaded_value === 'load_1') {
         console.log('✅ TEST 2 PASS: After reload() counter still = 1 (data was restored)');
-        this.data.test_results.push({
+        this.state.test_results.push({
           test: 'After reload() counter = 1 (restored)',
           status: 'PASS'
         });
       } else {
         console.log('❌ TEST 2 FAIL: After reload() counter =', this.data.counter, '(expected 1, data NOT restored)');
-        this.data.test_results.push({
+        this.state.test_results.push({
           test: 'After reload() counter = 1 (restored)',
           status: 'FAIL',
           details: `counter=${this.data.counter} (expected 1), loaded_value=${this.data.loaded_value}`
@@ -78,13 +82,13 @@ class Data_Restore_Test extends Jqhtml_Component {
       // TEST 3: initial_value should persist
       if (this.data.initial_value === 'from_create') {
         console.log('✅ TEST 3 PASS: initial_value persists across reload');
-        this.data.test_results.push({
+        this.state.test_results.push({
           test: 'initial_value persists',
           status: 'PASS'
         });
       } else {
         console.log('❌ TEST 3 FAIL: initial_value =', this.data.initial_value, '(expected "from_create")');
-        this.data.test_results.push({
+        this.state.test_results.push({
           test: 'initial_value persists',
           status: 'FAIL',
           details: `initial_value=${this.data.initial_value}`
@@ -97,9 +101,9 @@ class Data_Restore_Test extends Jqhtml_Component {
       console.log('FINAL RESULT:');
       console.log('========================================');
 
-      const all_passed = this.data.test_results.every(r => r.status === 'PASS');
+      const all_passed = this.state.test_results.every(r => r.status === 'PASS');
 
-      this.data.test_results.forEach(result => {
+      this.state.test_results.forEach(result => {
         const icon = result.status === 'PASS' ? '✅' : '❌';
         console.log(`${icon} ${result.test}`);
         if (result.details) {

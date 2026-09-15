@@ -1,0 +1,8 @@
+<Define:Component_Replacement_Edge_Cases>
+  <div>
+    <h1>Replacement edge cases: class attribute, throwing stop(), tag mismatch</h1>
+    <div $sid="strip_host"></div>
+    <div $sid="throw_host"></div>
+    <div $sid="tag_host"></div>
+  </div>
+</Define:Component_Replacement_Edge_Cases>

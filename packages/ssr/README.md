@@ -421,7 +421,7 @@ jqhtml.start_data_capture();
 
 // 3. Retrieve captured data (one-shot: clears buffer after retrieval)
 const captured = jqhtml.get_captured_data();
-// Returns: [{ component: 'DashboardIndex', args: { user_id: 123 }, data: { items: [...] } }, ...]
+// Returns: [{ component: 'DashboardIndex', args: { user_id: 123 }, data: { items: [...] }, key: 'DashboardIndex::{"user_id":123}' }, ...]
 
 // 4. Stop capture when done
 jqhtml.stop_data_capture();
@@ -432,6 +432,9 @@ return { html: renderedHtml, preload: captured };
 
 **Capture rules:**
 - Only components with `on_load()` are captured (static components excluded)
+- Each entry carries the `key` the component was actually cached under — including a
+  `cache_id()` override, whose `<Name>::<cache_id()>` shape cannot be derived from args.
+  `key` is absent only when the component had no key at all (a non-keyable arg)
 - Deduplicates by component name + args (Load Coordinator aware)
 - `get_captured_data()` is one-shot: clears the buffer on retrieval
 - `start_data_capture()` is idempotent (safe to call multiple times)
@@ -453,6 +456,9 @@ jqhtml.clear_preload_data();
 
 **Preload rules:**
 - `set_preload_data(entries)` must be called before components boot
+- An entry's `key` is used verbatim when present; otherwise the key is derived from
+  `component` + `args` exactly as the cache derives it, plain-data object args included.
+  An entry whose key cannot be derived is dropped
 - Each preload entry is consumed on first use (one-shot per key)
 - `set_preload_data(null)` or `set_preload_data([])` is a no-op
 - `clear_preload_data()` removes any unconsumed entries
@@ -529,9 +535,9 @@ const pageHtml = `
 | Method | Description |
 |--------|-------------|
 | `jqhtml.start_data_capture()` | Enable data capture mode (idempotent) |
-| `jqhtml.get_captured_data()` | Returns captured entries and clears buffer (one-shot) |
+| `jqhtml.get_captured_data()` | Returns captured entries `{component, args, data, key?}` and clears buffer (one-shot) |
 | `jqhtml.stop_data_capture()` | Stops capture and clears all capture state |
-| `jqhtml.set_preload_data(entries)` | Seeds preload cache with SSR-captured data |
+| `jqhtml.set_preload_data(entries)` | Seeds preload cache with SSR-captured data, honouring each entry's `key` |
 | `jqhtml.clear_preload_data()` | Clears unconsumed preload entries |
 
 ---

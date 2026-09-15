@@ -1,0 +1,6 @@
+<Define:Load_Result_Normalized>
+  <div>
+    <h1>this.data is always jqhtml's own serialized copy of the on_load() result</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Load_Result_Normalized>

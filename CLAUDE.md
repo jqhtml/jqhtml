@@ -96,6 +96,12 @@ You provide ONLY styling classes in the `class=""` attribute.
 - `$property=value` — Default args (quoted = string literal, unquoted = JS expression)
 - Regular attributes — Applied to root element
 
+**Default attributes resolve through the same chain templates do** — explicit `extends=""`
+first, then the JS class prototype chain. A slot-only JS subclass
+(`class Users_Grid extends Grid_Abstract`) inherits the parent `<Define>`'s `class=""` and
+attributes as well as its template. A parent default is applied only where the invocation
+did not set that attribute at all; an invocation `tabindex="0"` or `title=""` is SET and wins.
+
 **Template inheritance:** a parent template is looked up (via the `extends=""` attribute, then the JS class prototype chain) only when the child's template body is **slot-only** (contains nothing but `<Slot:>` tags at the top level). A body with any top-level HTML is used as-is. See "Slot-Based Template Inheritance" below.
 
 ### Interpolation
@@ -135,6 +141,17 @@ You provide ONLY styling classes in the `class=""` attribute.
 **Why:** The parser cannot distinguish `>` closing a tag from `>` inside JavaScript expressions.
 
 **Void elements auto-close (HTML5 standard):** `<input type="text">`, `<img src="logo.png">`, `<br>`, `<hr>`, `<meta>`, `<link>` auto-close. Components still need explicit self-closing: `<User_Card />`
+
+### Advanced: Dynamic Component Tags and Value Printers
+
+`<{expression} />` / `<{expression}>...</{expression}>` mounts the component whose name the
+expression evaluates to (render-time, same rule as a literal tag; closing expression must
+match textually). `jqhtml.add_object_printer(fn)` lets `<%= %>` render an object: `fn`
+returns `undefined` (decline), a string (escaped per the construct) or
+`{component: {name, args, attrs}}` (mounted, no content). Primitives and arrays never enter
+the chain; attribute position never uses it; an unhandled object throws. Both are advanced
+and documented in `docs/reference/22_value_printers_and_dynamic_tags.md` - prefer literal
+tags and primitive interpolation.
 
 ### $ Attributes (Component Parameters)
 
@@ -306,6 +323,14 @@ class My_Component extends Jqhtml_Component {
 4. **During on_load()**: **UNFROZEN** — the only place to load API data
 5. **After on_load()**: **FROZEN** again; all other lifecycle methods see read-only data
 
+**The freeze is DEEP.** Nested objects and arrays are frozen too, so `this.data.items.push(x)`,
+`this.data.user.name = 'x'` and `delete this.data.user.x` throw exactly like a top-level
+assignment; the error names the path (`this.data.items[2]`). Reads are untouched —
+`JSON.stringify`, `Array.isArray`, `.length`, spread, `for..of`, `.map`/`.filter`,
+`Object.keys` and identity (`this.data.items === this.data.items`) all behave as before.
+`Date`, `Map`, `Set` and `register_cache_class()` instances pass through unwrapped, because
+a Proxy cannot satisfy their internal slots. Mutable bookkeeping belongs in `this.state`.
+
 ### on_load() Access Restrictions
 
 `on_load()` runs against a Proxy that blocks access to most component properties.
@@ -346,7 +371,9 @@ Never manually call `this.render()` inside `on_load()` — the framework watches
 Input parameters (from `$` attributes). Mutable everywhere except `on_load()` (read-only there). Change args → call `this.reload()`. Used as the cache key.
 
 ### this.data — Loaded Data from APIs
-Set defaults in `on_create()`, populate in `on_load()`. Freeze/unfreeze cycle as above. Modifications trigger automatic re-renders. Cached by component name + `this.args`.
+Set defaults in `on_create()`, populate in `on_load()`. Freeze/unfreeze cycle as above — the restore snapshot is taken the moment `on_create()` returns, before any cache is read, so `on_load()` always restarts from the `on_create()` state even on a warm cache. Modifications trigger automatic re-renders. Cached by component name + `this.args`.
+
+**`this.data` is jqhtml's own serialized copy of what `on_load()` returned**, round-tripped through the cache serializer before assignment in every cache mode (including `none`). So nothing you still hold a reference to is aliased into `this.data`, and a fresh load and a cache hit produce the same thing by construction. Dates, `Map`, `Set` and classes registered with `jqhtml.register_cache_class()` survive. Anything else is stripped: functions, promises, DOM nodes, jQuery objects and component instances are dropped, an unregistered class instance becomes a plain object of its own properties, and cycles are cut. Development warns once per component and path, naming where the value belongs (`this.args` for callbacks, `this.state` for DOM nodes/timers/files/sockets, `register_cache_class()` for model instances); production converts silently.
 
 ### this.state — Component-Local State
 No framework meaning — a convention for component-specific values (timers, flags, WebSocket connections). Mutable anywhere, never frozen, never cached, no automatic re-renders.
@@ -359,6 +386,7 @@ No framework meaning — a convention for component-specific values (timers, fla
 | Does it configure what data to fetch? | `this.args` |
 | Is it passed from a parent component? | `this.args` |
 | Is it UI state (hover, focus, timers)? | `this.state` |
+| Do you need to mutate it outside `on_load()` (push to a list, bump a counter)? | `this.state` — the `this.data` freeze is deep, so nested mutation throws |
 | Should changing it re-fetch data? | `this.args` + `reload()` |
 | Should changing it re-render? | `this.data` (in on_load only) |
 
@@ -383,12 +411,12 @@ this.sid('name')  // Get child component instance by scoped ID
 
 | Method | Calls on_load() | Calls on_ready() | Redraws DOM | Checks Cache | Use Case |
 |--------|-----------------|------------------|-------------|--------------|----------|
-| `load()` | Yes | No | No | No | Re-fetch data only; developer controls next step. Returns `true` if data changed |
+| `load()` | Yes | No | No | No | Re-fetch data only; developer controls next step. Returns `true` if data changed, and `false` immediately — running nothing — when `on_load()` is not overridden |
 | `render(sid?)` | No | Yes | Always | No | Re-render with current data (pass a `$sid` to re-render one `$redrawable`) |
 | `reload()` | Yes | Yes | Conditional | If args changed | Re-fetch and re-render — the standard update method. Debounced |
 | `refresh()` | Yes | Conditional | Only if data changed | If args changed | Polling / background sync without flicker. Debounced (shares queue with reload) |
 | `ready(cb?)` | No | No | No | No | Promise (or callback) resolving when component completes its lifecycle |
-| `stop()` | No | No | No | No | Stop lifecycle before removal; calls `on_stop()`, does NOT remove DOM |
+| `stop()` | No | No | No | No | Stop lifecycle before removal: always adds `_Component_Stopped`, de-registers from the parent and fires `stop`; calls `on_stop()` when overridden; does NOT remove DOM. A hook that throws during boot stops the component the same way, so ancestors are never left waiting |
 
 `redraw()` is an alias for `render()`.
 
@@ -480,6 +508,12 @@ When a component template contains ONLY slots at the top level (no HTML), it aut
 3. **Slot-based** (automatic): template with only slots inherits from the JS parent
 
 Note: `tag` is NOT inherited through `extends` — each `<Define:>` sets its own `tag` or defaults to `div`.
+
+**A missing or throwing parent template is an ERROR, not an empty render.** A slot-only
+template is nothing but an override of a parent, so if no parent template can be resolved,
+or the parent template throws while rendering, the component throws. That lands on the boot
+error path: the error is logged naming the component and the parent template, the component
+is stopped, and any ancestor waiting on it is released.
 
 ### Parent-Child Communication
 

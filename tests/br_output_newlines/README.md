@@ -49,4 +49,4 @@ Without `<%br= %>`, you'd need to either:
 - `packages/parser/src/lexer.ts` - `EXPRESSION_BR` token
 - `packages/parser/src/parser.ts` - `nl2br` property on ExpressionNode
 - `packages/parser/src/codegen.ts` - `escape_html_nl2br()` call generation
-- `packages/core/src/template-renderer.ts` - `escape_html_nl2br()` function
+- `packages/core/src/escape.ts` - `escape_html_nl2br()` function

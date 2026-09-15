@@ -11,10 +11,24 @@
 
 import fs from 'fs';
 import path from 'path';
-import { spawn, exec } from 'child_process';
+import http from 'http';
+import crypto from 'crypto';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import { fileURLToPath } from 'url';
-import { chromium } from 'playwright';
+import { chromium, firefox, webkit } from 'playwright';
+import { require_browsers } from './check-browsers.js';
+
+// Which engine runs the test: --browser=chromium|firefox|webkit, else the
+// JQHTML_BROWSER environment variable (set by run-all-tests.sh / run-all-suites.sh
+// --browser=...), else Chromium.
+const ENGINES = { chromium, firefox, webkit };
+let BROWSER_NAME = process.env.JQHTML_BROWSER || 'chromium';
+for (const arg of process.argv) if (arg.startsWith('--browser=')) BROWSER_NAME = arg.split('=')[1];
+if (!ENGINES[BROWSER_NAME]) {
+  console.error(`Error: --browser must be one of chromium, firefox, webkit (got ${BROWSER_NAME})`);
+  process.exit(1);
+}
 import webpack from 'webpack';
 
 const execAsync = promisify(exec);
@@ -24,6 +38,11 @@ const __dirname = path.dirname(__filename);
 // Configuration defaults
 const DEFAULT_PORT = 8989;
 
+// Built bundles are cached here across runs: the 300 runs of the browser suite
+// (100 tests x 3 cache modes) mostly re-bundle byte-identical code.
+const BUNDLE_CACHE_DIR = '/tmp/jqhtml_bundle_cache';
+const BUNDLE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
 // Parse command line args
 let delaySeconds = 0;
 // Check environment variable first (for parallel test runner), then fall back to default
@@ -31,6 +50,10 @@ let TEST_PORT = process.env.JQHTML_TEST_PORT ? parseInt(process.env.JQHTML_TEST_
 // Cache mode: 'none' (no caching), 'data' (data cache mode), 'html' (html cache mode)
 // Check environment variable first (for parallel test runner), then fall back to 'none'
 let CACHE_MODE = process.env.JQHTML_TEST_CACHE_MODE || 'none';
+// Verdict gate opt-ins (see "The verdict gate" below). Either may also be declared from
+// inside the page as window.__expect_boot_errors / window.__dom_only.
+let EXPECT_BOOT_ERRORS = false;
+let DOM_ONLY = false;
 const args = process.argv.slice(2);
 const files = [];
 
@@ -47,6 +70,12 @@ for (const arg of args) {
       console.error('Error: --port must be a number between 1024 and 65535');
       process.exit(1);
     }
+  } else if (arg.startsWith('--browser=')) {
+    // handled above (engine selection); not a file
+  } else if (arg === '--expect-boot-errors') {
+    EXPECT_BOOT_ERRORS = true;
+  } else if (arg === '--dom-only') {
+    DOM_ONLY = true;
   } else if (arg.startsWith('--cache-mode=')) {
     CACHE_MODE = arg.split('=')[1];
     if (!['none', 'data', 'html'].includes(CACHE_MODE)) {
@@ -68,6 +97,9 @@ if (!inputFile) {
   console.error('  --delay=N          Wait N seconds before capturing output');
   console.error('  --port=N           Use port N for HTTP server (default: 8989)');
   console.error('  --cache-mode=MODE  Set cache mode: none, data, html (default: none)');
+  console.error('  --browser=ENGINE   chromium (default), firefox or webkit; or set JQHTML_BROWSER');
+  console.error('  --expect-boot-errors  This test deliberately provokes component boot errors');
+  console.error('  --dom-only         This test asserts by inspecting the printed DOM, not by logging a verdict');
   console.error('');
   console.error('  Dependencies can be .jqhtml files (compiled) or standalone .js files (loaded as-is)');
   process.exit(1);
@@ -93,11 +125,10 @@ const COMPILED_TEMPLATE = path.join(OUTPUT_DIR, `${FILE_NAME}.js`);
 const ENTRY_JS = path.join(OUTPUT_DIR, 'entry.js');
 const BUNDLE_JS = path.join(OUTPUT_DIR, 'bundle.js');
 const HTML_FILE = path.join(OUTPUT_DIR, 'test.html');
+const JQUERY_FILE = path.join(__dirname, '..', 'node_modules', 'jquery', 'dist', 'jquery.min.js');
 
 async function compileTemplate() {
-  console.log(`🔨 Compiling JQHTML templates... (cache mode: ${CACHE_MODE})`);
-
-  fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+  console.log('🔨 Compiling JQHTML templates...');
 
   const compilerPath = path.join(__dirname, '..', 'packages', 'parser', 'bin', 'jqhtml-compile');
   const compiledDeps = [];
@@ -181,21 +212,17 @@ window.Jqhtml_Component = Jqhtml_Component;
 
 console.log('✓ JQHTML Core loaded from bundle');
 
-// Cache mode configuration (injected by test runner)
-// Mode: '${CACHE_MODE}' (none = no caching, data = data mode, html = html mode)
-window.__JQHTML_TEST_CACHE_MODE__ = '${CACHE_MODE}';
-${CACHE_MODE === 'none' ? `
-// No cache mode - don't call set_cache_key()
-console.log('✓ Cache mode: none (caching disabled)');
-` : CACHE_MODE === 'data' ? `
-// Data cache mode
-jqhtml.set_cache_key('test_fixed_key', 'data');
-console.log('✓ Cache mode: data');
-` : `
-// HTML cache mode
-jqhtml.set_cache_key('test_fixed_key', 'html');
-console.log('✓ Cache mode: html');
-`}
+// Cache mode configuration.
+// The mode is read from the PAGE (window.__JQHTML_TEST_CACHE_MODE__, set by an inline
+// <script> in test.html) rather than baked in here, so one bundle serves all three
+// modes and the bundle cache can be shared between them.
+const __test_cache_mode = window.__JQHTML_TEST_CACHE_MODE__ || 'none';
+if (__test_cache_mode === 'none') {
+  console.log('✓ Cache mode: none (caching disabled)');
+} else {
+  jqhtml.set_cache_key('test_fixed_key', __test_cache_mode);
+  console.log('✓ Cache mode: ' + __test_cache_mode);
+}
 
 // Enable verbose logging to see cache operations
 if (typeof window !== 'undefined') {
@@ -307,6 +334,62 @@ if (templates.length > 0) {
   console.log(`✓ Created entry file`);
 }
 
+/**
+ * Identity of the bundle we are about to build. Anything that can change the bundle's
+ * bytes has to be in here: the template/JS sources, the compiler that turns them into
+ * JS, and the @jqhtml/core build they are bundled against. The cache mode deliberately
+ * is NOT - it reaches the page at runtime, so all three modes share one bundle.
+ */
+function bundleCacheKey() {
+  const h = crypto.createHash('sha256');
+  h.update('jqhtml-bundle-v1');
+
+  const sources = [INPUT_FILE, ...dependencyFiles.map((f) => path.resolve(f))];
+  for (const file of sources) {
+    h.update(path.basename(file));
+    h.update(fs.readFileSync(file));
+    // A .jqhtml file may have a paired .js class that gets inlined with it.
+    const paired = file.replace(/\.jqhtml$/, '.js');
+    if (paired !== file && fs.existsSync(paired)) h.update(fs.readFileSync(paired));
+  }
+
+  // Built artefacts are large; their mtime+size is enough to notice a rebuild.
+  for (const build of [
+    path.join(__dirname, '..', 'packages', 'core', 'dist', 'index.js'),
+    path.join(__dirname, '..', 'packages', 'parser', 'dist', 'compiler.js'),
+  ]) {
+    const st = fs.existsSync(build) ? fs.statSync(build) : null;
+    h.update(st ? `${build}:${st.mtimeMs}:${st.size}` : `${build}:missing`);
+  }
+  h.update(String(fs.statSync(__filename).mtimeMs));   // this runner generates the entry file
+
+  return h.digest('hex');
+}
+
+/** Keep the cache bounded: drop anything untouched for a day. */
+function pruneBundleCache() {
+  if (!fs.existsSync(BUNDLE_CACHE_DIR)) return;
+  const cutoff = Date.now() - BUNDLE_CACHE_TTL_MS;
+  for (const name of fs.readdirSync(BUNDLE_CACHE_DIR)) {
+    const file = path.join(BUNDLE_CACHE_DIR, name);
+    try {
+      if (fs.statSync(file).mtimeMs < cutoff) fs.unlinkSync(file);
+    } catch { /* another runner pruned it first */ }
+  }
+}
+
+/** Publish a freshly built bundle. Rename is atomic, so parallel runs cannot tear it. */
+function saveBundleToCache(cacheFile) {
+  try {
+    fs.mkdirSync(BUNDLE_CACHE_DIR, { recursive: true });
+    const tmp = `${cacheFile}.${process.pid}.tmp`;
+    fs.copyFileSync(BUNDLE_JS, tmp);
+    fs.renameSync(tmp, cacheFile);
+  } catch (e) {
+    console.log(`(bundle cache write skipped: ${e.message})`);
+  }
+}
+
 async function bundleWithWebpack() {
   console.log('📦 Bundling with Webpack...');
 
@@ -348,6 +431,10 @@ async function bundleWithWebpack() {
 function createHTML() {
   console.log('📄 Creating test HTML...');
 
+  // jQuery is served by our own server when the repo has it (same 3.7.1 build as the
+  // CDN), so a test run makes no network request at all.
+  const jquerySrc = fs.existsSync(JQUERY_FILE) ? 'jquery.js' : 'https://code.jquery.com/jquery-3.7.1.min.js';
+
   const html = `<!DOCTYPE html>
 <html>
 <head>
@@ -357,8 +444,11 @@ function createHTML() {
 <body>
   <div id="app"></div>
 
+  <!-- Cache mode for this run - read by the bundle and by test scripts -->
+  <script>window.__JQHTML_TEST_CACHE_MODE__ = ${JSON.stringify(CACHE_MODE)};</script>
+
   <!-- Load jQuery first (external dependency) -->
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="${jquerySrc}"></script>
 
   <!-- Load webpack bundle (contains jqhtml core + template) -->
   <script src="bundle.js"></script>
@@ -369,49 +459,67 @@ function createHTML() {
   console.log(`✓ Created ${HTML_FILE}`);
 }
 
+const MIME = { '.html': 'text/html', '.js': 'application/javascript', '.json': 'application/json', '.map': 'application/json', '.css': 'text/css' };
+
+/**
+ * Serve OUTPUT_DIR from this process. This used to spawn `python3 -m http.server` and
+ * then poll with ss/curl until it answered - three processes and up to a second of
+ * sleeping per test run, times 300 runs.
+ */
 async function startServer() {
-  console.log('🌐 Starting server...');
+  const server = http.createServer((req, res) => {
+    const urlPath = decodeURIComponent(req.url.split('?')[0]);
+    // jquery.js is virtual: it lives in the repo's node_modules, not in OUTPUT_DIR.
+    const file = urlPath === '/jquery.js'
+      ? JQUERY_FILE
+      : path.join(OUTPUT_DIR, path.normalize(urlPath).replace(/^(\.\.[/\\])+/, ''));
 
-  // Kill any existing server on port
-  await execAsync(`ps ax | grep "python.*${TEST_PORT}" | grep -v grep | awk '{print $1}' | xargs -r kill -9 2>/dev/null || true`);
-
-  // Wait for port to be free
-  let attempts = 0;
-  while (attempts < 50) {
-    const { stdout } = await execAsync(`ss -tlnp 2>/dev/null | grep :${TEST_PORT} || echo "PORT_FREE"`);
-    if (stdout.trim() === "PORT_FREE") break;
-    await new Promise(resolve => setTimeout(resolve, 100));
-    attempts++;
-  }
-
-  // Start simple python server
-  const server = spawn('python3', ['-m', 'http.server', TEST_PORT.toString()], {
-    cwd: OUTPUT_DIR,
-    detached: false,
-    stdio: ['ignore', 'pipe', 'pipe']
+    fs.readFile(file, (err, data) => {
+      if (err) { res.writeHead(404); res.end('not found'); return; }
+      // no-store: the same URL (localhost:PORT/bundle.js) serves different bytes on the
+      // next test, and the browser is now shared between runs.
+      res.writeHead(200, {
+        'Content-Type': MIME[path.extname(file)] || 'application/octet-stream',
+        'Cache-Control': 'no-store',
+      });
+      res.end(data);
+    });
   });
 
-  // Wait for server to start
-  attempts = 0;
-  while (attempts < 50) {
+  // A port can still be held briefly by a previous run's socket; retry rather than fail.
+  for (let attempt = 0; attempt < 20; attempt++) {
     try {
-      await execAsync(`curl -s --connect-timeout 0.1 --max-time 0.1 -o /dev/null -w "%{http_code}" http://localhost:${TEST_PORT}/ | grep -E "^[23]"`);
-      break;
+      await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(TEST_PORT, '127.0.0.1', () => { server.removeListener('error', reject); resolve(); });
+      });
+      console.log(`✓ Server running on http://localhost:${TEST_PORT}`);
+      return server;
     } catch (e) {
-      await new Promise(resolve => setTimeout(resolve, 100));
-      attempts++;
+      if (e.code !== 'EADDRINUSE') throw e;
+      await new Promise((r) => setTimeout(r, 100));
     }
   }
-
-  console.log(`✓ Server running on http://localhost:${TEST_PORT}`);
-  return server;
+  throw new Error(`Port ${TEST_PORT} is still in use`);
 }
 
 async function runTest() {
   console.log('🎭 Running Playwright test...');
 
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  console.log(`🌐 Engine: ${BROWSER_NAME}`);
+  require_browsers([BROWSER_NAME]);   // fatal, with install instructions, if the build is missing
+
+  // The parallel runner launches ONE browser per engine and passes its websocket
+  // endpoint; connecting to it saves a full browser start-up per test run. Each run
+  // still gets its own browser context, so cookies/localStorage/etc. stay isolated
+  // exactly as a freshly launched browser would be.
+  const shared_ws = process.env.JQHTML_BROWSER_WS;
+  const browser = shared_ws
+    ? await ENGINES[BROWSER_NAME].connect(shared_ws)
+    : await ENGINES[BROWSER_NAME].launch({ headless: true });
+  console.log(shared_ws ? '✓ Connected to shared browser' : '✓ Launched browser');
+  const context = await browser.newContext();
+  const page = await context.newPage();
 
   const logs = [];
   const errors = [];
@@ -438,22 +546,101 @@ async function runTest() {
   // Get final DOM (outerHTML to include the component's root element)
   const dom = await page.evaluate(() => document.getElementById('app').outerHTML);
 
-  await browser.close();
+  // The verdict gate reads these; a test may declare its opt-ins from inside the page
+  // instead of on the command line.
+  const declared = await page.evaluate(() => ({
+    testPassed: window.testPassed,
+    expect_boot_errors: window.__expect_boot_errors === true,
+    dom_only: window.__dom_only === true,
+  }));
 
-  return { logs, errors, dom };
+  await context.close();
+  await browser.close();   // on a connected browser this just drops the connection
+
+  return { logs, errors, dom, declared };
+}
+
+// ---------------------------------------------------------------------------
+// The verdict gate
+//
+// Every test is judged HERE, identically, whatever its run-test.sh does. 84 of the
+// ~115 run-test.sh scripts used to exit 0 unconditionally, so a component that died
+// at boot or an assertion that printed FAIL still scored green.
+//
+// A run FAILS when any of these hold:
+//   (a) the page set window.testPassed === false
+//   (b) a console line matched "FAIL:" or "❌ FAIL"
+//   (c) the page logged a component boot error ("[JQHTML Error]", "Error booting
+//       component", "failed in boot") and the test did not opt in
+//   (d) the page produced NO verdict at all - no SUMMARY line, no window.testPassed,
+//       no PASS line - and the test did not declare --dom-only
+//
+// Opt-ins, each available as a CLI flag on test-runner.js or as a global the test sets
+// before mounting:
+//   --expect-boot-errors / window.__expect_boot_errors = true
+//       the test deliberately provokes boot errors (child_boot_failure_releases_parent,
+//       slot_inheritance_errors_surface, coordinator_error_and_cleanup, ...)
+//   --dom-only / window.__dom_only = true
+//       the test asserts by inspecting the rendered DOM that is printed, not by logging
+//       a verdict. Only legitimate when something else still checks the result.
+// ---------------------------------------------------------------------------
+
+const FAIL_LINE = /(^|\s)FAIL:|❌ FAIL/;
+const PASS_LINE = /(^|\s)PASS:|✅ PASS/;
+const SUMMARY_LINE = /(^|\s)SUMMARY:/;
+const BOOT_ERROR_LINE = /\[JQHTML Error\]|Error booting component|failed in boot/;
+
+function verdict(logs, declared) {
+  const expect_boot_errors = EXPECT_BOOT_ERRORS || declared.expect_boot_errors;
+  const dom_only = DOM_ONLY || declared.dom_only;
+
+  if (declared.testPassed === false) return 'window.testPassed === false';
+
+  const failed = logs.find((l) => FAIL_LINE.test(l));
+  if (failed) return `assertion failed: ${failed.trim()}`;
+
+  if (!expect_boot_errors) {
+    const boot_error = logs.find((l) => BOOT_ERROR_LINE.test(l));
+    if (boot_error) {
+      return `component boot error: ${boot_error.trim()}`
+        + ' (declare --expect-boot-errors if deliberate)';
+    }
+  }
+
+  const reported = logs.some((l) => SUMMARY_LINE.test(l) || PASS_LINE.test(l))
+    || declared.testPassed === true;
+  if (!reported && !dom_only) {
+    return 'test produced no verdict (no SUMMARY, no PASS line, no window.testPassed;'
+      + ' declare --dom-only if it asserts by DOM inspection)';
+  }
+
+  return null;
 }
 
 async function main() {
   let server = null;
 
   try {
-    const compilationResult = await compileTemplate();
-    createEntryFile(compilationResult);
-    await bundleWithWebpack();
+    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
+    pruneBundleCache();
+
+    const cacheFile = path.join(BUNDLE_CACHE_DIR, `${bundleCacheKey()}.js`);
+    if (fs.existsSync(cacheFile)) {
+      fs.copyFileSync(cacheFile, BUNDLE_JS);
+      fs.utimesSync(cacheFile, new Date(), new Date());   // keep hot entries from expiring
+      console.log(`📦 bundle: cached (cache mode: ${CACHE_MODE})`);
+    } else {
+      const compilationResult = await compileTemplate();
+      createEntryFile(compilationResult);
+      await bundleWithWebpack();
+      saveBundleToCache(cacheFile);
+      console.log(`📦 bundle: built (cache mode: ${CACHE_MODE})`);
+    }
+
     createHTML();
     server = await startServer();
 
-    const { logs, errors, dom } = await runTest();
+    const { logs, errors, dom, declared } = await runTest();
 
     console.log('\n' + '='.repeat(60));
     console.log('CONSOLE OUTPUT:');
@@ -472,7 +659,13 @@ async function main() {
     console.log('='.repeat(60));
     console.log(dom);
 
-    console.log('\n✅ Test complete!');
+    const reason = verdict(logs, declared);
+    if (reason) {
+      console.log(`\nVERDICT: FAIL (${reason})`);
+      process.exitCode = 1;
+    } else {
+      console.log('\nVERDICT: PASS');
+    }
 
   } catch (error) {
     console.error('❌ Test failed:', error.message);
@@ -480,8 +673,8 @@ async function main() {
     process.exit(1);
   } finally {
     if (server) {
-      server.kill();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      server.closeAllConnections?.();   // playwright keeps the socket alive otherwise
+      server.close();
     }
 
     // Cleanup temp directory

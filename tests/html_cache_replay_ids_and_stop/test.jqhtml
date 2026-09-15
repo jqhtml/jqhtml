@@ -1,0 +1,7 @@
+<Define:Html_Cache_Replay_Ids_And_Stop>
+  <div>
+    <h1>HTML-cache replay re-scopes ids, and stops the children it replaces</h1>
+    <div $sid="warm"></div>
+    <div $sid="pair"></div>
+  </div>
+</Define:Html_Cache_Replay_Ids_And_Stop>

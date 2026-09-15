@@ -3,6 +3,76 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.68 (2026-09-15)
+
+### Performance
+
+- Interpolated text is escaped by string replacement rather than a DOM round trip per
+  value, and the post-`innerHTML` element and component lookups are one query per pass
+  instead of one per element. Measured -27% on text-heavy renders and -25% to -57% on
+  large lists of tracked elements or child components. See packages/core/CHANGELOG.md.
+
+### Added
+
+- VS Code extension: three-tier headless test suite (stubbed unit tests, TextMate
+  tokenisation snapshots, a real extension host under xvfb) wired into
+  `./run-all-suites.sh`; plus the code-review fixes listed in
+  packages/vscode-extension/CHANGELOG.md.
+- `tests_benchmark/`: paired A/B render benchmarks of the working tree against the
+  runtime at a pinned commit, both loaded in one page and alternated per iteration, plus
+  a CPU profiler per scenario.
+
+### Fixed
+
+- `$(component)` returned a jQuery wrapper around the component object instead of the
+  component's root element, so every jQuery call on it silently did nothing. See
+  packages/core/CHANGELOG.md.
+- Replacing a component on an element left `class=""` behind, swallowed a throwing
+  `stop()` and overwrote the component anyway, and repaired a wrong tag only for
+  server-rendered content (dropping the element's jQuery `.data()` when it did). See
+  packages/core/CHANGELOG.md.
+- In `'html'` cache mode, a parent whose child had no `on_load()` never became ready, and
+  a `reload()` that injected cached HTML left inert markup when the reloaded data came
+  back unchanged. See packages/core/CHANGELOG.md.
+- A `"` in an interpolated attribute value could break out of the attribute. See
+  packages/core/CHANGELOG.md.
+- Recovering from a full localStorage quota wiped the cache a second time on the next
+  write. See packages/core/CHANGELOG.md.
+- The `create` event fired twice for every `.on('create')` subscriber. See
+  packages/core/CHANGELOG.md.
+- A hand-written `id` was rewritten to `<value>:<cid>` when the element also carried an
+  event or `$` attribute. Plain ids are now emitted verbatim; use `$sid` for per-instance
+  ids. See packages/core/CHANGELOG.md.
+- A slot-only template whose parent template is missing or throws rendered an empty element
+  with only a warning. It is now an error naming the component and the parent template. See
+  packages/core/CHANGELOG.md.
+- `<Define>` default attributes followed only the `extends=` chain, so a slot-only JS
+  subclass inherited its parent's template but none of the parent `<Define>`'s `class=""`
+  or attributes. They now resolve through the same chain templates do. An invocation
+  attribute of `""` is also no longer overwritten by the `Define` default. See
+  packages/core/CHANGELOG.md.
+
+### Removed
+
+- `jqhtml.render_template()`: a second, broken renderer that nothing called, with a
+  duplicate slot-inheritance implementation that disagreed with the live one. See
+  packages/core/CHANGELOG.md.
+
+## 2.3.67 (2026-09-14)
+
+### Added
+
+- **Value printers.** `jqhtml.add_object_printer(fn)` lets `<%= %>`, `<%!= %>` and `<%br= %>`
+  render an object. Printers chain in registration order; `undefined` declines, a string is
+  treated as a literal at that site (escaped per construct), a `{component: {name, args, attrs}}`
+  descriptor mounts the named component (no content). Primitives and arrays never enter the
+  chain, attribute position never uses it, and an unhandled object throws instead of printing
+  `[object Object]`. See packages/core/CHANGELOG.md and packages/parser/CHANGELOG.md.
+- **Dynamic component tags.** `<{expression} />` and `<{expression}>…</{expression}>` mount the
+  component whose name the expression evaluates to, validated at render time by the literal-tag
+  rule; the closing expression must match the opening one textually. See
+  packages/parser/CHANGELOG.md.
+
 ## 2.3.65 (2026-09-07)
 
 ### Fixed

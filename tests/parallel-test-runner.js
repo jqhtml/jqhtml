@@ -12,7 +12,7 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,6 +30,32 @@ const RED = '\x1b[31m';
 const YELLOW = '\x1b[33m';
 const CYAN = '\x1b[36m';
 const NC = '\x1b[0m';
+
+// ---------------------------------------------------------------------------
+// Shared browser
+//
+// Every test run used to start (and tear down) its own browser process. That is
+// seconds per run on Firefox/WebKit and 300 runs per engine. Instead we start ONE
+// browser server here and hand its websocket endpoint to every run-test.sh via
+// JQHTML_BROWSER_WS; test-runner.js connects to it and opens its own browser
+// context, which keeps each test as isolated as its own browser was.
+// ---------------------------------------------------------------------------
+
+const HARNESS_DIR = path.join(__dirname, '..', 'jqhtml-render-harness');
+
+function selectedEngine() {
+  for (const arg of process.argv) if (arg.startsWith('--browser=')) return arg.split('=')[1];
+  return process.env.JQHTML_BROWSER || 'chromium';
+}
+
+async function startSharedBrowser(engineName) {
+  // playwright is installed in the harness, not in tests/.
+  const mod = await import(pathToFileURL(path.join(HARNESS_DIR, 'node_modules', 'playwright', 'index.js')).href);
+  const playwright = mod.default || mod;
+  const engine = playwright[engineName];
+  if (!engine) throw new Error(`unknown engine "${engineName}"`);
+  return engine.launchServer({ headless: true });
+}
 
 async function discoverTests(testsDir) {
   const entries = fs.readdirSync(testsDir, { withFileTypes: true });
@@ -202,8 +228,34 @@ async function main() {
 
   console.log(`Running ${baseTests.length} tests × ${CACHE_MODES.length} cache modes = ${allTests.length} total test runs\n`);
 
+  // One browser for the whole run; every spawned test connects to it.
+  const engineName = selectedEngine();
+  let browserServer = null;
+  try {
+    browserServer = await startSharedBrowser(engineName);
+    process.env.JQHTML_BROWSER_WS = browserServer.wsEndpoint();
+  } catch (e) {
+    // Not fatal: without the endpoint each test launches its own browser as before.
+    console.log(`${YELLOW}Shared browser unavailable (${e.message}); each test will launch its own.${NC}`);
+  }
+
+  const stopBrowser = () => {
+    if (!browserServer) return Promise.resolve();
+    const server = browserServer;
+    browserServer = null;
+    return server.close().catch(() => {});
+  };
+  process.on('SIGINT', () => { stopBrowser().finally(() => process.exit(130)); });
+  process.on('SIGTERM', () => { stopBrowser().finally(() => process.exit(143)); });
+  process.on('exit', () => { browserServer?.kill?.(); });
+
   // Run all tests in parallel
-  const results = await runTestsInParallel(allTests, CONCURRENCY);
+  let results;
+  try {
+    results = await runTestsInParallel(allTests, CONCURRENCY);
+  } finally {
+    await stopBrowser();
+  }
 
   // Two newlines after test indicators
   console.log('\n');

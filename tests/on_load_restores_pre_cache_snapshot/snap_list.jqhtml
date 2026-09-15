@@ -1,0 +1,10 @@
+<%--
+Snap_List - appends one row in on_load().
+
+The append is the whole point: it is only correct if on_load() always starts from
+the on_create() state. A snapshot taken after the cache hydrated this.data makes
+the warm-cache run start from ['a'] and end with ['a','a'].
+--%>
+<Define:Snap_List class="snap-list">
+  <span class="count"><%= this.data.items.length %></span>
+</Define:Snap_List>

@@ -16,6 +16,14 @@ export interface PreloadEntry {
   component: string;
   args: Record<string, any>;
   data: Record<string, any>;
+  /**
+   * The exact cache key the capturing component was keyed under (from
+   * generate_cache_key()). Emitted by get_captured_data() and honoured by
+   * set_preload_data(). Without it a cache_id() component could never match:
+   * its key is `<name>::<cache_id()>`, a shape no amount of arg serialization
+   * on the client can reproduce. Absent when the component had no key.
+   */
+  key?: string;
 }
 
 // --- Capture (Server Side) ---
@@ -65,11 +73,15 @@ export function capture_component_data(
     const cloned_args = JSON.parse(JSON.stringify(args));
     const cloned_data = JSON.parse(JSON.stringify(data));
 
-    _capture_buffer.push({
+    const entry: PreloadEntry = {
       component: component_name,
       args: cloned_args,
       data: cloned_data,
-    });
+    };
+    // Carry the key forward so the client matches on the SAME identity the server
+    // used, rather than re-deriving one from args and hoping the shapes agree.
+    if (cache_key !== null) entry.key = cache_key;
+    _capture_buffer.push(entry);
   } catch (error) {
     // Non-serializable data — skip capture for this component
     if (typeof console !== 'undefined') {
@@ -124,10 +136,20 @@ export function set_preload_data(entries: PreloadEntry[] | null): void {
   _preload_cache.clear();
 
   for (const entry of entries) {
-    // Generate key using the same algorithm as Load Coordinator
-    const result = Load_Coordinator.generate_invocation_key(entry.component, entry.args);
-    if (result.key !== null) {
-      _preload_cache.set(result.key, entry.data);
+    // The captured key wins. Falling back to args means matching what
+    // generate_cache_key() computes for a component with no cache_id(), which
+    // INCLUDES content serialization - without it an object arg keyed to null
+    // here and the entry was dropped, so preload never applied to it.
+    const key = entry.key !== undefined
+      ? entry.key
+      : Load_Coordinator.generate_invocation_key(
+          entry.component,
+          entry.args,
+          { allow_content_serialization: true }
+        ).key;
+
+    if (key !== null) {
+      _preload_cache.set(key, entry.data);
     }
   }
 }

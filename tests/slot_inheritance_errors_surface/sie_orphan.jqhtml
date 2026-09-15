@@ -1,0 +1,9 @@
+<%--
+Sie_Orphan - slot-only template with NO extends= and no JS class at all, so there is no
+parent template to inherit. Rendering this empty hid the mistake; it is now an error.
+--%>
+<Define:Sie_Orphan>
+  <Slot:body>
+    <span>orphan slot content</span>
+  </Slot:body>
+</Define:Sie_Orphan>

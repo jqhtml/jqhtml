@@ -39,10 +39,10 @@ class Test_Integration_Config_Modes extends Jqhtml_Component {
     // ============================================================
     console.log('\n3. DEV MODE WARNS ON UNCACHEABLE ARGS:');
     warnings.length = 0;
-    await spawn('Cfg_Cached', { filters: { id: 1 } });
+    await spawn('Cfg_Cached', { on_pick: () => 1 });   // a function arg genuinely declines caching; plain objects are content-keyed
     const warn = warnings.find(w => w.includes('Cfg_Cached'));
     assert('warned about uncacheable arg', !!warn);
-    assert('names the offending arg', !!warn && warn.includes('$filters'));
+    assert('names the offending arg', !!warn && warn.includes('$on_pick'));
     assert('explains cache reuse is lost', !!warn && /not be restored from cache/.test(warn));
     assert('recommends cache_id()', !!warn && warn.includes('cache_id()'));
     assert('gives a DevTools locator', !!warn && warn.includes('data-nocache'));
@@ -50,14 +50,14 @@ class Test_Integration_Config_Modes extends Jqhtml_Component {
     // ============================================================
     console.log('\n4. WARNING IS DEDUPED PER COMPONENT:');
     warnings.length = 0;
-    await spawn('Cfg_Cached', { filters: { id: 2 } });
-    await spawn('Cfg_Cached', { filters: { id: 3 } });
+    await spawn('Cfg_Cached', { on_pick: () => 2 });
+    await spawn('Cfg_Cached', { on_pick: () => 3 });
     assert('repeat instances do not re-warn', warnings.filter(w => w.includes('Cfg_Cached')).length === 0);
 
     // ============================================================
     console.log('\n5. cache_id() SUPPRESSES THE WARNING:');
     warnings.length = 0;
-    await spawn('Cfg_With_Id', { filters: { id: 9 } });
+    await spawn('Cfg_With_Id', { filters: { id: 9 }, on_pick: () => 9 });   // cache_id() reads filters; the function arg would otherwise decline
     assert('component with cache_id() is not warned about', !warnings.some(w => w.includes('Cfg_With_Id')));
 
     // ============================================================

@@ -7,7 +7,10 @@
 class Form_Base extends Jqhtml_Component {
   on_create() {
     console.log('[Form_Base] on_create: Initializing form base');
-    this.data.fields = {};
+    // Field values are read out of the DOM in on_ready(), where this.data is frozen -
+    // and the freeze is DEEP, so this.data.fields.x = ... throws. Form field state is
+    // UI state, so it lives in this.state.
+    this.state.fields = {};
   }
 
   async on_ready() {
@@ -16,12 +19,12 @@ class Form_Base extends Jqhtml_Component {
 
   // Base class methods
   get_data() {
-    return this.data.fields;
+    return this.state.fields;
   }
 
   validate() {
     console.log('[Form_Base] validate() called');
-    return Object.keys(this.data.fields).length > 0;
+    return Object.keys(this.state.fields).length > 0;
   }
 }
 

@@ -1,0 +1,7 @@
+<%--
+Bf_Plain_Parent - one plain child, re-created on every render(). Used to check
+what _stop() leaves behind for the OUTGOING child instance.
+--%>
+<Define:Bf_Plain_Parent class="bf-plain-parent">
+  <Bf_Plain $sid="plain" />
+</Define:Bf_Plain_Parent>

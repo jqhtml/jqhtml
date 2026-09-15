@@ -3,8 +3,8 @@
 Markup written in component A's template and handed to component B — a `<Slot:x>` body or
 the default content between `<B>...</B>` — is compiled as a closure over A. `<%= %>`,
 template locals and `$sid` therefore already resolved to A. But the runtime attribute pass
-bound `@click`/`on*` handlers, scoped hand-written `id=`, and set `instantiator()` using B,
-the component the content was rendered *inside*.
+bound `@click`/`on*` handlers and set `instantiator()` using B, the component the content
+was rendered *inside*.
 
 The same line of template obeyed two scope rules. A `<button $sid="view_as_client"
 @click=this.view_as_client>` written in a sidebar slot had its id minted with A's cid and was
@@ -23,7 +23,10 @@ time.
 1. `@click` in a `<Slot:>` body runs with `this` = the component whose template wrote it,
    and the receiver is not used.
 2. `$sid` in a slot body scopes to the definer (unchanged behaviour, kept as a guard).
-3. A hand-written `id=` in a slot body is scoped with the definer's cid.
+3. A hand-written `id=` in a slot body is emitted verbatim - `id="slot_plain"` stays
+   `slot_plain`, and nothing in the document carries a `slot_plain:<cid>` id. (This used
+   to be scoped with the definer's cid, but only because the element also carried a
+   `@click`; audit bug 19. Use `$sid` for a per-instance id.)
 4. A component written in a slot body reports the definer from `instantiator()`.
 5. Default content between component tags behaves identically.
 6. The child → slot data channel is untouched: `content('row', record, i)` delivers both
@@ -32,4 +35,5 @@ time.
 7. The receiver's own template is unaffected: its own `@click` binds to itself and its own
    `$sid` resolves only from itself.
 
-Against the previous core, assertions 1, 3, 4 and 5 fail (9 of 17); all 17 pass now.
+Against the core before the content-context fix, assertions 1, 4 and 5 fail; against the
+core before the plain-`id` fix (audit bug 19), assertion 3 fails. All 17 pass now.

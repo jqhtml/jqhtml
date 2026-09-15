@@ -83,9 +83,9 @@ For user-entered text with line breaks (comments, descriptions, etc.), use `<%br
 The compiler emits a call to `jqhtml.escape_html_nl2br(value)`, a public export alongside
 `escape_html()`. Escaping happens FIRST (via `textContent`/`innerHTML`, so it follows the
 browser's own rules), and only then are newlines replaced — which is why the injected
-`<br />` survives while any `<br>` the user typed does not. Both functions are exported from
-`packages/core/src/template-renderer.ts` and can be called directly when building markup
-outside a template.
+`<br />` survives while any `<br>` the user typed does not. Both functions live in
+`packages/core/src/escape.ts`, are exported from the package, and can be called directly
+when building markup outside a template.
 
 ```javascript
 this.data.comment_text = "Line 1\nLine 2\nLine 3";
@@ -434,6 +434,14 @@ An attribute cannot be assigned directly to a `<%= %>` block - the interpolation
 <!-- CORRECT for $ attributes - use a literal JavaScript expression instead -->
 <Component $foo=bar() />
 ```
+
+## Advanced: Dynamic Component Tags and Object Interpolation
+
+Two capabilities for the uncommon case where data, not the template author, decides what
+renders. `<{expression} />` mounts the component whose name the expression evaluates to,
+under the same naming rule as a literal tag, and `<%= %>` can render an object through a
+registered value printer. Both are documented in `22_value_printers_and_dynamic_tags.md`;
+prefer literal tags and primitive interpolation whenever they suffice.
 
 ## Key Syntax Rules
 

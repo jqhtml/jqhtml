@@ -66,7 +66,34 @@
  * - Transient UI state (convenience, not required)
  *
  * @internal This class is not exposed in the public API
+ *
+ * ---------------------------------------------------------------------------
+ * REPORTING WHAT WAS DROPPED
+ *
+ * `this.data` is always the serialized copy this file produces - in EVERY cache
+ * mode, including 'none' (see component.ts `_apply_load_result`). Whatever the
+ * serializer cannot express is therefore not merely missing from the cache, it
+ * is missing from `this.data`, and an author needs to be told once rather than
+ * discover it on the next cache hit.
+ *
+ * Two small optional parameters carry that:
+ *
+ *   process_for_serialization(value, verbose, seen, path, collector?)
+ *       `collector(path, kind)` is invoked for every value that is dropped or
+ *       degraded. `path` is a dotted/bracketed path from the root the caller
+ *       named; `kind` is one of Strip_Kind. Paths are only BUILT when a
+ *       collector is present, so the no-collector path costs nothing.
+ *
+ *   Jqhtml_Local_Storage.normalize_for_cache(value, component_name?)
+ *       With a component name, and only in development mode, each dropped path
+ *       prints exactly ONE console.warn for the life of the page (keyed
+ *       `${component_name}:${path}`, the same once-only shape as
+ *       warn_uncacheable_args in component-cache.ts). Production converts
+ *       silently. Neither ever throws.
+ * ---------------------------------------------------------------------------
  */
+
+import { get_config } from './config.js';
 
 // ============================================================================
 // Class Registry for Serialization
@@ -108,17 +135,42 @@ export function is_cache_class_registered(class_name: string): boolean {
 // ============================================================================
 
 /**
+ * What kind of value the serializer had to drop or degrade. Reported to a
+ * collector; each kind maps to one piece of advice in strip_advice().
+ */
+export type Strip_Kind =
+    | 'function'
+    | 'promise'
+    | 'dom-node'
+    | 'jquery'
+    | 'component'
+    | 'symbol'
+    | 'bigint'
+    | 'circular'
+    | 'unregistered-class';
+
+/** Called once per dropped/degraded value with its path and what it was. */
+export type Strip_Collector = (path: string, kind: Strip_Kind, detail?: string) => void;
+
+/**
  * Serialize a value to JSON string, handling ES6 class instances recursively.
  * Returns null if serialization fails for any reason.
  *
  * @param value - The value to serialize
  * @param verbose - Whether to log warnings
+ * @param path - Root path used when reporting drops (only used with a collector)
+ * @param collector - Optional reporter, see the file header
  * @returns Serialized JSON string, or null if serialization failed
  */
-function serialize_value(value: any, verbose: boolean): string | null {
+function serialize_value(
+    value: any,
+    verbose: boolean,
+    path: string = '',
+    collector?: Strip_Collector
+): string | null {
     try {
         const seen = new WeakSet<object>();
-        const processed = process_for_serialization(value, verbose, seen);
+        const processed = process_for_serialization(value, verbose, seen, path, collector);
 
         if (processed === undefined) {
             // Serialization failed - undefined signals failure
@@ -136,14 +188,29 @@ function serialize_value(value: any, verbose: boolean): string | null {
 
 /**
  * Recursively process a value for serialization.
- * Returns undefined if serialization should fail (unserializable value encountered).
+ *
+ * Values the serializer cannot express are DROPPED, never passed through: the
+ * result of this function is what becomes `this.data`, so letting a function or
+ * a DOM node survive here would make `this.data` differ from what the cache can
+ * ever return. A dropped property is omitted from an object and becomes `null`
+ * in an array - JSON's own semantics for the same situation.
+ *
+ * Returns undefined for a value that has to be dropped.
  *
  * @param value - The value to process
  * @param verbose - Whether to log warnings
  * @param seen - WeakSet to detect circular references
- * @returns Processed value ready for JSON.stringify, or undefined if failed
+ * @param path - Dotted path of this value (only built when a collector is present)
+ * @param collector - Optional reporter for dropped/degraded values
+ * @returns Processed value ready for JSON.stringify, or undefined if dropped
  */
-function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<object>): any {
+function process_for_serialization(
+    value: any,
+    verbose: boolean,
+    seen: WeakSet<object>,
+    path: string = '',
+    collector?: Strip_Collector
+): any {
     // Handle null and undefined
     if (value === null) {
         return null;
@@ -160,10 +227,41 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
         }
 
         // bigint, symbol, function cannot be serialized
+        if (typeof value === 'function') {
+            collector?.(path, 'function');
+        } else if (typeof value === 'symbol') {
+            collector?.(path, 'symbol');
+        } else if (typeof value === 'bigint') {
+            collector?.(path, 'bigint');
+        }
         if (verbose) {
             console.warn(`[JQHTML Cache] Cannot serialize ${typeof value} - value will be omitted`);
         }
         // Return undefined to omit this value (not fail entire serialization)
+        return undefined;
+    }
+
+    // Live objects that only LOOK like data. Each is checked before anything
+    // treats it as a bag of properties, because walking one produces a
+    // meaningless husk (a jQuery object becomes {0: ..., length: 1}) instead of
+    // the drop the author needs to hear about.
+    if (typeof value.nodeType === 'number') {
+        collector?.(path, 'dom-node');
+        return undefined;
+    }
+    if (value.jquery) {
+        collector?.(path, 'jquery');
+        return undefined;
+    }
+    // Duck-typed on purpose: importing Jqhtml_Component here would be a cycle
+    // (component.ts imports this file). _cid + component_name() is the pair no
+    // plain data object carries.
+    if (value._cid !== undefined && typeof value.component_name === 'function') {
+        collector?.(path, 'component');
+        return undefined;
+    }
+    if (typeof value.then === 'function') {
+        collector?.(path, 'promise');
         return undefined;
     }
 
@@ -175,10 +273,11 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
     // JSON round-trip semantics do not preserve identity anyway, so emitting a
     // copy per reference is correct; silently omitting the property is not.
     if (seen.has(value)) {
+        collector?.(path, 'circular');
         if (verbose) {
-            console.warn('[JQHTML Cache] Circular reference detected - cannot serialize');
+            console.warn('[JQHTML Cache] Circular reference detected - cutting the cycle');
         }
-        return undefined; // Fail entire serialization
+        return undefined; // Cut the cycle here; the rest of the tree still serializes
     }
     seen.add(value);
 
@@ -188,7 +287,9 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
             const result: any[] = [];
             for (let i = 0; i < value.length; i++) {
                 const item = value[i];
-                const processed = process_for_serialization(item, verbose, seen);
+                const processed = process_for_serialization(
+                    item, verbose, seen, collector ? `${path}[${i}]` : '', collector
+                );
                 // For arrays, we keep undefined as null to preserve indices
                 result.push(processed === undefined ? null : processed);
             }
@@ -207,8 +308,9 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
         if (value instanceof Map) {
             const entries: [any, any][] = [];
             for (const [k, v] of value) {
-                const processedKey = process_for_serialization(k, verbose, seen);
-                const processedValue = process_for_serialization(v, verbose, seen);
+                const entry_path = collector ? `${path}.get(${String(k)})` : '';
+                const processedKey = process_for_serialization(k, verbose, seen, entry_path, collector);
+                const processedValue = process_for_serialization(v, verbose, seen, entry_path, collector);
                 entries.push([processedKey, processedValue]);
             }
             return {
@@ -220,8 +322,11 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
         // Handle Set objects
         if (value instanceof Set) {
             const items: any[] = [];
+            let index = 0;
             for (const item of value) {
-                items.push(process_for_serialization(item, verbose, seen));
+                items.push(process_for_serialization(
+                    item, verbose, seen, collector ? `${path}[Set ${index++}]` : '', collector
+                ));
             }
             return {
                 [CLASS_MARKER]: 'Set',
@@ -234,43 +339,22 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
 
         // Handle registered class instances
         if (ctor && ctor.name && class_registry[ctor.name]) {
-            const props: Record<string, any> = {};
-
-            // Extract own enumerable properties (bypass any toJSON method)
-            for (const key of Object.keys(value)) {
-                const propValue = value[key];
-                const processed = process_for_serialization(propValue, verbose, seen);
-                // Only include if not undefined (failed serialization)
-                if (processed !== undefined || propValue === undefined) {
-                    props[key] = processed;
-                }
-            }
-
             return {
                 [CLASS_MARKER]: ctor.name,
-                [PROPS_MARKER]: props
+                [PROPS_MARKER]: process_own_properties(value, verbose, seen, path, collector)
             };
         }
 
         // Handle plain objects (constructor is Object or no constructor)
         if (ctor === Object || ctor === undefined || ctor === null) {
-            const result: Record<string, any> = {};
-
-            for (const key of Object.keys(value)) {
-                const propValue = value[key];
-                const processed = process_for_serialization(propValue, verbose, seen);
-                // Only include if not undefined (unless original was undefined)
-                if (processed !== undefined || propValue === undefined) {
-                    result[key] = processed;
-                }
-            }
-
-            return result;
+            return process_own_properties(value, verbose, seen, path, collector);
         }
 
-        // Unregistered class instance - convert to plain object for hot/cold parity
-        // This ensures developers catch missing class registrations during development
-        // (methods will be lost, only properties preserved)
+        // Unregistered class instance - convert to plain object for hot/cold parity.
+        // Properties are preserved, prototype methods are lost, exactly as a cache
+        // hit would produce, so the loss shows up on the first load rather than on
+        // the next page view.
+        collector?.(path, 'unregistered-class', ctor.name);
         if (verbose) {
             console.warn(
                 `[JQHTML Cache] Converting unregistered class "${ctor.name}" to plain object. ` +
@@ -278,23 +362,111 @@ function process_for_serialization(value: any, verbose: boolean, seen: WeakSet<o
             );
         }
 
-        // Convert to plain object - properties are preserved, prototype methods are lost
-        const result: Record<string, any> = {};
-
-        for (const key of Object.keys(value)) {
-            const propValue = value[key];
-            const processed = process_for_serialization(propValue, verbose, seen);
-            // Only include if not undefined (unless original was undefined)
-            if (processed !== undefined || propValue === undefined) {
-                result[key] = processed;
-            }
-        }
-
-        return result;
+        return process_own_properties(value, verbose, seen, path, collector);
     } finally {
         // Pop this object off the ancestor path now that its subtree is done.
         seen.delete(value);
     }
+}
+
+/**
+ * Walk an object's own enumerable properties (bypassing any toJSON) into a plain
+ * object. Shared by plain objects, registered class instances and degraded
+ * unregistered instances - all three keep exactly the same property semantics.
+ */
+function process_own_properties(
+    value: any,
+    verbose: boolean,
+    seen: WeakSet<object>,
+    path: string,
+    collector?: Strip_Collector
+): Record<string, any> {
+    const result: Record<string, any> = {};
+
+    for (const key of Object.keys(value)) {
+        const propValue = value[key];
+        const processed = process_for_serialization(
+            propValue, verbose, seen, collector ? `${path}.${key}` : '', collector
+        );
+        // Only include if not undefined (unless original was undefined)
+        if (processed !== undefined || propValue === undefined) {
+            result[key] = processed;
+        }
+    }
+
+    return result;
+}
+
+// ============================================================================
+// Development warnings for dropped values
+// ============================================================================
+
+// One warning per component + path, for the life of the page. A list of 50 rows
+// each carrying an $on_select callback must print ONE warning, not 50, and must
+// not print it again on the next reload() or on the next instance of the same
+// component. Same shape as _warned_uncacheable in component-cache.ts.
+const _warned_stripped = new Set<string>();
+
+/**
+ * What was lost, and where the value actually belongs. Every message names a
+ * destination, because "it was dropped" without "put it here instead" is not
+ * actionable.
+ */
+function strip_advice(kind: Strip_Kind, detail?: string): string {
+    switch (kind) {
+        case 'function':
+            return 'a function cannot be serialized. Callbacks are configuration, not loaded data - ' +
+                   'pass it in this.args (from the parent template) and keep only ids in this.data.';
+        case 'promise':
+            return 'a promise cannot be serialized. Await it inside on_load() and store the RESULT, ' +
+                   'or hold the pending promise in this.state.';
+        case 'dom-node':
+            return 'a DOM node cannot be serialized. Elements, timers, files and sockets belong in this.state.';
+        case 'jquery':
+            return 'a jQuery object cannot be serialized. Elements, timers, files and sockets belong in this.state.';
+        case 'component':
+            return 'a Jqhtml_Component cannot be serialized. Keep component references in this.state ' +
+                   'and address children with this.sid().';
+        case 'symbol':
+            return 'a symbol cannot be serialized. Use a string, or keep it in this.state.';
+        case 'bigint':
+            return 'a bigint cannot be serialized. Convert it to a string in on_load(), or keep it in this.state.';
+        case 'circular':
+            return 'it points back to one of its own ancestors, and the cycle was cut. Store the graph ' +
+                   'flat (ids instead of back-references) in this.data, or keep the linked form in this.state.';
+        case 'unregistered-class':
+            return `it is an instance of the unregistered class "${detail}", so it was degraded to a plain ` +
+                   `object and its methods are gone. Call jqhtml.register_cache_class(${detail}) at startup ` +
+                   `to get real instances back.`;
+    }
+}
+
+/**
+ * Build the collector normalize_for_cache() hands to the serializer, or
+ * `undefined` when nobody is listening - production, or a caller that named no
+ * component. Returning undefined (rather than a no-op function) is what keeps
+ * the serializer from building path strings at all on the hot path.
+ */
+function make_strip_collector(component_name?: string): Strip_Collector | undefined {
+    if (!component_name) return undefined;
+    if (get_config().mode !== 'development') return undefined;
+
+    return (path: string, kind: Strip_Kind, detail?: string) => {
+        try {
+            const dedupe_key = `${component_name}:${path}`;
+            if (_warned_stripped.has(dedupe_key)) return;
+            _warned_stripped.add(dedupe_key);
+
+            console.warn(
+                `[JQHTML] <${component_name}> dropped ${path} from this.data: ${strip_advice(kind, detail)}\n` +
+                `  this.data is always the serialized copy jqhtml stores in and restores from cache, ` +
+                `so only serializable values survive on_load() - in every cache mode.`,
+                { component: component_name, path, kind }
+            );
+        } catch {
+            // A warning must never be able to break a load.
+        }
+    };
 }
 
 // ============================================================================
@@ -713,44 +885,40 @@ export class Jqhtml_Local_Storage {
     /**
      * Perform a serialize/deserialize round-trip on a value.
      *
-     * This ensures "hot" data (fresh from on_load) behaves identically to "cold" data
-     * (restored from cache). Unregistered class instances will be converted to plain
-     * objects, exactly as they would be if restored from cache.
-     *
-     * Use this to normalize data after on_load() so developers catch missing class
-     * registrations immediately rather than only after a page reload.
+     * The result is ALWAYS jqhtml's own copy: nothing of the caller's object graph
+     * is aliased through, and a value the serializer cannot express is dropped
+     * rather than smuggled out. That is what makes `this.data` identical whether it
+     * came from on_load() or from a cache hit - the old "on failure return the
+     * original" branch broke exactly that promise, and only on the hard cases.
      *
      * @param {any} value - The value to normalize
-     * @returns {any} The value after serialize/deserialize round-trip, or original if serialization fails
+     * @param {string} [component_name] - Names the component in development warnings.
+     *        Omit to convert silently (the unit tests and non-component callers).
+     * @returns {any} The round-tripped value. Never the original object.
      */
-    static normalize_for_cache(value: any): any {
+    static normalize_for_cache(value: any, component_name?: string): any {
         const verbose = this._is_verbose();
+        const collector = make_strip_collector(component_name);
 
         // Serialize to JSON string
-        const serialized = serialize_value(value, verbose);
+        const serialized = serialize_value(value, verbose, 'this.data', collector);
 
         if (serialized === null) {
-            // Serialization failed completely - return original
-            // (This happens with circular references or other fatal issues)
-            if (verbose) {
-                console.warn(
-                    '[JQHTML Cache] normalize_for_cache: Serialization failed, returning original value'
-                );
-            }
-            return value;
+            // The value as a WHOLE could not be expressed (it was itself a function,
+            // a promise, a DOM node...). The round trip of such a value is nothing;
+            // returning the original would put an uncacheable object into this.data.
+            return {};
         }
 
         // Deserialize back to object
         const deserialized = deserialize_value(serialized, verbose);
 
-        if (deserialized === null) {
-            // Deserialization failed - return original
-            if (verbose) {
-                console.warn(
-                    '[JQHTML Cache] normalize_for_cache: Deserialization failed, returning original value'
-                );
-            }
-            return value;
+        // `null` from deserialize_value() is ambiguous: it means "failed", but a value
+        // that legitimately serialized to the text `null` also comes back as null. The
+        // serialized text disambiguates.
+        if (deserialized === null && serialized !== 'null') {
+            // Only reachable when a registered class constructor blew up on restore.
+            return {};
         }
 
         return deserialized;
@@ -777,7 +945,10 @@ export class Jqhtml_Local_Storage {
 
                 // Clear only JQHTML keys and retry once
                 this._clear_jqhtml_keys();
-                localStorage.setItem('_jqhtml_cache_key', this._cache_key!);
+                // Re-stamp the SCOPE MARKER, not the raw developer key: _validate_scope()
+                // compares against `${CORE_VERSION}::${key}`, so writing the bare key here
+                // made the very next write look like a scope change and wipe the cache again.
+                localStorage.setItem('_jqhtml_cache_key', this._scope_marker!);
 
                 try {
                     localStorage.setItem(scoped_key, serialized);

@@ -1,0 +1,7 @@
+<%--
+Lrn_Sink - returns the kitchen-sink payload from on_load(). The template prints
+nothing interesting; the assertions read this.data directly.
+--%>
+<Define:Lrn_Sink class="lrn-sink">
+  <span class="marker"><%= this.data.model ? this.data.model.kind : 'none' %></span>
+</Define:Lrn_Sink>

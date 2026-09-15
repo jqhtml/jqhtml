@@ -1,0 +1,10 @@
+<%--
+Bf_Slow - a slow on_load() used to stop the component mid-reload.
+
+GLOBALS:
+    window.__bf_slow_loaded_calls  - on_loaded() call count
+    window.__bf_slow_ready_calls   - on_ready() call count
+--%>
+<Define:Bf_Slow class="bf-slow">
+  <span class="tick"><%= this.data.tick %></span>
+</Define:Bf_Slow>

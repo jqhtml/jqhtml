@@ -1,0 +1,3 @@
+<Define:Dt_Panel class="panel">
+  <div class="panel-body"><%= content() %></div>
+</Define:Dt_Panel>

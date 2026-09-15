@@ -1,12 +1,12 @@
 class Reload_Debounce_Test extends Jqhtml_Component {
   on_create() {
-    this.args.total_calls = 0;  // Track in args (not restored)
+    window.__reload_debounce_calls = 0;  // window counter: this.args is read-only inside on_load and this.data is restored per load
     this.data.load_count = 0;
   }
 
   async on_load() {
-    this.args.total_calls++;  // Increment in args
-    const call_num = this.args.total_calls;
+    window.__reload_debounce_calls++;  // Increment the window counter
+    const call_num = window.__reload_debounce_calls;
     console.log(`on_load execution #${call_num}`);
 
     // Simulate slow load
@@ -40,7 +40,7 @@ class Reload_Debounce_Test extends Jqhtml_Component {
     await Promise.all(promises);
 
     console.log('');
-    console.log(`Final total on_load calls: ${this.args.total_calls}`);
+    console.log(`Final total on_load calls: ${window.__reload_debounce_calls}`);
     console.log('Expected: 3 (initial + 2 debounced reloads)');
     console.log('');
     console.log('Why 3 is correct:');
@@ -51,14 +51,14 @@ class Reload_Debounce_Test extends Jqhtml_Component {
     console.log('  5. This guarantees fresh data even if state changed during execution');
     console.log('');
 
-    if (this.args.total_calls === 3) {
+    if (window.__reload_debounce_calls === 3) {
       console.log('✅ PASS: reload() debouncing works correctly');
       console.log('   - 5 rapid calls coalesced to 2 executions (after initial)');
       console.log('   - Guarantees data freshness');
       console.log('   - All promises resolved');
       this.$sid('results').html('<h3 style="color: green;">✅ Test passed</h3>');
     } else {
-      console.log(`❌ FAIL: Expected 3 executions, got ${this.args.total_calls}`);
+      console.log(`❌ FAIL: Expected 3 executions, got ${window.__reload_debounce_calls}`);
       console.log('   Note: Exact count may vary based on timing');
       this.$sid('results').html('<h3 style="color: orange;">⚠️ Test inconclusive (timing-dependent)</h3>');
     }

@@ -9,6 +9,20 @@
 import { Load_Coordinator } from './load-coordinator.js';
 
 /**
+ * JSON for an error message. The value being rejected is arbitrary author data and may
+ * be cyclic or otherwise unserializable - the diagnostic must never throw over the
+ * error it is trying to report.
+ */
+function safe_json(value: any): string {
+  try {
+    const text = JSON.stringify(value);
+    return text === undefined ? String(value) : text;
+  } catch {
+    return String(value);
+  }
+}
+
+/**
  * Set up the `this.data` property on a component using Object.defineProperty
  * with a Proxy that enforces freeze/unfreeze semantics.
  *
@@ -22,9 +36,88 @@ import { Load_Coordinator } from './load-coordinator.js';
 export function setup_data_property(component: any): void {
   let _data: Record<string, any> = {};
 
+  // Wrapper memo for the deep-freeze proxies. Keyed by the RAW target object, so a
+  // value read twice returns the same wrapper and `this.data.items === this.data.items`
+  // holds - identity comparisons and `Set`/`Map` membership on nested data keep working.
+  // WeakMap: a wrapper dies with the object it wraps.
+  const frozen_wrappers = new WeakMap<object, any>();
+
+  // Only plain objects and arrays are wrapped. Anything with a real prototype
+  // (Date, Map, Set, and classes restored by register_cache_class()) carries internal
+  // slots that a Proxy receiver cannot satisfy: `this.data.created.getTime()` would
+  // call the method with the proxy as `this` and throw. Those values pass through raw -
+  // a shallow hole we accept, because breaking Date/Map/Set reads would be worse than
+  // missing a rare mutation of one.
+  const is_wrappable = (value: any): boolean => {
+    if (value === null || typeof value !== 'object') return false;
+    if (Array.isArray(value)) return true;
+    const proto = Object.getPrototypeOf(value);
+    return proto === Object.prototype || proto === null;
+  };
+
+  // Dotted path for error messages: array indices read as [0], keys as .name
+  const join_path = (path: string, target: any, prop: string | symbol): string =>
+    Array.isArray(target) ? `${path}[${String(prop)}]` : `${path}.${String(prop)}`;
+
+  const frozen_violation = (path: string, verb: 'modify' | 'delete', value?: any): never => {
+    const value_text = verb === 'modify' ? ` = ${safe_json(value)}` : '';
+    console.error(
+      `[JQHTML] ERROR: Component "${component.component_name()}" attempted to ${verb} ${path} outside of on_create() or on_load().\n\n` +
+      `RESTRICTION: this.data can ONLY be modified in:\n` +
+      `  - on_create() (set initial defaults, synchronous only)\n` +
+      `  - on_load() (fetch data from APIs, can be async)\n\n` +
+      `NESTED VALUES COUNT: the freeze is DEEP. Mutating an object or array inside\n` +
+      `this.data (push, splice, assigning a property, delete) is modifying this.data.\n\n` +
+      `WHY: this.data represents loaded state. Modifying it outside these methods bypasses the framework's render cycle.\n\n` +
+      `FIX:\n` +
+      `  ❌ In on_ready(): ${path}${value_text};\n` +
+      `  ✅ In on_load(): fetch the value, so the framework can re-render\n` +
+      `  ✅ For component-local bookkeeping: this.state (unrestricted, never cached)`
+    );
+
+    throw new Error(
+      `[JQHTML] Cannot ${verb} ${path} outside of on_create() or on_load(). ` +
+      `this.data is frozen after on_create() and unfrozen only during on_load(). ` +
+      `The freeze is deep - nested objects and arrays are frozen too.`
+    );
+  };
+
+  // Read-only view of a nested value. Handed out ONLY while __data_frozen is true
+  // (the top-level get trap checks), so the traps here never need to re-check: a
+  // wrapper the author kept a reference to stays read-only for its whole life.
+  const create_frozen_wrapper = (obj: any, path: string): any => {
+    const existing = frozen_wrappers.get(obj);
+    if (existing) return existing;
+
+    const wrapper = new Proxy(obj, {
+      get: (target, prop) => {
+        const value = (target as any)[prop];
+        // Functions are returned raw: array methods are invoked with the wrapper as
+        // `this`, so push/splice still land in this trap's set/deleteProperty.
+        return is_wrappable(value) ? create_frozen_wrapper(value, join_path(path, target, prop)) : value;
+      },
+      set: (target, prop, value) => frozen_violation(join_path(path, target, prop), 'modify', value),
+      deleteProperty: (target, prop) => frozen_violation(join_path(path, target, prop), 'delete')
+    });
+
+    frozen_wrappers.set(obj, wrapper);
+    return wrapper;
+  };
+
   // Helper to create frozen proxy for data object
   const create_proxy = (obj: Record<string, any>): Record<string, any> => {
     return new Proxy(obj, {
+      get: (target, prop) => {
+        const value = target[prop as keyof typeof target];
+        // Deep freeze: while frozen, every nested object/array is read through a
+        // read-only wrapper, so this.data.items.push(x) throws instead of silently
+        // mutating. Unfrozen (on_create, on_load's detached run, _apply_load_result)
+        // reads return the raw value, because those phases may legally mutate it.
+        if (component.__data_frozen && is_wrappable(value)) {
+          return create_frozen_wrapper(value, `this.data.${String(prop)}`);
+        }
+        return value;
+      },
       set: (target, prop, value) => {
         if (component.__data_frozen) {
           console.error(
@@ -112,10 +205,13 @@ export function setup_data_property(component: any): void {
  * All other property access (this.$, this.$sid, etc.) throws errors.
  *
  * @param component - The component instance
- * @param use_load_coordinator - Whether to use Load_Coordinator for deduplication
+ * @param dedup_key - The dedup key captured by the caller, or null to run uncoordinated.
+ *                    The key is passed in rather than recomputed because args may legally
+ *                    change while on_load() runs, and a recomputed key would address a
+ *                    different entry than the one this leader registered.
  * @returns The resulting data and optional coordination completion function
  */
-export async function execute_on_load_detached(component: any, use_load_coordinator: boolean = false): Promise<{
+export async function execute_on_load_detached(component: any, dedup_key: string | null = null): Promise<{
   data: Record<string, any>;
   complete_coordination: ((data: Record<string, any>) => void) | null;
 }> {
@@ -128,13 +224,24 @@ export async function execute_on_load_detached(component: any, use_load_coordina
   // Can't use JSON clone because args may contain functions (_slots, callbacks)
   const component_name = component.component_name();
 
+  // Wrapper memo for this one on_load() run. Without it every nested read built a
+  // fresh Proxy, so `this.args.filter !== this.args.filter` for an object arg and
+  // identity comparisons inside on_load() silently failed. Lives only for the duration
+  // of this call - args may legally be replaced between loads.
+  const readonly_wrappers = new WeakMap<object, any>();
+
   const create_readonly_proxy = (obj: any, path: string = 'this.args'): any => {
     if (obj === null || typeof obj !== 'object') return obj;
-    return new Proxy(obj, {
+
+    const existing = readonly_wrappers.get(obj);
+    if (existing) return existing;
+
+    const proxy = new Proxy(obj, {
       get(target: any, prop: string | symbol) {
         const value = target[prop];
-        // Recursively wrap nested objects (but not functions)
-        if (value !== null && typeof value === 'object' && typeof value !== 'function') {
+        // Recursively wrap nested objects. Functions are returned raw - `typeof value`
+        // is already 'object' here, so a function never reaches this branch.
+        if (value !== null && typeof value === 'object') {
           return create_readonly_proxy(value, `${path}.${String(prop)}`);
         }
         return value;
@@ -164,6 +271,9 @@ export async function execute_on_load_detached(component: any, use_load_coordina
         );
       }
     });
+
+    readonly_wrappers.set(obj, proxy);
+    return proxy;
   };
 
   // Create a detached context object that on_load will operate on
@@ -244,28 +354,22 @@ export async function execute_on_load_detached(component: any, use_load_coordina
     }
   });
 
-  // Create promise for this on_load() call
-  const on_load_promise = (async () => {
-    try {
-      await component._call_lifecycle('on_load', restricted_this);
-    } catch (error: any) {
-      if (use_load_coordinator) {
-        // Handle error and notify coordinator
-        Load_Coordinator.handle_leader_error(component, error as Error);
-      }
-      throw error;
-    }
-  })();
-
-  // If using Load_Coordinator, register as leader
-  // Note: We store the completion function but DON'T call it here
-  // It will be called by _load() after _apply_load_result() updates this.data
+  // Register as leader BEFORE on_load() runs, so the error path always finds the entry
+  // it has to reject. The completion function is stored, not called here: _load() calls
+  // it after _apply_load_result() has updated this.data.
   let complete_coordination: ((data: Record<string, any>) => void) | null = null;
-  if (use_load_coordinator) {
-    complete_coordination = Load_Coordinator.register_leader(component, on_load_promise);
+  if (dedup_key !== null) {
+    complete_coordination = Load_Coordinator.register_leader(component, dedup_key);
   }
 
-  await on_load_promise;
+  try {
+    await component._call_lifecycle('on_load', restricted_this);
+  } catch (error: any) {
+    if (dedup_key !== null) {
+      Load_Coordinator.handle_leader_error(dedup_key, error as Error);
+    }
+    throw error;
+  }
 
   // Note: We don't validate args changes here because external code (like parent
   // components calling reload()) is allowed to modify component.args during on_load().

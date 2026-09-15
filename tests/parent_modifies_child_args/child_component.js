@@ -6,6 +6,10 @@ class Child_Component extends Jqhtml_Component {
   }
 
   async on_load() {
+    // on_load() may touch nothing but this.args/this.data, so the record of which
+    // filters were loaded lives on a window-level tally.
+    window.__pmca_loads = window.__pmca_loads || [];
+    window.__pmca_loads.push(this.args.filter);
     console.log('[CHILD] on_load() called with args:', JSON.stringify(this.args));
     console.log('[CHILD] Current filter:', this.args.filter);
 

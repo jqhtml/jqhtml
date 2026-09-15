@@ -1,0 +1,15 @@
+<%--
+Rs_Poller - a child whose on_load() always produces the SAME data.
+
+Every refresh() therefore takes the "data unchanged" path: no re-render, no
+on_ready(). That is the path where the component used to be left permanently
+not ready (audit bug 5).
+
+GLOBALS:
+    window.__rs_poller_load_calls   - on_load() call count
+    window.__rs_poller_ready_calls  - on_ready() call count
+    window.__rs_poller_delay        - ms on_load() sleeps (used to stop a child mid-load)
+--%>
+<Define:Rs_Poller class="rs-poller">
+  <span class="label"><%= this.data.label %></span>
+</Define:Rs_Poller>

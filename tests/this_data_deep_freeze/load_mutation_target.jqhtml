@@ -1,0 +1,3 @@
+<Define:Load_Mutation_Target class="card">
+  <div>loaded: <%= this.data.user.name %> / <%= this.data.items.length %> items</div>
+</Define:Load_Mutation_Target>

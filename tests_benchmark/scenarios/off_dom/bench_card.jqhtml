@@ -1,0 +1,4 @@
+<Define:Bench_Card class="bench-card" data-role="card">
+  <h4><%= this.args.item.label %></h4>
+  <p class="idx"><%= this.args.index %></p>
+</Define:Bench_Card>

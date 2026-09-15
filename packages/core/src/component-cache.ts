@@ -63,7 +63,7 @@ const _warned_uncacheable = new Set<string>();
  *
  * Controlled by the `warn_uncacheable_args` integration flag (see config.ts).
  */
-function warn_uncacheable_component(
+export function warn_uncacheable_component(
   component: any,
   uncacheable_property?: string,
   uncacheable_reason?: string
@@ -121,6 +121,34 @@ function warn_uncacheable_component(
 }
 
 /**
+ * An HTML-cache entry: the inner HTML of a component plus the cid it was rendered
+ * under. Scoped ids inside the markup are "<name>:<cid>", so the owner's cid is what
+ * lets a replaying instance tell its own elements from its children's.
+ */
+export interface Html_Cache_Snapshot {
+  cid: string;
+  html: string;
+}
+
+/**
+ * Read an HTML-cache entry, rejecting anything that is not a well-formed snapshot.
+ * Entries written by an older core are bare strings; they are treated as a miss (and
+ * are cleared wholesale by the CORE_VERSION scope marker on the next version bump).
+ */
+function read_html_snapshot(html_cache_key: string): Html_Cache_Snapshot | null {
+  const entry = Jqhtml_Local_Storage.get(html_cache_key);
+  if (
+    entry !== null &&
+    typeof entry === 'object' &&
+    typeof entry.cid === 'string' &&
+    typeof entry.html === 'string'
+  ) {
+    return entry as Html_Cache_Snapshot;
+  }
+  return null;
+}
+
+/**
  * Read cache during create() phase.
  * Sets component._cache_key, _cached_html, _use_cached_data_hit as side effects.
  *
@@ -167,14 +195,14 @@ export function read_cache_in_create(component: any): void {
   if (cache_mode === 'html') {
     // HTML cache mode - check for cached HTML to inject on first render
     const html_cache_key = `${cache_key}::html`;
-    const cached_html = Jqhtml_Local_Storage.get(html_cache_key);
-    if (cached_html !== null && typeof cached_html === 'string') {
+    const cached_html = read_html_snapshot(html_cache_key);
+    if (cached_html !== null) {
       component._cached_html = cached_html;
 
       if ((window as any).jqhtml?.debug?.verbose) {
         console.log(
           `[Cache html] Component ${component._cid} (${component.component_name()}) found cached HTML`,
-          { cache_key: html_cache_key, html_length: cached_html.length }
+          { cache_key: html_cache_key, html_length: cached_html.html.length, snapshot_cid: cached_html.cid }
         );
       }
     } else {
@@ -249,13 +277,13 @@ export function check_cache_on_reload(component: any): boolean {
   if (cache_mode === 'html') {
     // HTML cache mode - check for cached HTML
     const html_cache_key = `${cache_key}::html`;
-    const cached_html = Jqhtml_Local_Storage.get(html_cache_key);
+    const cached_html = read_html_snapshot(html_cache_key);
 
-    if (cached_html !== null && typeof cached_html === 'string') {
+    if (cached_html !== null) {
       if ((window as any).jqhtml?.debug?.verbose) {
         console.log(
           `[Cache html] reload() - Component ${component._cid} (${component.component_name()}) found cached HTML (args changed)`,
-          { cache_key: html_cache_key, html_length: cached_html.length }
+          { cache_key: html_cache_key, html_length: cached_html.html.length, snapshot_cid: cached_html.cid }
         );
       }
 
@@ -307,7 +335,11 @@ export function write_html_cache_snapshot(component: any): void {
 
     const html = component.$.html();
     const html_cache_key = `${component._cache_key}::html`;
-    Jqhtml_Local_Storage.set(html_cache_key, html);
+    // Store the cid this markup was rendered under alongside it: every scoped id inside
+    // reads "<name>:<cid>", and a reader cannot tell the snapshotting component's own
+    // elements from its children's without knowing which cid was the owner's.
+    // See Jqhtml_Component._rescope_cached_html().
+    Jqhtml_Local_Storage.set(html_cache_key, { cid: component._cid, html });
 
     if ((window as any).jqhtml?.debug?.verbose) {
       console.log(

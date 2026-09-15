@@ -1,0 +1,6 @@
+<Define:On_Load_Restores_Pre_Cache_Snapshot>
+  <div>
+    <h1>on_load() restarts from the on_create() state, warm cache or not</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:On_Load_Restores_Pre_Cache_Snapshot>

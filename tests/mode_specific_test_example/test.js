@@ -59,8 +59,10 @@ class Mode_Specific_Test extends Jqhtml_Component {
 
     this.add_result('Test is running in correct mode', true);
 
-    // Check that caching is actually enabled
-    const cacheEnabled = !!window.jqhtml.get_cache_key();
+    // Check that caching is actually enabled. get_cache_mode() is the public reader;
+    // there is no get_cache_key() and never was, which is why this branch used to die
+    // at boot with a TypeError and still score green.
+    const cacheEnabled = !!window.jqhtml.get_cache_mode();
     this.add_result('Cache is enabled', cacheEnabled);
 
     // Check that we're in data mode

@@ -1,0 +1,4 @@
+<Define:Hc_Card>
+  <span $sid="name"><%= this.data.name %></span>
+  <Hc_Child $sid="child" />
+</Define:Hc_Card>

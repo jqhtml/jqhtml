@@ -1,0 +1,6 @@
+<Define:Child_Boot_Failure_Releases_Parent>
+  <div>
+    <h1>A child whose boot throws is stopped, and never wedges its parent</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Child_Boot_Failure_Releases_Parent>

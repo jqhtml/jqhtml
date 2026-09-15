@@ -1,0 +1,6 @@
+<Define:Ready_State_After_Partial_Render_And_Refresh>
+  <div>
+    <h1>Ready state after a partial render and after a quiet refresh</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Ready_State_After_Partial_Render_And_Refresh>

@@ -1,0 +1,12 @@
+<%--
+Create_Event_Fires_Once - the 'create' lifecycle event fires exactly once per component.
+
+boot_component() used to call component.trigger('create') on top of the trigger already
+inside component.create() (audit bug 18), so every subscriber saw it twice.
+--%>
+<Define:Create_Event_Fires_Once>
+  <div>
+    <h1>The 'create' event fires exactly once</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Create_Event_Fires_Once>

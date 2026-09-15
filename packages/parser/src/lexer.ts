@@ -31,6 +31,7 @@ export enum TokenType {
   TAG_OPEN = 'TAG_OPEN',                     // <tagname or <ComponentName
   TAG_CLOSE = 'TAG_CLOSE',                   // </tagname or </ComponentName
   TAG_NAME = 'TAG_NAME',                     // The tag/component name
+  DYNAMIC_TAG_NAME = 'DYNAMIC_TAG_NAME',     // <{expression}> - value is the expression text
   SELF_CLOSING = 'SELF_CLOSING',             // />
   
   // Attributes
@@ -560,6 +561,15 @@ export class Lexer {
 
     // Check for HTML tags (including components)
     if (this.current_char() === '<') {
+      // Dynamic component tags: <{expression} ...> and </{expression}>
+      if (this.peek_ahead(1) === '{') {
+        this.scan_dynamic_tag(false);
+        return;
+      }
+      if (this.peek_ahead(1) === '/' && this.peek_ahead(2) === '{') {
+        this.scan_dynamic_tag(true);
+        return;
+      }
       // Peek ahead to see if this is an HTML tag
       if (this.peek_ahead(1) === '/') {
         // Closing tag
@@ -631,6 +641,9 @@ export class Lexer {
           break;
         }
         // Also stop for HTML tags
+        if (this.peek_ahead(1) === '{' || (this.peek_ahead(1) === '/' && this.peek_ahead(2) === '{')) {
+          break; // Dynamic component tag
+        }
         if (this.peek_ahead(1) === '/' && this.is_tag_start_at(2)) {
           break; // Closing tag
         }
@@ -1150,6 +1163,64 @@ export class Lexer {
     // delimiters still apply - the block is raw HTML, not an opaque blob.
     if (name.toLowerCase() === 'pre' && this.last_token_type() === TokenType.GT) {
       this.scan_raw_text_element('pre');
+    }
+  }
+
+  /**
+   * <{expression} attrs...> or </{expression}>: a component whose name is
+   * computed at render time. The expression runs from the { after < to its
+   * matching }, honouring nested braces and string literals, so a > inside it
+   * (<{a > b ? 'X' : 'Y'}>) never terminates the tag - the tag name ends at
+   * the brace, not at >. Emits TAG_OPEN/TAG_CLOSE then DYNAMIC_TAG_NAME
+   * carrying the raw expression text; attributes scan as for any tag.
+   */
+  private scan_dynamic_tag(closing: boolean) {
+    const start = this.position;
+    const start_line = this.line;
+    const start_column = this.column;
+    this.advance(); // <
+    if (closing) this.advance(); // /
+    this.add_token(closing ? TokenType.TAG_CLOSE : TokenType.TAG_OPEN, closing ? '</' : '<', start, this.position);
+
+    const brace_start = this.position;
+    this.advance(); // {
+    const expr_start = this.position;
+    let depth = 1;
+    let quote: string | null = null;
+    while (this.position < this.input.length) {
+      const ch = this.current_char();
+      if (quote !== null) {
+        if (ch === '\\') { this.advance(); if (this.position < this.input.length) this.advance(); continue; }
+        if (ch === quote) quote = null;
+        this.advance();
+        continue;
+      }
+      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; this.advance(); continue; }
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) break; }
+      this.advance();
+    }
+    if (depth !== 0) {
+      throw new JQHTMLParseError(
+        `Unterminated dynamic component tag: <${closing ? '/' : ''}{ has no matching }`,
+        start_line,
+        start_column,
+        this.input
+      );
+    }
+    const expression = this.input.substring(expr_start, this.position);
+    this.advance(); // }
+    this.add_token(TokenType.DYNAMIC_TAG_NAME, expression, brace_start, this.position);
+
+    if (closing) {
+      this.skip_whitespace();
+      if (this.current_char() === '>') {
+        const gt_start = this.position;
+        this.advance();
+        this.add_token(TokenType.GT, '>', gt_start, this.position);
+      }
+    } else {
+      this.scan_attributes();
     }
   }
 

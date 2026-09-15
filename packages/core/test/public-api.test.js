@@ -32,7 +32,6 @@ describe('named exports', () => {
     'escape_html',
     'escape_html_nl2br',
     'process_instructions',
-    'render_template',
     'register_cache_class',
     'start_data_capture',
     'get_captured_data',

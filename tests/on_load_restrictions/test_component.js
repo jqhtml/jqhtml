@@ -1,20 +1,20 @@
 class Test_Component extends Jqhtml_Component {
   async on_load() {
-    // Valid: accessing this.args and this.data
+    // Valid: reading this.args, writing this.data.
     const user_id = this.args.user_id;
 
-    // Valid: setting this.data
-    this.data = {
-      user_id: user_id,
-      loaded: true
+    const blocked = [];
+    const leaked = [];
+    const probe = (name, fn) => {
+      try { fn(); leaked.push(name); } catch (e) { blocked.push(name); }
     };
 
-    // Test restriction: try to access component_name() (should throw)
-    try {
-      const name = this.component_name();
-      this.data.test_failed = 'Should not be able to access this.component_name()';
-    } catch (error) {
-      this.data.test_passed = 'Correctly blocked this.component_name() access';
-    }
+    probe('component_name', () => this.component_name());
+    probe('$', () => this.$);
+    probe('$sid', () => this.$sid('anything'));
+    probe('render', () => this.render);
+    probe('state', () => this.state);
+
+    this.data = { user_id, loaded: true, blocked, leaked };
   }
 }

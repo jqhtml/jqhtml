@@ -17,13 +17,15 @@ on_create() {
 }
 ```
 
-### 2. this.data Frozen After on_create()
+### 2. this.data Frozen After on_create() - DEEPLY
 
-After `on_create()` completes, `this.data` is frozen. Any attempt to modify should throw an error:
+After `on_create()` completes, `this.data` is frozen. Any attempt to modify should throw
+an error, and the freeze reaches nested objects and arrays:
 
 ```javascript
 on_render() {
-  this.data.rendered = 'should_fail';  // ❌ Should throw error
+  this.data.rendered = 'should_fail';     // ❌ Should throw error
+  this.data.nested.list.push(99);         // ❌ Should throw too (deep freeze)
 }
 ```
 
@@ -33,8 +35,9 @@ During `on_load()`, `this.data` is unfrozen to allow loading data from APIs:
 
 ```javascript
 async on_load() {
-  this.data.loaded = 'from_api';  // ✅ Should succeed
+  this.data.loaded = 'from_api';   // ✅ Should succeed
   this.data.loaded_at = Date.now();
+  this.data.nested.list.push(3);   // ✅ Nested writes are unfrozen here too
 }
 ```
 
@@ -44,7 +47,11 @@ After `on_load()` completes, `this.data` is frozen again:
 
 ```javascript
 on_ready() {
-  this.data.ready = 'should_fail';  // ❌ Should throw error
+  this.data.ready = 'should_fail';            // ❌ Should throw error
+  this.data.nested.list.push(99);             // ❌ Nested push throws
+  this.data.nested.user.name = 'z';           // ❌ Nested assignment throws
+  delete this.data.nested.user.name;          // ❌ Nested delete throws
+  this.data.nested.list[0] = 42;              // ❌ Index assignment throws
 }
 ```
 
@@ -54,8 +61,18 @@ Values set during writable phases should persist:
 
 - `this.data.initial` from `on_create()` ✅ present
 - `this.data.loaded` from `on_load()` ✅ present
+- `this.data.nested` reflects `[1,2,3]` and `user.name === 'b'` — the `on_create()` and
+  `on_load()` writes, and nothing else ✅
 - `this.data.rendered` from `on_render()` attempt ❌ absent (threw error)
 - `this.data.ready` from `on_ready()` attempt ❌ absent (threw error)
+
+### 6. Where the Test's Own Bookkeeping Lives
+
+The assertion log is `this.state.test_results`, because it is appended from `on_render()`
+and `on_ready()` where `this.data` is frozen — a `push()` into an array inside `this.data`
+throws exactly like an assignment. `on_load()` can reach neither `this.state` nor any other
+property, so its outcome is carried out through `this.data` and turned into results in
+`on_ready()`.
 
 ## Expected Output
 
@@ -114,12 +131,18 @@ The freeze/unfreeze cycle enforces strict lifecycle discipline:
 | on_render() | Frozen | DOM updates only |
 | on_ready() | Frozen | Event binding, DOM manipulation |
 
+The freeze is **deep**: while frozen, reading a nested object or array out of `this.data`
+returns a read-only view, so `push`, `splice`, nested assignment and `delete` all throw.
+The error message names the dotted path (`this.data.nested.list[0]`). Reads are unaffected
+— `JSON.stringify`, `Array.isArray`, `for..of`, `.map`/`.filter`, `Object.keys` and
+identity (`this.data.x === this.data.x`) behave exactly as before.
+
 **Error thrown when frozen:**
 ```
-TypeError: Cannot add property X, object is not extensible
+[JQHTML] Cannot modify this.data.nested.list[0] outside of on_create() or on_load().
+this.data is frozen after on_create() and unfrozen only during on_load().
+The freeze is deep - nested objects and arrays are frozen too.
 ```
-
-Or similar proxy-based error depending on implementation.
 
 ## Documentation Reference
 

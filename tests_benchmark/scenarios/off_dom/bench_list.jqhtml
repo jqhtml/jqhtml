@@ -1,0 +1,7 @@
+<Define:Bench_List>
+  <div class="list">
+    <% for (let item of this.args.items) { %>
+      <Bench_Card $sid="card" $item=item $index=item.i class="card" />
+    <% } %>
+  </div>
+</Define:Bench_List>

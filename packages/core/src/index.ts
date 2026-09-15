@@ -25,7 +25,9 @@ export {
 } from './component-registry.js';
 export type { ComponentConstructor, TemplateFunction, TemplateDefinition } from './component-registry.js';
 export { debug_overlay } from './debug-overlay/index.js';
-export { COMPONENT_NAME_PATTERN, COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
+export { COMPONENT_NAME_PATTERN, COMPONENT_NAME_RULE, is_component_name, dynamic_component_name } from './component-name.js';
+export { add_object_printer, print_object, get_object_printers } from './value-printers.js';
+export type { Object_Printer, Component_Descriptor, Print_Mode } from './value-printers.js';
 
 // Instruction processing
 export {
@@ -39,12 +41,11 @@ export type {
   SlotInstruction
 } from './instruction-processor.js';
 
-// Template support
+// HTML escaping (the compiled render functions call these through `jqhtml.`)
 export {
-  render_template,
   escape_html,
   escape_html_nl2br
-} from './template-renderer.js';
+} from './escape.js';
 
 // Boot (server-side component hydration)
 export { boot } from './boot.js';
@@ -109,15 +110,16 @@ import {
   list_components
 } from './component-registry.js';
 import { debug_overlay } from './debug-overlay/index.js';
+import { add_object_printer, print_object } from './value-printers.js';
+import { dynamic_component_name } from './component-name.js';
 import {
   process_instructions,
   extract_slots
 } from './instruction-processor.js';
 import {
-  render_template,
   escape_html,
   escape_html_nl2br
-} from './template-renderer.js';
+} from './escape.js';
 import { boot } from './boot.js';
 // Template compilation removed - handled at build time by @jqhtml/parser
 
@@ -186,6 +188,9 @@ const jqhtml = {
   Jqhtml_Component,
   LifecycleManager,
 
+  // Internal - exposed for debugging and for tests that inspect coordination state
+  Load_Coordinator,
+
   // Registry
   register,
   register_component,
@@ -202,7 +207,6 @@ const jqhtml = {
   // Template system
   process_instructions,
   extract_slots,
-  render_template,
   escape_html,
   escape_html_nl2br,
   
@@ -215,6 +219,12 @@ const jqhtml = {
   // Integration configuration - see config.ts
   configure,
   get_config,
+
+  // Value printers: how <%= %> renders an object (see value-printers.ts).
+  // print_object and dynamic_component_name are called by compiled templates.
+  add_object_printer,
+  print_object,
+  dynamic_component_name,
 
   // Component debug overlay: hover outlines + click-to-inspect modal.
   // jqhtml.debug_overlay.enable() / .disable() / .is_enabled() / .inspect(x)

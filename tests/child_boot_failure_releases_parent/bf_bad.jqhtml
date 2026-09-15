@@ -1,0 +1,8 @@
+<%--
+Bf_Bad - a child whose on_load() rejects. Its boot can never reach 'ready', so
+the framework must STOP it: the stop event is the only thing that can release a
+parent parked in _wait_for_children_ready().
+--%>
+<Define:Bf_Bad class="bf-bad">
+  <span>never rendered with data</span>
+</Define:Bf_Bad>

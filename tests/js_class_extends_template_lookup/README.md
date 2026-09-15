@@ -14,6 +14,9 @@ Tests that when a JS class extends another JS class, and the parent class has a 
 - **Form_Base.js + Form_Base.jqhtml**: Base class with template
   - Has logic methods: `get_data()`, `validate()`
   - Has template with card layout
+  - Field values live in `this.state.fields`: `My_Form` reads them out of the DOM in
+    `on_ready()`, where `this.data` is frozen - and the freeze is DEEP, so
+    `this.data.fields.sample = ...` throws. Form field values are UI state anyway.
 - **My_Form.js**: Extends Form_Base, NO template
   - Adds method: `format_output()`
   - No .jqhtml file

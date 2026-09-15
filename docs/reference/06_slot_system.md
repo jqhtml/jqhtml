@@ -310,7 +310,26 @@ class UsersDataGrid extends DataGrid_Abstract {
 </Define:UsersDataGrid>
 ```
 
-**Result**: `UsersDataGrid` renders using `DataGrid_Abstract` structure with customized slot content. The framework walks the JavaScript prototype chain to find parent templates automatically.
+**Result**: `UsersDataGrid` renders using `DataGrid_Abstract` structure with customized slot content. The framework resolves the parent template in one order: the explicit `extends=""` attribute first, then the JavaScript prototype chain.
+
+### Failure is an error, not an empty render
+
+A slot-only template is nothing but an override of a parent template — on its own it has no
+markup at all. So both ways of failing to reach that parent throw:
+
+- **No parent template can be resolved** (no `extends=""`, and no ancestor class has a
+  registered template — usually a missing `register_template()`)
+- **The parent template throws** while rendering the child's slots
+
+The thrown error names the component and, for the second case, the parent template. It
+travels the normal component boot error path: it is logged, the component is stopped, and
+any ancestor waiting for it becomes ready rather than hanging. Neither case renders a blank
+element.
+
+Default `<Define>` attributes follow the same chain. A child that inherits
+`DataGrid_Abstract`'s template also inherits `<Define:DataGrid_Abstract>`'s `class=""` and
+other attributes, whether the chain came from `extends=""` or from `class UsersDataGrid
+extends DataGrid_Abstract`.
 
 ## Slot Forwarding (Advanced Pattern)
 

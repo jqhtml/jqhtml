@@ -113,6 +113,12 @@ Expected order:
 - `on_render()` does NOT have access to child components yet
 - `on_render()` MUST be synchronous (no async/await)
 
+**Where the log lives:** the ordering log is `this.state.lifecycle_log`, appended from
+`on_render()`, from `on_ready()`, and by the child reaching into its parent. `this.data`
+is frozen in all of those phases, and the freeze is DEEP - a `push()` into a nested array
+throws just as an assignment does - so component-local bookkeeping belongs in
+`this.state`.
+
 ## Documentation Reference
 
 - CLAUDE.md: "Component Lifecycle" section

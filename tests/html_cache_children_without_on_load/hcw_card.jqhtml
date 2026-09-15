@@ -1,0 +1,4 @@
+<Define:Hcw_Card>
+  <span $sid="name"><%= this.data.name %></span>
+  <Hcw_Leaf $sid="leaf" $mark="in card" />
+</Define:Hcw_Card>

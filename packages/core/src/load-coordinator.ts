@@ -27,9 +27,10 @@ interface CoordinationEntry {
     status: 'loading' | 'completed' | 'failed';
     promise: Promise<void>;
     resolve_promise: () => void;  // Resolves when coordination completes (after data is ready)
+    reject_promise: (error: Error) => void;  // Rejects when the leader's on_load() throws
     leader_component: Jqhtml_Component;
-    leader_data: any;
-    leader_error: Error | null;
+    /** The leader's final data as JSON TEXT, so every follower can parse its own object. */
+    leader_data: string | null;
     waiting: Jqhtml_Component[];
 }
 
@@ -178,17 +179,12 @@ export class Load_Coordinator {
     /**
      * Check if a component should execute on_load() or wait for existing request
      * Returns true if component should execute (is leader), false if should wait (is follower)
+     *
+     * @param key - The dedup key the caller captured for this load. Every coordinator
+     *              method takes it, because args may legally change during on_load()
+     *              and a recomputed key would address a different (or no) entry.
      */
-    static should_execute_on_load(component: Jqhtml_Component): boolean {
-        const { key } = this.generate_invocation_key(component.component_name(), component.args);
-
-        // No identity means no coordination. Without this, every un-keyable component
-        // would share the single `null` registry entry and adopt an unrelated
-        // component's data - the worst failure this system can produce.
-        if (key === null) {
-            return true;
-        }
-
+    static should_execute_on_load(component: Jqhtml_Component, key: string): boolean {
         const entry = this._registry.get(key);
 
         if (!entry) {
@@ -211,32 +207,32 @@ export class Load_Coordinator {
      * Register a leader component that will execute on_load()
      * Creates coordination entry and returns a function to call when data is ready
      *
+     * @param key - The dedup key captured by the caller (see should_execute_on_load)
      * @returns A function that accepts the final data and completes coordination
      */
     static register_leader(
         component: Jqhtml_Component,
-        on_load_promise: Promise<void>
+        key: string
     ): (final_data: Record<string, any>) => void {
-        const { key } = this.generate_invocation_key(component.component_name(), component.args);
-
-        // Un-keyable component: run alone, register nothing. See should_execute_on_load().
-        if (key === null) {
-            return () => { /* no coordination to complete */ };
-        }
-
-        // Create a promise that we control - it resolves when complete_coordination is called
+        // Create a promise that we control - it settles when coordination completes or fails
         let resolve_promise!: () => void;
-        const coordination_promise = new Promise<void>((resolve) => {
+        let reject_promise!: (error: Error) => void;
+        const coordination_promise = new Promise<void>((resolve, reject) => {
             resolve_promise = resolve;
+            reject_promise = reject;
         });
+
+        // A leader with no followers still has to be able to reject this promise on
+        // error; without a handler that rejection surfaces as an unhandled rejection.
+        coordination_promise.catch(() => { /* followers handle it; this is the floor */ });
 
         const entry: CoordinationEntry = {
             status: 'loading',
-            promise: coordination_promise,  // Followers await THIS promise, not on_load_promise
+            promise: coordination_promise,  // Followers await THIS promise, not on_load's
             resolve_promise,
+            reject_promise,
             leader_component: component,
             leader_data: null,
-            leader_error: null,
             waiting: []
         };
 
@@ -248,10 +244,9 @@ export class Load_Coordinator {
 
     /**
      * Get the coordination promise for a follower component
-     * Returns a promise that resolves when the leader completes
+     * Returns a promise that resolves when the leader completes, or rejects if it failed
      */
-    static get_coordination_promise(component: Jqhtml_Component): Promise<void> | null {
-        const { key } = this.generate_invocation_key(component.component_name(), component.args);
+    static get_coordination_promise(key: string): Promise<void> | null {
         const entry = this._registry.get(key);
 
         if (!entry || entry.status !== 'loading') {
@@ -266,7 +261,7 @@ export class Load_Coordinator {
      * Stores leader's data, marks entry as completed, and resolves the promise.
      * Followers retrieve the data themselves via get_leader_data().
      *
-     * @param key - The coordination key
+     * @param key - The coordination key captured at registration
      * @param leader - The leader component
      * @param final_data - The final data after on_load and normalization
      * @private
@@ -278,13 +273,13 @@ export class Load_Coordinator {
             return;
         }
 
-        // Store the final data (already normalized by _apply_load_result)
-        // Deep clone to avoid sharing proxy objects between components
+        // Stored as TEXT so each follower parses its own object graph - sharing one
+        // decoded object would let one component's mutation reach every other.
         try {
-            entry.leader_data = JSON.parse(JSON.stringify(final_data));
+            entry.leader_data = JSON.stringify(final_data);
         } catch (error) {
-            // If data can't be serialized, use direct reference (may have issues)
-            entry.leader_data = final_data;
+            // Unserializable data cannot be shared; followers load independently.
+            entry.leader_data = null;
         }
         entry.status = 'completed';
 
@@ -298,26 +293,24 @@ export class Load_Coordinator {
         // Resolve the promise - followers waiting on it will now wake up
         entry.resolve_promise();
 
-        // Note: We do NOT delete the entry here anymore.
-        // Followers need to retrieve the data after the promise resolves.
-        // Entry will be cleaned up when last follower retrieves data.
+        // Nobody is waiting, so nothing will ever come back to collect the data.
+        // Without this the registry grows once per distinct name+args, forever.
+        if (entry.waiting.length === 0) {
+            this._registry.delete(key);
+        }
     }
 
     /**
      * Get leader's data for a follower component
      * Called by follower after coordination promise resolves
-     * Returns the data and cleans up if this is the last follower
+     * Returns a freshly parsed copy and cleans up if this is the last follower
+     *
+     * @param key - The dedup key captured by the follower before it began waiting
      */
-    static get_leader_data(component: Jqhtml_Component): Record<string, any> | null {
-        const { key } = this.generate_invocation_key(component.component_name(), component.args);
-
-        if (!key) {
-            return null;
-        }
-
+    static get_leader_data(component: Jqhtml_Component, key: string): Record<string, any> | null {
         const entry = this._registry.get(key);
 
-        if (!entry || entry.status !== 'completed') {
+        if (!entry || entry.status !== 'completed' || entry.leader_data === null) {
             return null;
         }
 
@@ -326,6 +319,9 @@ export class Load_Coordinator {
         if (follower_index !== -1) {
             entry.waiting.splice(follower_index, 1);
         }
+
+        // One parse per follower: each gets its OWN object, never a shared reference.
+        const data = JSON.parse(entry.leader_data);
 
         if ((window as any).jqhtml?.debug?.verbose) {
             console.log(
@@ -346,40 +342,33 @@ export class Load_Coordinator {
             }
         }
 
-        return entry.leader_data;
+        return data;
     }
 
     /**
      * Handle leader on_load() error
-     * Propagates error to all followers and cleans up entry
+     * Rejects every waiting follower and clears the entry so the next component retries
+     *
+     * @param key - The dedup key captured at registration
      */
-    static handle_leader_error(component: Jqhtml_Component, error: Error): void {
-        const { key } = this.generate_invocation_key(component.component_name(), component.args);
+    static handle_leader_error(key: string, error: Error): void {
         const entry = this._registry.get(key);
 
         if (!entry) {
             return;
         }
 
-        entry.leader_error = error;
         entry.status = 'failed';
 
         console.error(
-            `[Load Coordinator] Leader ${component._cid} on_load() failed for key: ${key}`,
+            `[Load Coordinator] Leader ${entry.leader_component._cid} on_load() failed for key: ${key}`,
             error
         );
 
-        // Propagate error to all followers
-        // Note: Followers will handle errors the same way as if their own on_load() failed
-        // This is transparent to the developer
-        for (const follower of entry.waiting) {
-            console.error(
-                `[Load Coordinator] Follower ${follower._cid} failed due to leader error`,
-                error
-            );
-            // The follower's lifecycle will handle the error naturally
-            // as the promise rejection will propagate
-        }
+        // Reject FIRST: followers are parked on this promise and their catch in _load()
+        // propagates the failure exactly as if their own on_load() had thrown. Deleting
+        // without rejecting left them awaiting a promise nobody could ever settle.
+        entry.reject_promise(error);
 
         // Clear coordination entry so future requests can retry
         this._registry.delete(key);

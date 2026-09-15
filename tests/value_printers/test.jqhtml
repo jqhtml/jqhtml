@@ -1,0 +1,16 @@
+<Define:Test_Value_Printers>
+  <div>
+    <h1>Value printers</h1>
+    <p $sid="money"><%= this.state.price %></p>
+    <p $sid="escaped"><%= this.state.markup %></p>
+    <p $sid="raw"><%!= this.state.markup %></p>
+    <p $sid="nl2br"><%br= this.state.lines %></p>
+    <div $sid="rich"><%= this.state.rich %></div>
+    <ul $sid="list">
+      <% for (let row of this.state.rows) { %>
+        <li><%= row.body %></li>
+      <% } %>
+    </ul>
+    <p $sid="attr" title="<%= this.state.price %>">attr</p>
+  </div>
+</Define:Test_Value_Printers>

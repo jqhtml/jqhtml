@@ -1,0 +1,7 @@
+<%--
+Bf_Good - an ordinary child with an async on_load(). It must still reach ready
+even though its sibling's boot throws.
+--%>
+<Define:Bf_Good class="bf-good">
+  <span class="label"><%= this.data.label %></span>
+</Define:Bf_Good>

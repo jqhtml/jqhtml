@@ -1,0 +1,12 @@
+<%--
+Test_Preload_Load_Keys - SSR preload, load()'s cache write and the cache read all use
+ONE key derivation (component-cache.ts generate_cache_key).
+
+Before the fix there were three: preload-data.ts and component.ts load() built keys
+without content serialization, so an object-arg component preloaded nothing and wrote
+nothing, and a cache_id() component's key shape never matched a preload entry.
+--%>
+<Define:Test_Preload_Load_Keys>
+  <h2>Preload / load() / cache key agreement</h2>
+  <div $sid="results"></div>
+</Define:Test_Preload_Load_Keys>

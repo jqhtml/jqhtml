@@ -1,0 +1,14 @@
+<Define:Bench_Escape>
+  <table>
+    <% for (let row of this.args.rows) { %>
+      <tr>
+        <td><%= row.a %></td>
+        <td><%= row.b %></td>
+        <td><%= row.c %></td>
+        <td><%= row.d %></td>
+        <td><%br= row.e %></td>
+        <td><%= row.n %></td>
+      </tr>
+    <% } %>
+  </table>
+</Define:Bench_Escape>

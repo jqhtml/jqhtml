@@ -2,6 +2,13 @@ class Test_ShallowFind extends Jqhtml_Component {
   on_ready() {
     console.log('=== shallowFind() Test Suite ===\n');
 
+    let passed = 0;
+    let failed = 0;
+    const assert = (name, condition) => {
+      if (condition) { console.log('   PASS: ' + name); passed++; }
+      else { console.log('   FAIL: ' + name); failed++; }
+    };
+
     // Test 1: Basic nested widgets
     const test1 = this.$.find('[data-test="1"]');
     const result1 = test1.shallowFind('.Widget');
@@ -11,7 +18,7 @@ class Test_ShallowFind extends Jqhtml_Component {
     result1.each(function() {
       console.log('  -', $(this).attr('data-sid'), ':', $(this).text().trim().split('\n')[0]);
     });
-    console.log('Result:', result1.length === 2 ? '✓ PASS' : '✗ FAIL');
+    assert('basic nested widgets: 2 matches', result1.length === 2);
     console.log('');
 
     // Test 2: Deep nesting
@@ -23,7 +30,7 @@ class Test_ShallowFind extends Jqhtml_Component {
     result2.each(function() {
       console.log('  -', $(this).attr('data-sid'), ':', $(this).text().trim().split('\n')[0]);
     });
-    console.log('Result:', result2.length === 1 ? '✓ PASS' : '✗ FAIL');
+    assert('deep nesting: 1 match', result2.length === 1);
     console.log('');
 
     // Test 3: No matches
@@ -32,7 +39,7 @@ class Test_ShallowFind extends Jqhtml_Component {
     console.log('Test 3: No Matches');
     console.log('Expected: 0 matches');
     console.log('Found:', result3.length, 'matches');
-    console.log('Result:', result3.length === 0 ? '✓ PASS' : '✗ FAIL');
+    assert('no matches: 0 matches', result3.length === 0);
     console.log('');
 
     // Test 4: Adjacent siblings
@@ -44,7 +51,7 @@ class Test_ShallowFind extends Jqhtml_Component {
     result4.each(function() {
       console.log('  -', $(this).attr('data-sid'), ':', $(this).text().trim());
     });
-    console.log('Result:', result4.length === 3 ? '✓ PASS' : '✗ FAIL');
+    assert('adjacent siblings: 3 matches', result4.length === 3);
     console.log('');
 
     // Test 5: Mixed hierarchy
@@ -56,7 +63,7 @@ class Test_ShallowFind extends Jqhtml_Component {
     result5.each(function() {
       console.log('  -', $(this).attr('data-sid'), ':', $(this).text().trim().split('\n')[0]);
     });
-    console.log('Result:', result5.length === 2 ? '✓ PASS' : '✗ FAIL');
+    assert('mixed hierarchy: 2 matches', result5.length === 2);
     console.log('');
 
     // Performance comparison
@@ -86,5 +93,14 @@ class Test_ShallowFind extends Jqhtml_Component {
     console.log('');
     console.log('Note: shallowFind() is slightly slower due to traversal logic,');
     console.log('but provides different semantics (stops at matches)');
+
+    console.log('');
+    console.log('========================================');
+    console.log('SUMMARY: ' + passed + ' passed, ' + failed + ' failed');
+    console.log('========================================');
+    console.log('');
+
+    window.testPassed = (failed === 0);
+    window.testReady = true;
   }
 }

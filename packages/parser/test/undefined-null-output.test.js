@@ -59,7 +59,7 @@ describe('Undefined/null expression output', () => {
       const result = compile(`<Define:Test>\n  <div><%!= this.data.html %></div>\n</Define:Test>`);
       // unescaped path pushes result directly; ensure the guard is in front of it
       assert.ok(
-        /result !== undefined && result !== null\) \{ _output\.push\(result\)/.test(result.code),
+        /result !== undefined && result !== null\) \{ _output\.push\(typeof result === 'object' \? jqhtml\.print_object\(result, 'raw'\) : result\)/.test(result.code),
         'unescaped output wrapper should guard the raw push'
       );
     });
@@ -67,7 +67,7 @@ describe('Undefined/null expression output', () => {
     it('guards nl2br <%br= %> against undefined and null', () => {
       const result = compile(`<Define:Test>\n  <div><%br= this.data.text %></div>\n</Define:Test>`);
       assert.ok(
-        /result !== undefined && result !== null\) \{ _output\.push\(jqhtml\.escape_html_nl2br/.test(result.code),
+        /result !== undefined && result !== null\) \{ _output\.push\(typeof result === 'object' \? jqhtml\.print_object\(result, 'nl2br'\) : jqhtml\.escape_html_nl2br/.test(result.code),
         'nl2br output wrapper should guard the escape_html_nl2br push'
       );
     });

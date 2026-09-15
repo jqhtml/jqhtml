@@ -1,0 +1,6 @@
+<Define:Jquery_Unwraps_Component>
+  <div>
+    <h1>$(component) unwraps to the component's root element</h1>
+    <div $sid="host"></div>
+  </div>
+</Define:Jquery_Unwraps_Component>

@@ -244,6 +244,21 @@ Framework resolves templates in this order:
 
 All three mechanisms can work together in the same component hierarchy.
 
+**Default attributes use the same resolution.** The `class=""` and other plain attributes
+on a `<Define>` tag are collected up the same chain — explicit `extends=""` first, then the
+JS prototype chain — so a child can never inherit a parent's template without inheriting
+that parent `<Define>`'s attributes. In the combined example below, `UsersDataGrid` renders
+with `class="UsersDataGrid Component card datagrid"`, the `card datagrid` coming from
+`<Define:DataGrid_Abstract>` even though `UsersDataGrid` has no `extends=""`.
+
+A parent default is applied only where the invocation set no such attribute at all. An
+invocation `tabindex="0"` or `title=""` is set, and keeps its value.
+
+**A slot-only template that cannot reach a parent template is an error.** If no parent
+template resolves, or the parent template throws while rendering, the component throws
+rather than rendering an empty element: the error is logged naming the component and the
+parent template, the component is stopped, and any ancestor waiting on it is released.
+
 ### Combined Example
 
 ```javascript

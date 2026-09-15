@@ -1,0 +1,9 @@
+<%--
+Bf_Parent - one healthy child and one child whose on_load() rejects.
+The parent has no on_load() of its own: its readiness depends purely on its
+children, which is the point of the test.
+--%>
+<Define:Bf_Parent class="bf-parent">
+  <Bf_Good $sid="good" />
+  <Bf_Bad $sid="bad" />
+</Define:Bf_Parent>

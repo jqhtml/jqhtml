@@ -1,0 +1,18 @@
+<%--
+Default_Attributes_Follow_Prototype_Chain - <Define> default attributes resolve through
+exactly the chain templates do.
+
+Audit bug 21: _apply_default_attributes() walked only the `extends=` chain, so a slot-only
+JS subclass got its parent's TEMPLATE but none of the parent <Define>'s class/attrs.
+Audit LOW (component.ts ~:2170): `if (!this.$.attr(key))` treated "0" and "" as unset, so
+an invocation tabindex="0" was overwritten by the Define's tabindex="-1".
+--%>
+<Define:Default_Attributes_Follow_Prototype_Chain>
+  <div>
+    <h1>Define defaults follow the prototype chain</h1>
+    <Da_Child $sid="child" />
+    <Da_Base $sid="zero" tabindex="0" />
+    <Da_Base $sid="empty" title="" />
+    <div $sid="stage"></div>
+  </div>
+</Define:Default_Attributes_Follow_Prototype_Chain>

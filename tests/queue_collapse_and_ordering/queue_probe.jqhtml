@@ -1,0 +1,5 @@
+<Define:Queue_Probe class="card">
+  <div class="probe">
+    <div $sid="value"><%= this.data.value || '' %></div>
+  </div>
+</Define:Queue_Probe>

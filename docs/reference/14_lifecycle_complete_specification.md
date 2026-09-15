@@ -848,11 +848,15 @@ class ProductCard extends Jqhtml_Component {
 
 **Pattern**: `load()` invokes `on_load()` then `on_loaded()`, just as `render()` invokes `on_render()`. The unprefixed method is what you call; the `on_` method is the hook you override.
 
-**Behavior**:
+**A component that does not override `on_load()`**: `load()` returns `false` immediately and
+runs nothing. `this.data` keeps what `on_create()` set. There is no fetch to redo, so the
+call is a no-op rather than a reset.
+
+**Behavior** (component with a custom `on_load()`):
 1. Snapshots current `this.data` for change detection
 2. Restores `this.data` to `on_create()` snapshot (deterministic environment)
 3. Executes `on_load()` on detached proxy (same restrictions as boot-time)
-4. Atomically updates `this.data` with result, re-freezes it
+4. Atomically updates `this.data` with the SERIALIZED COPY of the result (see `15_deduplication_and_caching.md`), re-freezes it
 5. Updates cache if data changed
 6. Calls `on_loaded()` and triggers the `'loaded'` event
 7. Returns `true` if data changed, `false` if unchanged
@@ -863,6 +867,19 @@ class ProductCard extends Jqhtml_Component {
 - `this.data` is unfrozen (writable)
 - `this.args` is read-only
 - `this.$`, `this.$sid()`, and all other properties are blocked
+
+**Concurrent calls collapse**: `load()` shares the component's lifecycle queue with
+`render()`, `reload()` and `refresh()`. Calls made while a load is already running collapse
+into ONE further execution - the most recent call's is the one that runs. Every collapsed
+caller receives the result of the load that actually ran, so three rapid `await this.load()`
+calls all see the same `true`/`false`, and none of them reports "unchanged" for a load it
+never got. A `render()` made while a `load()` is waiting does not replace it: both run, in
+call order.
+
+**A caller resolves before the next queued operation starts**: `await this.load()` (and
+`render()`/`reload()`/`refresh()`) returns as soon as ITS operation finishes. It does not
+wait for whatever was queued behind it, so an operation queued after your call cannot delay
+your `await`.
 
 **Use when**:
 - You've saved something to the backend and want fresh data, but want to control what happens next
@@ -973,7 +990,7 @@ class ProductList extends Jqhtml_Component {
 2. Calls `on_load()` to fetch fresh data
 3. Compares the fetched data with the last-rendered data snapshot
 4. **Only re-renders if the data changed** (unlike `reload()`, which always renders)
-5. If no re-render occurs, skips waiting for children and calling `on_ready()`
+5. If no re-render occurs, skips waiting for children and calling `on_ready()`. The `'ready'` event is still triggered, so `ready()` waiters (and any parent waiting on this component) resolve - only the `on_ready()` hook is skipped
 6. **Does NOT** call: `on_create()`
 
 **Use when**:
@@ -1011,12 +1028,19 @@ class LivePriceTicker extends Jqhtml_Component {
 **Purpose**: Synchronously stops component and all children before removal.
 
 **Behavior**:
-1. Checks if already stopped (`_Component_Stopped` class)
-2. Sets `_Component_Stopped` class on element
-3. Recursively stops all child components
-4. Calls `on_stop()` lifecycle hook
-5. Triggers `stop` event
-6. **Does NOT** remove DOM (caller is responsible for removal)
+1. Returns immediately if already stopped
+2. Recursively stops all child components
+3. Sets `_Component_Stopped` class on the element
+4. De-registers the component from its parent's child registry
+5. Calls `on_stop()` - only if the component overrides it
+6. Triggers `stop` event
+7. **Does NOT** remove DOM (caller is responsible for removal)
+
+Steps 3, 4 and 6 are unconditional. They are not cleanup the component asked for; they
+are how the rest of the framework learns the component is dead. The class is the
+observable stopped state, a component left in its parent's registry is a dead child
+every later child-ready wait walks, and the `stop` event is what releases anything
+waiting on a component that will never fire `ready` again.
 
 **Synchronous**: `stop()`, `on_stop()`, and `this.on('stop')` must all be synchronous. The entire stop process is atomic.
 
@@ -1063,6 +1087,34 @@ const chart = $('#live-chart').component();
 chart.stop();  // Synchronous cleanup
 $('#live-chart').remove();  // Now safe to remove DOM
 ```
+
+---
+
+### Errors During Boot
+
+**A hook that throws during boot stops the component.** `on_create()`, `on_render()`,
+`on_load()`, `on_loaded()` and `on_ready()` all run inside the boot chain; if any of them
+throws or rejects, the component can never reach `ready`.
+
+The framework:
+
+1. **Logs the error** to `console.error` through the debug error handler, with the error
+   object itself as an argument (so `jqhtml.debug.breakOnError` breaks there and a stack
+   trace survives in the console).
+2. **Stops the component** - the `_Component_Stopped` class, de-registration from its
+   parent's child registry, and the `stop` event, exactly as `stop()` would.
+3. **Goes no further.** The error is not re-thrown. Boot is started without `await` by
+   both the template instruction processor and `$(el).component()`, so a re-throw would
+   surface only as an `unhandledrejection` on `window`.
+
+**A broken child therefore cannot block its ancestors.** A parent waiting for its children
+to be ready races each child's `ready` against its `stop`, so the failed child's `stop`
+releases the parent, which goes on to run `on_ready()` normally. The failed component stays
+in the DOM, stopped and marked, with whatever it had rendered before the throw.
+
+There is no error hook to override. Handle recoverable failures inside `on_load()`
+(`try`/`catch`, then render an error state from `this.data`); a throw that escapes is
+treated as a defect, not as a control-flow signal.
 
 ---
 
@@ -1343,7 +1395,8 @@ JQHTML provides three properties (`this.args`, `this.data`, `this.state`) with s
 3. Changing `this.args` and calling `reload()` may return cached data instantly
 
 **`this.data` is special because:**
-1. It's frozen outside `on_create()` and `on_load()` - modifications elsewhere throw errors
+1. It's frozen outside `on_create()` and `on_load()` - modifications elsewhere throw errors,
+   nested ones (`this.data.items.push(x)`) included
 2. Changes to it trigger automatic re-renders
 3. It's cached by the framework
 
@@ -1482,6 +1535,36 @@ class ProductList extends Jqhtml_Component {
   - **Unfrozen** during `on_load()` execution
   - **Restored** to `on_create()` state before each `on_load()` call
   - **Frozen** again after `on_load()` completes
+- **The freeze is DEEP.** While frozen, reading a nested object or array out of `this.data`
+  returns a read-only view, so every modification throws, not only a top-level one:
+
+  ```javascript
+  on_ready() {
+    this.data.items.push(3);          // ERROR: names this.data.items[2]
+    this.data.user.name = 'b';        // ERROR: names this.data.user.name
+    delete this.data.user.x;          // ERROR
+    this.data.nested.list[0].id = 2;  // ERROR: names this.data.nested.list[0].id
+  }
+  ```
+
+  Reads behave exactly as they did: `JSON.stringify(this.data)`, `Array.isArray`, `.length`,
+  spread, `for..of`, `.map`/`.filter`, `Object.keys`, and identity
+  (`this.data.items === this.data.items`, because the read-only views are memoized per
+  object). `Date`, `Map`, `Set` and instances of classes registered with
+  `register_cache_class()` are returned unwrapped - a Proxy receiver cannot satisfy their
+  internal slots, and `this.data.created.getTime()` has to keep working - so mutating one
+  of those is the one remaining shallow spot.
+- **Mutable bookkeeping belongs in `this.state`**, which is unrestricted: a log you append
+  to from `on_render()`/`on_ready()`, a counter, a list you filter locally.
+- **The restore point is the `on_create()` state, always.** `create()` snapshots `this.data`
+  the moment `on_create()` returns, BEFORE it reads the cache. A `data`-mode cache hit
+  replaces `this.data` for the first render, but it does not become the restore point, so
+  `on_load()` begins from the same state on a warm cache as on a cold one. An append in
+  `on_load()` (`this.data.items.push(row)`) therefore produces the same list every time.
+- **What `on_load()` returns is not what `this.data` becomes.** The result is round-tripped
+  through the cache serializer first, in every cache mode - see
+  `15_deduplication_and_caching.md` for what survives, what is stripped, and the once-only
+  development warning.
 - **Access restrictions in `on_load()`**: Can ONLY access `this.args` (read-only) and `this.data` (read/write)
 - Framework automatically caches `this.data` based on component name + `this.args`
 - Modifications trigger automatic re-renders
@@ -1808,6 +1891,7 @@ class AutoRefresh extends Jqhtml_Component {
 |---------|-----------|-----|
 | `this.users = await fetch(...)` in on_load() | `this.data.users = await fetch(...)` | this.data is for API data, enables caching |
 | `this.data.counter++` in on_ready() | `this.state.counter++` | this.data frozen outside on_create()/on_load() |
+| `this.data.items.push(x)` in on_ready() | `this.state.items.push(x)` | the freeze is deep - nested mutation throws too |
 | `this.args.filter = 'new'` in on_load() | `this.args.filter = 'new'` in on_ready() then `this.reload()` | this.args read-only in on_load() |
 | Changing this.args without reload() | `this.args.page = 2; this.reload();` | Framework needs to re-run on_load() with new args |
 | `this.my_data = {...}` for API data | `this.data = {...}` | Framework can't cache arbitrary properties |
@@ -1930,6 +2014,22 @@ this.trigger('saved');
 this.trigger('selected', { item_id: 123, item_name: 'Widget' });
 ```
 
+**Stickiness applies to every event, not just lifecycle events.** `trigger()` records the
+event name and its payload before dispatching, and `.on()`/`.once()` registered afterwards
+fire immediately with that stored payload. This is deliberate and is what makes
+late-attaching subscribers work without a separate "what is the current state" read:
+
+```javascript
+grid.trigger('row_selected', { id: 7 });
+
+// Registered later - fires immediately with { id: 7 }, and again on every future trigger.
+grid.on('row_selected', (comp, row) => inspector.show(row.id));
+```
+
+Call `component.invalidate('row_selected')` to drop the stored marker when later
+subscribers should wait for the next real occurrence instead (this is what `reload()` does
+to `'ready'`).
+
 **Dispatch semantics:** `trigger()` dispatches to a **snapshot** of the handlers
 registered at the moment it was called. Every one of them is invoked exactly once for
 that trigger, in registration order, and a handler that deregisters itself during
@@ -1963,7 +2063,7 @@ component.on('selected', (comp, data) => {
 Like `.on()`, but fires the callback **exactly once**. Callback signature: `(component, data?) => void`
 
 **Semantics:**
-- If the event has already occurred (sticky/retroactive): the callback fires **immediately** and is **not** registered as a listener. No future firings will occur.
+- If the event has already occurred (sticky/retroactive - true of custom events as well as lifecycle events): the callback fires **immediately** and is **not** registered as a listener. No future firings will occur.
 - If the event has not yet occurred: the callback is registered as a one-time listener. When the event fires, the callback executes and is automatically deregistered. Subsequent firings of the same event will not invoke it.
 - Returns `this` for chaining.
 
@@ -2037,7 +2137,7 @@ This behavior is essential for lifecycle events. Without it, subscribing to `'re
 
 **Note:** When a callback fires immediately for an already-occurred event, the `data` parameter is `undefined` since the original event data is not stored.
 
-**Resetting this behavior:** Use `invalidate(event_name)` to clear the "already occurred" marker. The framework does this automatically at the start of `render()` and `reload()` so that handlers registered mid-cycle wait for completion.
+**Resetting this behavior:** Use `invalidate(event_name)` to clear the "already occurred" marker. The framework does this automatically at the start of `render()` and `reload()` so that handlers registered mid-cycle wait for completion. `render('sid')` invalidates only the redrawable child it delegates to - the parent's `ready` is left intact, because the parent is not running a lifecycle of its own.
 
 ### Built-in Lifecycle Events
 
@@ -2048,7 +2148,7 @@ This behavior is essential for lifecycle events. Without it, subscribing to `'re
 | `'load'` | After `on_load()` completes |
 | `'loaded'` | After `on_loaded()` completes (data frozen, DOM accessible) |
 | `'rendered'` | Once, after final render chain completes (before ready phase) |
-| `'ready'` | After `on_ready()` completes (component fully initialized) |
+| `'ready'` | After `on_ready()` completes (component fully initialized), or at the end of a `refresh()` that did not re-render (no `on_ready()` in that case) |
 | `'stop'` | When component is stopped/destroyed |
 
 ```javascript

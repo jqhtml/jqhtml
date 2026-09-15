@@ -1,0 +1,10 @@
+<Define:Bench_Tracked>
+  <ul>
+    <% for (let item of this.args.items) { %>
+      <li $sid="row" data-index="<%= item.i %>" class="row item-<%= item.i %>" @click=this.on_row_click>
+        <span $sid="label" title="<%= item.label %>"><%= item.label %></span>
+        <button @click=this.on_button_click class="btn">go</button>
+      </li>
+    <% } %>
+  </ul>
+</Define:Bench_Tracked>

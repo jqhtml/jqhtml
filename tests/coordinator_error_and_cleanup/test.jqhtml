@@ -1,0 +1,6 @@
+<Define:Coordinator_Error_And_Cleanup>
+  <div>
+    <h1>Load coordinator: error propagation and registry cleanup</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Coordinator_Error_And_Cleanup>

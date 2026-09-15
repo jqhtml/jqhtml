@@ -65,15 +65,12 @@ export function init_jquery_plugin(jQuery: any): void {
 
   // Override jQuery constructor to handle component instances
   const JQueryWithComponentSupport: any = function(selector: any, context?: any) {
-    // Check if selector is a JQHTML component instance
-    if (
-      selector &&
-      typeof selector === 'object' &&
-      selector.$ &&
-      typeof selector.$sid === 'function' &&
-      typeof selector.id === 'function'
-    ) {
-      // Return the component's jQuery element
+    // Unwrap a component instance to its root element, so $(component) behaves
+    // exactly like component.$ (addClass, find, [0] and every other jQuery method).
+    // The check is an instanceof on the class itself: the previous duck-type tested
+    // for an id() method, which Jqhtml_Component has never had, so this branch was
+    // dead and $(component) wrapped the plain object instead.
+    if (selector instanceof Jqhtml_Component) {
       return selector.$;
     }
 
@@ -165,12 +162,12 @@ export function init_jquery_plugin(jQuery: any): void {
     // Check if component already exists on this element
     const existingComponent = element.data('_component');
     if (existingComponent) {
-      // Stop existing component (with error handling to continue on failure)
-      try {
-        existingComponent.stop();
-      } catch (error) {
-        console.warn('[JQHTML] Error stopping existing component during replacement:', error);
-      }
+      // Stop the existing component. A throwing stop() is NOT swallowed: the caller
+      // asked to replace a live component, and overwriting one whose on_stop() failed
+      // would leave its timers, intervals and listeners running against DOM that is
+      // about to be destroyed. Let the throw reach the caller with the old component
+      // still in place, so the failure is visible and recoverable.
+      existingComponent.stop();
 
       // Remove component classes (any class starting with a capital letter, or a
       // component name with the reserved underscore prefix - except BEM classes)
@@ -186,7 +183,14 @@ export function init_jquery_plugin(jQuery: any): void {
           const capital_first = cls[0] === cls[0].toUpperCase() && cls[0] !== cls[0].toLowerCase();
           return !capital_first && !is_component_name(cls);
         });
-        element.attr('class', nonComponentClasses.join(' '));
+        // Drop the attribute entirely when nothing survived the strip: attr('class', '')
+        // leaves a `class=""` in the markup, which is noise in the DOM and in snapshot
+        // comparisons for an element that now has no classes at all.
+        if (nonComponentClasses.length > 0) {
+          element.attr('class', nonComponentClasses.join(' '));
+        } else {
+          element.removeAttr('class');
+        }
       }
 
       // Remove component data
@@ -232,17 +236,36 @@ export function init_jquery_plugin(jQuery: any): void {
       const currentTag = element.prop('tagName').toLowerCase();
 
       if (currentTag !== expectedTag.toLowerCase()) {
-        // Tag mismatch
-        if (args._inner_html) {
-          // Replace element with correct tag (only when using server-rendered content)
+        // Tag mismatch. Replace whenever we can actually do it: the element must be in
+        // a document (replaceWith() on a parentless element is a silent no-op that would
+        // strand the component on a detached node) and must not be <body>.
+        //
+        // This used to require a truthy args._inner_html, i.e. server-rendered content.
+        // boot.ts always sets _inner_html - but it empties the placeholder first, so a
+        // placeholder with no server content carries '' and fell through to a warning,
+        // hydrating into the wrong tag. Hydration of an empty placeholder still works:
+        // the copied innerHTML is simply ''.
+        const oldEl = element[0];
+        const can_replace = currentTag !== 'body' && !!(oldEl && oldEl.parentNode);
+
+        if (can_replace) {
           const newElement = jQuery(`<${expectedTag}></${expectedTag}>`);
 
           // Copy all attributes from old element to new element
-          const oldEl = element[0];
           if (oldEl && oldEl.attributes) {
             for (let i = 0; i < oldEl.attributes.length; i++) {
               const attr = oldEl.attributes[i];
               newElement.attr(attr.name, attr.value);
+            }
+          }
+
+          // Carry the jQuery data store across. $-args and anything the caller stashed
+          // with .data() live there, and they are read back off the element during
+          // component construction - dropping them silently changed the component's args.
+          const old_data = element.data();
+          if (old_data) {
+            for (const key of Object.keys(old_data)) {
+              newElement.data(key, old_data[key]);
             }
           }
 

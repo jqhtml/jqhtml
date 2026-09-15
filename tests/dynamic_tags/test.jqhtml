@@ -1,0 +1,19 @@
+<Define:Test_Dynamic_Tags>
+  <div>
+    <h1>Dynamic component tags</h1>
+    <div $sid="editor_host"><{this.state.editor} $sid="editor" $field="title" /></div>
+    <div $sid="placeholder_host"><{this.state.missing} $sid="missing" /><Dt_Not_Defined_Either $sid="literal_missing" /></div>
+    <div $sid="content_host">
+      <{this.state.wrapper} $sid="wrapper">
+        <b $sid="inner_b">wrapped</b>
+        <{this.state.inner} $sid="nested" $field="nested" />
+      </{this.state.wrapper}>
+    </div>
+    <form $sid="form">
+      <label>Title</label>
+      <{ this.state.editor } $sid="form_editor" $field="form_title" />
+      <button type="submit">go</button>
+    </form>
+    <div $sid="ternary"><{this.state.n > 1 ? 'Dt_Text_Input' : 'Dt_Wysiwyg_Input'} $sid="ternary_editor" $field="t" /></div>
+  </div>
+</Define:Test_Dynamic_Tags>

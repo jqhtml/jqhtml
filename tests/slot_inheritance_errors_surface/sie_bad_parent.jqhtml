@@ -1,0 +1,11 @@
+<%--
+Sie_Bad_Parent - a parent template that throws while rendering.
+
+this.data.sie_missing is undefined, so reading .deep off it is a TypeError raised from
+INSIDE the parent's render function - exactly the shape of a real defect in a parent's
+markup.
+--%>
+<Define:Sie_Bad_Parent class="sie-bad-parent">
+  <div><%= this.data.sie_missing.deep %></div>
+  <div class="sie-slot"><%= content('body') %></div>
+</Define:Sie_Bad_Parent>

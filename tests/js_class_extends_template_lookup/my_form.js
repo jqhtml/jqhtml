@@ -9,7 +9,7 @@ class My_Form extends Form_Base {
     console.log('[My_Form] on_ready: My form ready');
 
     // Populate form data
-    this.data.fields.sample = this.$sid('field').val();
+    this.state.fields.sample = this.$sid('field').val();
   }
 
   // Child class adds functionality

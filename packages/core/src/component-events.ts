@@ -4,18 +4,23 @@
  * Extracted from component.ts - handles lifecycle event registration,
  * triggering, and state tracking.
  *
- * Events have "sticky" semantics for lifecycle events: if an event has already
- * occurred, new .on() handlers fire immediately with the stored data.
+ * EVERY event is "sticky", not just the lifecycle ones: trigger() records the event
+ * name and its payload, and a handler registered afterwards fires immediately with that
+ * last payload. This is deliberate and applies to custom events too - a subscriber that
+ * arrives after `trigger('row_selected', row)` still learns which row is selected,
+ * which is what makes late-attaching UI work without a separate "current state" read.
  */
 
 /**
  * Register a callback for an event.
  *
- * Lifecycle events (create, render, load, loaded, ready) are "sticky":
- * If a lifecycle event has already occurred, the callback fires immediately
- * AND registers for future occurrences.
+ * All events are "sticky", lifecycle (create, render, load, loaded, ready, stop) and
+ * custom alike: if the event has already been triggered, the callback fires immediately
+ * with the payload of that last trigger AND registers for future occurrences.
  *
- * Custom events only fire when explicitly triggered via trigger().
+ * invalidate(event_name) drops the stored marker when a component wants later
+ * subscribers to wait for the next real occurrence instead (reload() does this for
+ * 'ready').
  *
  * @param component - The component instance
  * @param event_name - Name of the event

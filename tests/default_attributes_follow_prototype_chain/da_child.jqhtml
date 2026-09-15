@@ -1,0 +1,10 @@
+<%--
+Da_Child - slot-only template with NO extends=. The template comes from Da_Base through
+the JS prototype chain (class Da_Child extends Da_Base), and so must Da_Base's <Define>
+default attributes.
+--%>
+<Define:Da_Child>
+  <Slot:body>
+    <span>child body</span>
+  </Slot:body>
+</Define:Da_Child>

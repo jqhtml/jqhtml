@@ -14,7 +14,7 @@ class Child_Component extends Jqhtml_Component {
     // Find parent and add to its log
     const parent = this.$.closest('.Parent_With_Render').component();
     if (parent) {
-      parent.data.lifecycle_log.push(log_entry);
+      parent.state.lifecycle_log.push(log_entry);
     }
   }
 }

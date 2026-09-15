@@ -54,6 +54,11 @@ async on_load() {
 }
 ```
 
+**Where the assertion log lives:** `this.state.test_results`. It is appended from
+`on_ready()`, where `this.data` is frozen — and the freeze is DEEP, so pushing into an array
+inside `this.data` throws exactly like an assignment. It also has to survive the `reload()`
+this test performs, which restores `this.data` to the `on_create()` snapshot.
+
 ## Expected Output
 
 ```
@@ -62,31 +67,27 @@ THIS.DATA RESTORE ON RELOAD TEST:
 on_create() - Initial this.data:
 {
   "initial_value": "from_create",
-  "counter": 0,
-  "test_results": []
+  "counter": 0
 }
 
 on_load() START - this.data:
 {
   "initial_value": "from_create",
-  "counter": 0,
-  "test_results": []
+  "counter": 0
 }
 
 on_load() END - this.data:
 {
   "initial_value": "from_create",
   "counter": 1,
-  "loaded_value": "load_1",
-  "test_results": []
+  "loaded_value": "load_1"
 }
 
 on_ready() - this.data:
 {
   "initial_value": "from_create",
   "counter": 1,
-  "loaded_value": "load_1",
-  "test_results": [...]
+  "loaded_value": "load_1"
 }
 
 ✅ TEST 1 PASS: First on_load() counter = 1
@@ -96,24 +97,21 @@ Calling reload()...
 on_load() START - this.data:
 {
   "initial_value": "from_create",
-  "counter": 0,           <-- RESTORED to 0
-  "test_results": []
+  "counter": 0            <-- RESTORED to 0
 }
 
 on_load() END - this.data:
 {
   "initial_value": "from_create",
   "counter": 1,           <-- Incremented to 1 again
-  "loaded_value": "load_1",
-  "test_results": []
+  "loaded_value": "load_1"
 }
 
 After reload() - this.data:
 {
   "initial_value": "from_create",
   "counter": 1,           <-- Still 1 (not 2!)
-  "loaded_value": "load_1",
-  "test_results": [...]
+  "loaded_value": "load_1"
 }
 
 ✅ TEST 2 PASS: After reload() counter still = 1 (data was restored)

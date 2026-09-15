@@ -12,8 +12,9 @@ Validates the distinction between `render()` (re-render current data) and `reloa
 
 ```javascript
 async on_ready() {
-  // Modify data directly
-  this.data.count = 42;
+  // this.data is frozen here (deeply - nested pushes throw too). Drive the re-render
+  // from this.args / this.state instead.
+  this.args.count = 42;
 
   // Re-render without fetching
   await this.render();  // Does NOT call on_load()
@@ -125,6 +126,11 @@ async change_filter(filter) {
 2. Wait for children to be ready
 3. Call `on_ready()`
 4. **Does NOT** call `on_load()`
+
+**Where the test's own bookkeeping lives:** the assertion log is `this.state.test_results`.
+It is appended from `on_ready()`, where `this.data` is frozen - and the freeze is DEEP, so
+pushing into a nested array throws exactly like an assignment. `this.state` also survives
+`reload()`, which restores `this.data` to the `on_create()` snapshot.
 
 **reload() process:**
 1. Restore `this.data` to `on_create()` snapshot

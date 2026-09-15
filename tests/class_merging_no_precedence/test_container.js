@@ -19,15 +19,16 @@ class Test_Container extends Jqhtml_Component {
     // 2. 'highlight' (from invocation)
     // 3. 'shadow' (from invocation)
     // 4. 'Base_Card' (component name, auto-added)
-    // 5. 'Jqhtml_Component' (framework marker, auto-added)
+    // 5. 'Component' (framework marker, auto-added - the marker is `Component`, not
+    //    the JS base class name `Jqhtml_Component`)
 
-    const expected = ['card-base', 'highlight', 'shadow', 'Base_Card', 'Jqhtml_Component'];
+    const expected = ['card-base', 'highlight', 'shadow', 'Base_Card', 'Component'];
     const tests = [];
 
     console.log('Expected classes:');
     expected.forEach(cls => {
       const present = classes.includes(cls);
-      console.log(`  ${cls}: ${present ? '✅ present' : '❌ MISSING'}`);
+      console.log(present ? `   PASS: class ${cls} present` : `   FAIL: class ${cls} MISSING`);
       tests.push(present);
     });
     console.log('');
@@ -68,6 +69,11 @@ class Test_Container extends Jqhtml_Component {
       this.$sid('results').html('<span style="color: red;">❌ Some tests failed</span>');
     }
     console.log('========================================');
+    console.log(`SUMMARY: ${tests.filter(t => t).length} passed, ${tests.filter(t => !t).length} failed`);
+    console.log('========================================');
     console.log('');
+
+    window.testPassed = all_passed;
+    window.testReady = true;
   }
 }

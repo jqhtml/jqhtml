@@ -1,0 +1,7 @@
+<Define:Html_Cache_Children_Without_On_Load>
+  <div>
+    <h1>HTML cache: template-only children, and a cache-injecting reload with unchanged data</h1>
+    <div $sid="parent_host"></div>
+    <div $sid="card_host"></div>
+  </div>
+</Define:Html_Cache_Children_Without_On_Load>

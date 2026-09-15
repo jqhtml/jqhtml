@@ -13,7 +13,7 @@ OUT=$(node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/rendered_order_child.jqhtml" \
   "$SCRIPT_DIR/rendered_order_child.js" \
   "$SCRIPT_DIR/rendered_flag_target.jqhtml" \
-  --delay=3 2>&1)
+  --delay=6 2>&1)
 STATUS=$?
 echo "$OUT"
 

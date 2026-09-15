@@ -1,0 +1,4 @@
+<Define:Vp_Rich_Text class="vp-rich">
+  <span class="label"><%= this.args.label %></span>
+  <%!= this.args.value %>
+</Define:Vp_Rich_Text>

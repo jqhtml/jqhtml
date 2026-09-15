@@ -1,0 +1,19 @@
+<%--
+Coord_Card - a card whose on_load() can be made to fail on its FIRST call for a
+given $user_id. Used to drive the load coordinator's error and cleanup paths.
+
+ARGS:
+    $user_id  - the id that forms the deduplication key
+    $filter   - unused by on_load(); exists only so a parent can CHANGE the args
+                after the card has already joined a coordination group
+
+DATA:
+    this.data = {label, seq, nested: {id}, loaded}
+--%>
+<Define:Coord_Card class="coord-card">
+  <% if (this.data.loaded) { %>
+    <span class="label"><%= this.data.label %></span>
+  <% } else { %>
+    <span class="loading">loading</span>
+  <% } %>
+</Define:Coord_Card>

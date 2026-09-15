@@ -1,13 +1,15 @@
 class Parent_With_Render extends Jqhtml_Component {
   on_create() {
-    this.data.lifecycle_log = [];
+    // this.state, not this.data: the log is component-local bookkeeping appended from
+    // on_render()/on_ready(), where this.data is frozen (deeply - a nested push throws).
+    this.state.lifecycle_log = [];
   }
 
   on_render() {
     const timestamp = Date.now();
     const log_entry = `Parent on_render (${timestamp})`;
     console.log(log_entry);
-    this.data.lifecycle_log.push(log_entry);
+    this.state.lifecycle_log.push(log_entry);
 
     // Hide uninitialized UI
     this.$.css('opacity', '0');
@@ -18,7 +20,7 @@ class Parent_With_Render extends Jqhtml_Component {
     const timestamp = Date.now();
     const log_entry = `Parent on_ready (${timestamp})`;
     console.log(log_entry);
-    this.data.lifecycle_log.push(log_entry);
+    this.state.lifecycle_log.push(log_entry);
 
     // Show UI after children ready
     this.$.css('opacity', '1');
@@ -31,7 +33,7 @@ class Parent_With_Render extends Jqhtml_Component {
     console.log('========================================');
     console.log('');
 
-    this.data.lifecycle_log.forEach((entry, idx) => {
+    this.state.lifecycle_log.forEach((entry, idx) => {
       console.log(`${idx + 1}. ${entry}`);
     });
 
@@ -44,7 +46,7 @@ class Parent_With_Render extends Jqhtml_Component {
 
     // Check order - note: on_render may be called twice (double-render pattern)
     // Key requirement: on_render fires BEFORE child ready
-    const log_types = this.data.lifecycle_log.map(e => e.split('(')[0].trim());
+    const log_types = this.state.lifecycle_log.map(e => e.split('(')[0].trim());
 
     const first_is_parent_render = log_types[0] === 'Parent on_render';
     const has_child_ready = log_types.includes('Child on_ready');

@@ -2,17 +2,19 @@
 ################################################################################
 # run-all-suites.sh - Run every JQHTML test suite and report one summary.
 #
-#   ./run-all-suites.sh                 # EVERY suite, browser included (~25 min)
+#   ./run-all-suites.sh                 # EVERY suite, browser included on all three engines (~8 min)
 #   ./run-all-suites.sh --fast          # skip the browser suite (~15s)
 #   ./run-all-suites.sh --build         # build packages first (unit tests read dist/)
 #   ./run-all-suites.sh --quiet         # summary only; failing suites still print
+#   ./run-all-suites.sh --browser=chromium  # browser suite on one engine only
+#                                           # (default runs chromium, firefox AND webkit)
 #
 # Exits non-zero if any suite fails, so it is usable as a release gate.
 #
 # The browser suite runs BY DEFAULT. It is the primary suite per CLAUDE.md - real
 # components in real Chrome across 3 cache modes - and it is the only layer that
 # exercises runtime behaviour at all; the unit suites cannot see it. It takes roughly
-# 25 minutes, so --fast exists for the edit/run loop. "Run all tests" means all of
+# 7 minutes (2.5 per engine), so --fast still exists for the edit/run loop. "Run all tests" means all of
 # them: a suite that is skipped by default is a suite nobody runs.
 ################################################################################
 
@@ -27,7 +29,10 @@ QUIET=0
 
 for arg in "$@"; do
   case "$arg" in
-    --fast|--no-browser) WITH_BROWSER=0 ;;
+    # JQHTML_FAST also reaches suites that gate their own slow tiers - the
+    # vscode extension host, for one.
+    --fast|--no-browser) WITH_BROWSER=0; export JQHTML_FAST=1 ;;
+    --browser=*)         export JQHTML_BROWSER="${arg#--browser=}" ;;   # one engine instead of chromium+firefox
     --build)             BUILD=1 ;;
     --quiet|-q)          QUIET=1 ;;
     -h|--help)           sed -n '4,10p' "$0"; exit 0 ;;
@@ -90,15 +95,15 @@ run_suite "parser: regression corpus" packages/parser npm run test:regression
 run_suite "parser: sourcemap"        packages/parser npm run validate:sourcemap
 run_suite "core: unit (jest)"        packages/core   npm test
 run_suite "ssr: protocol + render"   packages/ssr    npm test
-run_suite "vscode: formatter fixtures" packages/vscode-extension npm test
+run_suite "vscode: extension"        packages/vscode-extension npm test
 
 run_suite "docs: example compilation" . npm run validate:docs
 
 if [ "$WITH_BROWSER" -eq 1 ]; then
   echo
-  echo "${YELLOW}The browser suite takes around 25 minutes (94 tests x 3 cache modes).${OFF}"
-  echo "${GRAY}Use --fast to skip it during the edit/run loop.${OFF}"
-  run_suite "browser: behavioural (Chrome)" tests ./run-all-tests.sh
+  echo "${YELLOW}The browser suite runs every test x 3 cache modes on chromium, firefox AND webkit (~7 min).${OFF}"
+  echo "${GRAY}Use --fast to skip it, or --browser=chromium for the ~2.5 minute single-engine pass.${OFF}"
+  run_suite "browser: behavioural (${JQHTML_BROWSER:-chromium + firefox + webkit})" tests ./run-all-tests.sh
 fi
 
 echo
@@ -117,6 +122,7 @@ echo
 if [ "$WITH_BROWSER" -eq 0 ]; then
   echo "${YELLOW}  Browser suite SKIPPED (--fast). It is the only layer covering runtime${OFF}"
   echo "${YELLOW}  behaviour - run without --fast before committing or releasing.${OFF}"
+  echo "${YELLOW}  The vscode extension-host tier was skipped too (JQHTML_FAST=1).${OFF}"
 fi
 
 echo
