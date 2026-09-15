@@ -98,6 +98,9 @@
 
 // ---- modal ----------------------------------------------------------------
 
+// The modal is three children: a fixed title bar, a scrolling body, and a fixed
+// footer. The modal itself never scrolls - only .-body does - so the title and the
+// lifecycle buttons stay put without needing position: sticky.
 .#{t.$prefix}-modal {
   display: none;
   position: absolute;
@@ -106,9 +109,8 @@
   right: 24px;
   width: 520px;
   max-width: calc(100% - 48px);
-  max-height: calc(100% - 48px);
-  overflow: auto;
-  padding: 0 0 12px 0;
+  overflow: hidden;
+  padding: 0;
   background: t.$paper;
   color: t.$ink;
   border: 1px solid t.$rule;
@@ -121,16 +123,46 @@
   display: block;
 }
 
+// Opened on a component that sits in the right half of the viewport: the modal
+// would cover the very thing being inspected, so it moves to the other side.
+.#{t.$prefix}-modal.#{t.$prefix}-modal-left {
+  left: 24px;
+  right: auto;
+}
+
 .#{t.$prefix}-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  position: sticky;
-  top: 0;
   padding: 8px 12px;
   background: t.$ink;
   color: t.$paper;
   font-weight: bold;
+}
+
+.#{t.$prefix}-body {
+  display: block;
+  box-sizing: border-box;
+  overflow-y: scroll;
+  min-height: 300px;
+  max-height: min(600px, calc(100vh - 200px));
+  padding: 0 0 12px 0;
+}
+
+.#{t.$prefix}-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: t.$paper;
+  border-top: 1px solid t.$rule;
+}
+
+.#{t.$prefix}-footer-label {
+  color: t.$muted;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .#{t.$prefix}-title-name {
@@ -154,6 +186,16 @@
 
 .#{t.$prefix}-button:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+// The same button on the light footer: the dark-on-dark palette inverted.
+.#{t.$prefix}-button.#{t.$prefix}-footer-button {
+  color: t.$ink;
+  border-color: t.$rule;
+}
+
+.#{t.$prefix}-button.#{t.$prefix}-footer-button:hover {
+  background: #eef3ff;
 }
 
 .#{t.$prefix}-section {

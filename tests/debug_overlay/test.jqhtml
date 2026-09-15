@@ -1,11 +1,13 @@
 <Define:Test_Debug_Overlay>
   <div>
     <h1>Component debug overlay</h1>
-    <Dbg_Outer $sid="outer" $id=7 $title="Users" $records=this.state.records $on_pick=this.on_pick>
-      <Dbg_Inner $sid="inner" $id=42 $flag=true>
+    <Dbg_Outer $sid="outer" $id=7 $title="Users" $records=this.state.records $on_pick=this.on_pick style="width:500px">
+      <Dbg_Inner $sid="inner" $id=42 $flag=true style="width:120px">
         <button $sid="btn" @click=this.on_btn_click>click me</button>
       </Dbg_Inner>
     </Dbg_Outer>
+    <Dbg_Loader $sid="loader" />
+    <Dbg_Marker $sid="far" $id="far" style="position:absolute; right:0px; width:60px" />
     <div $sid="mount"></div>
   </div>
 </Define:Test_Debug_Overlay>

@@ -3,6 +3,16 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.69 (2026-09-15)
+
+### Added
+
+- Debug overlay: the inspector modal has a fixed title bar, a scrolling body and a
+  **Lifecycle:** footer with Reload / Refresh / Rerender / Reload w/o data. It opens on
+  the left when the inspected component sits in the right half of the window. Hover tabs
+  on components narrower than 400px may grow to 400px and are kept inside the right edge
+  of the window. See docs/reference/09_debugging_tools.md.
+
 ## 2.3.68 (2026-09-15)
 
 ### Performance

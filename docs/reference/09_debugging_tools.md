@@ -122,13 +122,29 @@ While enabled:
 - **Hover** outlines the component under the pointer and every component above it, each
   with a tab showing the component name and its simple args (strings, numbers, booleans;
   objects and functions are skipped). Outlines are drawn inside the element's box, so
-  nothing on the page moves.
+  nothing on the page moves. A tab is as wide as its component, except that a component
+  narrower than 400px still gets a tab of up to 400px so the name and args stay readable;
+  a tab that would then run past the right edge of the window is slid back to sit against
+  it.
 - **Click** opens an inspector for the innermost component instead of running the
   page's click handlers: name and class chain, `_cid`, lifecycle state, args, data and
   state with types, the DOM ancestry (click an ancestor to inspect it), the instantiator
   (the component whose template wrote the tag, which differs from the DOM parent for
   slot content), and a **Log to console** button that hands the live instance to DevTools.
+  The inspector opens in the top right, or in the top left when the inspected component
+  itself sits in the right half of the window, so it never covers what you clicked. Its
+  title bar and footer stay put while the sections between them scroll.
 - **Alt+click** passes through to the page. **Escape** closes the inspector.
+
+The inspector's footer is a **Lifecycle:** row that drives the component in place, each
+button re-opening the inspector afterwards so the lifecycle state reflects what happened:
+
+| Button | Effect |
+|---|---|
+| **Reload** | `reload()` - re-fetch data and re-render |
+| **Refresh** | `refresh()` - re-fetch data, re-render only if it changed |
+| **Rerender** | `render()` - re-render with the current data |
+| **Reload w/o data** | Re-renders the component from its `on_create()` state with its cache cleared and without running `on_load()`, so you can see what it looks like with no loaded data at all. **Reload** or **Refresh** returns it to normal. |
 
 Components created after `enable()` are covered automatically. `disable()` removes the
 listeners, outlines and inspector; the overlay's stylesheets stay installed but match

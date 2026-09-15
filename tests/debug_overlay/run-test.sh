@@ -12,6 +12,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test.js" \
   "$SCRIPT_DIR/dbg_outer.jqhtml" \
   "$SCRIPT_DIR/dbg_inner.jqhtml" \
+  "$SCRIPT_DIR/dbg_loader.jqhtml" \
   "$SCRIPT_DIR/dbg_marker.jqhtml" \
   --delay=3
 

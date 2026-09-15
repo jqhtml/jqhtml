@@ -110,3 +110,49 @@ describe('quota-exceeded recovery keeps the cache scope', () => {
     expect(localStorage.getItem('_jqhtml_cache_key')).toBe(`${version}::quota_app_v1`);
   });
 });
+
+/**
+ * remove() must scope its key exactly as get()/set() do.
+ *
+ * Every caller hands these three methods a DEVELOPER key (`<Component>::<args>`), and
+ * _build_key() turns it into `jqhtml::<key>::<developer_key>`. A remove() that skipped
+ * that step would delete nothing and leave the entry for the next get() to serve - which
+ * is what the debug overlay's cache drop relies on not happening.
+ */
+describe('remove() uses the same key scoping as get()/set()', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('deletes the entry set() wrote under the same developer key', () => {
+    jqhtml.set_cache_key('myapp_user_1');
+    Jqhtml_Local_Storage.set('Some_Component::{}', { rows: 1 });
+
+    expect(localStorage.getItem('jqhtml::Some_Component::{}::myapp_user_1')).not.toBeNull();
+    expect(Jqhtml_Local_Storage.get('Some_Component::{}')).toEqual({ rows: 1 });
+
+    Jqhtml_Local_Storage.remove('Some_Component::{}');
+
+    expect(localStorage.getItem('jqhtml::Some_Component::{}::myapp_user_1')).toBeNull();
+    expect(Jqhtml_Local_Storage.get('Some_Component::{}')).toBeNull();
+  });
+
+  it('removes the html snapshot entry independently of the data entry', () => {
+    jqhtml.set_cache_key('myapp_user_1');
+    Jqhtml_Local_Storage.set('Some_Component::{}', { rows: 1 });
+    Jqhtml_Local_Storage.set('Some_Component::{}::html', '<div></div>');
+
+    Jqhtml_Local_Storage.remove('Some_Component::{}::html');
+
+    expect(Jqhtml_Local_Storage.get('Some_Component::{}::html')).toBeNull();
+    expect(Jqhtml_Local_Storage.get('Some_Component::{}')).toEqual({ rows: 1 });
+  });
+
+  it('leaves entries from another cache scope alone', () => {
+    jqhtml.set_cache_key('myapp_user_1');
+    localStorage.setItem('jqhtml::Some_Component::{}::other_scope', '{"keep":true}');
+    Jqhtml_Local_Storage.set('Some_Component::{}', { rows: 1 });
+
+    Jqhtml_Local_Storage.remove('Some_Component::{}');
+
+    expect(localStorage.getItem('jqhtml::Some_Component::{}::other_scope')).toBe('{"keep":true}');
+  });
+});

@@ -1,0 +1,7 @@
+<%--
+Dbg_Loader - a component with a custom on_load(), for the overlay's lifecycle footer.
+
+DATA:
+    this.data = {loaded}  - false from on_create(), true once on_load() has run
+--%>
+<Define:Dbg_Loader class="dbg-loader">loaded: <%= this.data.loaded ? 'yes' : 'no' %></Define:Dbg_Loader>

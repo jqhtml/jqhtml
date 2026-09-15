@@ -124,6 +124,7 @@ export class Jqhtml_Component {
   _cid: string;                           // Component instance ID for scoping
   _component_name: string;                // The name this instance was invoked as: <Tag_Name>, .component('Tag_Name'), boot placeholder, or the class name
   _ready_state: number = 0;               // 0=created, 1=init, 2=loaded, 3=rendered, 4=ready
+  _debug_no_data: boolean = false;         // Set by _reload_without_data(); cleared by any real load
 
   // Private properties
   private _lifecycle_manager: LifecycleManager;
@@ -857,6 +858,9 @@ export class Jqhtml_Component {
       // The queued executor can start long after load() was called - re-check.
       if (this._stopped) return false;
 
+      // Any real load returns the component to normal, whatever the debug tool did.
+      this._debug_no_data = false;
+
       // Snapshot current data for change detection
       const data_before = JSON.stringify(this.data);
 
@@ -1078,6 +1082,9 @@ export class Jqhtml_Component {
    */
   async _load(): Promise<void> {
     if (this._stopped || this._ready_state >= 2) return;
+
+    // Any real load returns the component to normal, whatever the debug tool did.
+    this._debug_no_data = false;
 
     this._log_lifecycle('load', 'start');
 
@@ -1608,6 +1615,57 @@ export class Jqhtml_Component {
   }
 
   /**
+   * Re-render this component from its on_create() state with its cache dropped and
+   * WITHOUT running on_load()/on_loaded()/on_ready().
+   *
+   * @internal debug tool. Used by the debug overlay's lifecycle footer to see what a
+   * component looks like with no loaded data at all. Not public API, not documented,
+   * and no downstream code should call it: reload() or refresh() afterwards returns
+   * the component to normal (the snapshot is intact and the cache is gone, so the
+   * next load is a genuine fresh fetch).
+   */
+  _reload_without_data(): Promise<void> {
+    if (this._stopped) return Promise.resolve();
+
+    // Same marker invalidation reload()/render() do: later ready() waiters must wait
+    // for THIS cycle rather than resolve off the previous one.
+    this.invalidate('ready');
+
+    // Serialised with reload()/refresh() so it can never interleave with a real load.
+    return this._queue.enqueue('reload', async () => {
+      if (this._stopped) return;
+
+      // Drop this component's own cache entries (data and html snapshot), so a later
+      // reload() genuinely re-fetches instead of hydrating from what is on screen now.
+      const { cache_key } = generate_cache_key(this);
+      if (cache_key !== null) {
+        Jqhtml_Local_Storage.remove(cache_key);
+        Jqhtml_Local_Storage.remove(`${cache_key}::html`);
+      }
+
+      // Back to the on_create() state. Components with no custom on_load() take no
+      // snapshot (nothing can have changed this.data), so they simply re-render.
+      if (this.__initial_data_snapshot !== null) {
+        this.__data_frozen = false;
+        this.data = JSON.parse(JSON.stringify(this.__initial_data_snapshot));
+        this.__data_frozen = true;
+      }
+
+      // Read by the debug overlay's lifecycle row; cleared by _reload()/load()/_load().
+      this._debug_no_data = true;
+
+      this._render();
+      await this._wait_for_children_ready();
+
+      if (this._stopped) return;
+
+      this._ready_state = 4;
+      this._update_debug_attrs();
+      this.trigger('ready');
+    });
+  }
+
+  /**
    * Internal reload implementation - re-fetch data and re-render
    *
    * COMPLETE RELOAD PROCESS (Source of Truth):
@@ -1643,6 +1701,9 @@ export class Jqhtml_Component {
    */
   async _reload(): Promise<void> {
     if (this._stopped) return;
+
+    // Any real load returns the component to normal, whatever the debug tool did.
+    this._debug_no_data = false;
 
     // Invalidate ready event so new handlers wait for this reload to complete
     // This prevents .on('ready') handlers from firing immediately based on previous lifecycle

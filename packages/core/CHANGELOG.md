@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.69 (2026-09-15)
+
+### Added
+
+* **debug overlay:** hover tabs are no longer capped at the component's own width - a
+  component narrower than 400px gets a tab of up to 400px, and a tab that would overflow
+  the viewport is slid back so its right edge sits 5px inside it.
+* **debug overlay:** the inspector modal is split into `.jqhtml-debug-title`,
+  `.jqhtml-debug-body` (the only scrolling element: `overflow-y: scroll`, min-height
+  300px, max-height `min(600px, calc(100vh - 200px))`) and `.jqhtml-debug-footer`; the
+  modal itself no longer scrolls. It gains `.jqhtml-debug-modal-left` and opens on the
+  left when the inspected component is in the right half of the viewport.
+* **debug overlay:** a **Lifecycle:** footer row with Reload, Refresh, Rerender and
+  Reload w/o data. Each runs its call on the live component, logs any failure, and
+  re-opens the inspector once the call settles.
+
 ## 2.3.68 (2026-09-15)
 
 ### Performance

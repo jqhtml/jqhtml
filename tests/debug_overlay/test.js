@@ -31,6 +31,29 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     const labels = () => Array.from(shadow().querySelectorAll('.jqhtml-debug-label'));
     const modal = () => shadow().querySelector('.jqhtml-debug-modal');
     const modal_open = () => modal() && modal().classList.contains('jqhtml-debug-modal-open');
+    const modal_left = () => modal() && modal().classList.contains('jqhtml-debug-modal-left');
+    const body = () => shadow().querySelector('.jqhtml-debug-body');
+    const footer_buttons = () => Array.from(shadow().querySelectorAll('.jqhtml-debug-footer-button'));
+    const button_named = (label) => footer_buttons().find((b) => b.textContent === label);
+    const right_edge = (label) => label.getBoundingClientRect().right;
+    const lifecycle_row = () => {
+      const key = Array.from(shadow().querySelectorAll('.jqhtml-debug-key')).find((k) => k.textContent === 'lifecycle');
+      return key && key.nextElementSibling ? key.nextElementSibling.nextElementSibling.textContent : '';
+    };
+    // Bounded poll - every wait in this suite races a timeout of its own so a hang
+    // reports as a failed assertion instead of killing the harness.
+    const wait_for = async (predicate, ms) => {
+      const deadline = Date.now() + (ms || 1000);
+      while (Date.now() < deadline) {
+        if (predicate()) return true;
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      return !!predicate();
+    };
+    const resolves_within = (promise, ms) => Promise.race([
+      promise.then(() => true, () => false),
+      new Promise((r) => setTimeout(() => r(false), ms)),
+    ]);
     const fire = (el, type, init) => el.dispatchEvent(new MouseEvent(type, Object.assign({ bubbles: true, cancelable: true, composed: true }, init || {})));
     const has = (el, cls) => el.classList.contains(cls);
 
@@ -65,10 +88,29 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     const outer_label = labels().find((l) => l.textContent.includes('Dbg_Outer'));
     assert('outer label shows the string arg quoted', outer_label && /\$title="Users"/.test(outer_label.textContent));
     assert('outer label skips object and function args', outer_label && !/records|on_pick/.test(outer_label.textContent));
-    assert('label is no wider than its component', outer_label && parseInt(outer_label.style.maxWidth, 10) <= Math.round(outer.$[0].getBoundingClientRect().width));
+    const outer_width = Math.round(outer.$[0].getBoundingClientRect().width);
+    const inner_width = Math.round(inner.$[0].getBoundingClientRect().width);
+    assert('the wide component is wider than 400px -> ' + outer_width, outer_width > 400);
+    assert('label on a component wider than 400px matches the component width', outer_label && parseInt(outer_label.style.maxWidth, 10) === outer_width);
+    assert('the narrow component is narrower than 400px -> ' + inner_width, inner_width < 400);
+    assert('label on a narrower component may grow to 400px', inner_label && parseInt(inner_label.style.maxWidth, 10) === 400);
     const inner_left = parseInt(inner_label.style.left, 10);
     const outer_left = parseInt(outer_label.style.left, 10);
     assert('labels sharing a corner are stacked, not overlapping', inner_left !== outer_left || inner_label.style.top !== outer_label.style.top);
+
+    console.log('');
+    console.log('2b. A LABEL NEVER RUNS OFF THE RIGHT EDGE OF THE VIEWPORT:');
+    const far = this.sid('far');
+    const far_el = far.$[0];
+    assert('the far component sits in the right half of the viewport', far_el.getBoundingClientRect().left > window.innerWidth / 2);
+    fire(far_el, 'mouseover');
+    const far_label = labels().find((l) => /Dbg_Marker/.test(l.textContent));
+    assert('far component gets a label', !!far_label);
+    assert('far label may be wider than its 60px component', far_label && parseInt(far_label.style.maxWidth, 10) === 400);
+    assert('far label right edge stays inside the viewport -> ' + (far_label && Math.round(right_edge(far_label))),
+      far_label && right_edge(far_label) <= window.innerWidth - 5 + 0.5);
+    assert('far label left is never negative', far_label && parseInt(far_label.style.left, 10) >= 0);
+    fire(btn, 'mouseover');
 
     console.log('');
     console.log('3. CLICK OPENS THE MODAL INSTEAD OF FIRING THE HANDLER:');
@@ -100,7 +142,71 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
 
     console.log('');
-    console.log('5. COMPONENTS CREATED AFTER ENABLE ARE COVERED:');
+    console.log('5. THE MODAL MOVES TO THE SIDE THE COMPONENT IS NOT ON:');
+    fire(far_el, 'click');
+    assert('modal opens for the far-right component', modal_open() && /<Dbg_Marker>/.test(modal().textContent));
+    assert('modal moves left for a component in the right half of the viewport', modal_left());
+    fire(btn, 'click');
+    assert('modal opens for the left-side component', modal_open() && /<Dbg_Inner>/.test(modal().textContent));
+    assert('modal stays on the right for a component in the left half', !modal_left());
+
+    console.log('');
+    console.log('6. THE MODAL SCROLLS IN ITS BODY, NOT AS A WHOLE:');
+    assert('modal has a body element', !!body());
+    assert('every section lives in the body', body().querySelectorAll('.jqhtml-debug-section').length >= 5);
+    const body_style = getComputedStyle(body());
+    assert('body scrolls vertically (overflow-y: scroll)', body_style.overflowY === 'scroll');
+    const expected_max_height = Math.max(300, Math.min(600, window.innerHeight - 200));
+    assert('body max-height is ' + expected_max_height + 'px -> ' + body_style.maxHeight,
+      Math.round(parseFloat(body_style.maxHeight)) === expected_max_height);
+    assert('body min-height is 300px -> ' + body_style.minHeight, Math.round(parseFloat(body_style.minHeight)) === 300);
+    assert('the modal itself no longer scrolls', getComputedStyle(modal()).overflow === 'hidden');
+    assert('title bar sits outside the scroller', modal().firstElementChild.classList.contains('jqhtml-debug-title'));
+    assert('footer sits outside the scroller', modal().lastElementChild.classList.contains('jqhtml-debug-footer'));
+
+    console.log('');
+    console.log('7. THE FOOTER DRIVES THE COMPONENT LIFECYCLE:');
+    const loader = this.sid('loader');
+    await loader.ready();
+    overlay.inspect(loader);
+    const footer_label = shadow().querySelector('.jqhtml-debug-footer-label');
+    assert('footer row is labelled Lifecycle:', footer_label && footer_label.textContent === 'Lifecycle:');
+    assert('footer has exactly four buttons -> ' + footer_buttons().length, footer_buttons().length === 4);
+    assert('footer button labels are Reload / Refresh / Rerender / Reload w/o data',
+      JSON.stringify(footer_buttons().map((b) => b.textContent)) ===
+      JSON.stringify(['Reload', 'Refresh', 'Rerender', 'Reload w/o data']));
+    assert('loader booted with its loaded data', /loaded: yes/.test(loader.$.text()));
+
+    const loads_before = loader.state.load_count;
+    button_named('Reload w/o data').click();
+    assert('Reload w/o data re-renders from the on_create() state',
+      await wait_for(() => /loaded: no/.test(loader.$.text()), 1000));
+    assert('Reload w/o data did not run on_load() -> ' + loader.state.load_count,
+      loader.state.load_count === loads_before);
+    assert('component is ready again within 1s', await resolves_within(loader.ready(), 1000));
+    assert('lifecycle row reports the no-data state',
+      await wait_for(() => /no data/.test(lifecycle_row()), 1000));
+
+    button_named('Reload').click();
+    assert('Reload loads the component fully again',
+      await wait_for(() => /loaded: yes/.test(loader.$.text()), 1000));
+    assert('Reload ran on_load() once more -> ' + loader.state.load_count,
+      loader.state.load_count === loads_before + 1);
+    assert('component is ready within 1s after Reload', await resolves_within(loader.ready(), 1000));
+    assert('lifecycle row is back to plain ready',
+      await wait_for(() => /ready/.test(lifecycle_row()) && !/no data/.test(lifecycle_row()), 1000));
+
+    button_named('Refresh').click();
+    assert('Refresh settles within 1s and leaves the component alive',
+      (await resolves_within(loader.ready(), 1000)) && !loader.$.hasClass('_Component_Stopped'));
+    button_named('Rerender').click();
+    assert('Rerender settles within 1s and leaves the component alive',
+      (await resolves_within(loader.ready(), 1000)) && !loader.$.hasClass('_Component_Stopped'));
+    assert('loader still shows its loaded data after Refresh and Rerender', /loaded: yes/.test(loader.$.text()));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    console.log('');
+    console.log('8. COMPONENTS CREATED AFTER ENABLE ARE COVERED:');
     const marker = $('<div>').component('Dbg_Marker', { id: 'late' }).appendTo(this.$sid('mount')).component();
     await marker.ready();
     fire(marker.$[0], 'mouseover');
@@ -110,7 +216,7 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     assert('late component label present', labels().some((l) => /Dbg_Marker/.test(l.textContent) && /\$id="late"/.test(l.textContent)));
 
     console.log('');
-    console.log('6. DISABLE REMOVES EVERYTHING BUT THE INSTALLED STYLES:');
+    console.log('9. DISABLE REMOVES EVERYTHING BUT THE INSTALLED STYLES:');
     overlay.disable();
     assert('is_enabled() false', overlay.is_enabled() === false);
     assert('<html data-jqhtml-debug> removed', !html.hasAttribute('data-jqhtml-debug'));
@@ -124,7 +230,7 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     assert('inspect() is a no-op while disabled', overlay.inspect(outer) === false);
 
     console.log('');
-    console.log('7. RE-ENABLE REUSES THE INSTALLATION:');
+    console.log('10. RE-ENABLE REUSES THE INSTALLATION:');
     overlay.enable();
     assert('host reattached', !!shadow());
     assert('exactly one light stylesheet', document.querySelectorAll('#jqhtml-debug-light-styles').length === 1);

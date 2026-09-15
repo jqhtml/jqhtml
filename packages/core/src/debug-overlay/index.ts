@@ -35,6 +35,8 @@ const HIT_CLASS = `${PREFIX}hit`;
 const DEPTH_CLASS = `${PREFIX}depth-`;
 const DEPTH_COLORS = 6;                       // keep in step with $depth-colors in _tokens.scss
 const LABEL_HEIGHT = 18;
+const LABEL_MIN_WIDTH = 400;                  // a narrow component still gets a readable tab
+const VIEWPORT_MARGIN = 5;                    // gap kept between a label's right edge and the viewport
 const READY_STATES = ['created', 'init', 'loaded', 'rendered', 'ready'];
 
 interface Overlay_State {
@@ -214,9 +216,12 @@ function clear_hover(): void {
 
 /**
  * One tab per component in the chain, pinned to the component's top-left
- * corner and no wider than the component. Outermost first so the innermost
- * paints on top; tabs that share a corner (a child filling its parent, the
- * usual case) stack downward instead of hiding each other.
+ * corner. Width: the component's, but a narrow component still gets up to
+ * LABEL_MIN_WIDTH so its name and args stay legible; a label that would then
+ * run off the right edge is slid back so its right edge sits at the margin.
+ * Outermost first so the innermost paints on top; tabs that share a corner (a
+ * child filling its parent, the usual case) stack downward instead of hiding
+ * each other.
  */
 function render_labels(): void {
   const layer = state.layer!;
@@ -233,13 +238,25 @@ function render_labels(): void {
     taken.set(key, stacked + 1);
 
     const label = el('div', `label ${PREFIX}depth-${depth % DEPTH_COLORS}`);
-    label.style.left = `${left}px`;
+    // Laid out at the left edge FIRST, then moved. An absolutely positioned box
+    // shrink-to-fits into the room its own `left` leaves, so measuring it at its
+    // final position would report the squeezed width, and moving it would let it
+    // re-expand - the two chase each other. At left 0 it has the whole viewport,
+    // so the measurement below is the width it will actually keep.
+    label.style.left = '0px';
     label.style.top = `${top + stacked * LABEL_HEIGHT}px`;
-    label.style.maxWidth = `${Math.max(24, Math.round(rect.width))}px`;
+    label.style.maxWidth = `${rect.width < LABEL_MIN_WIDTH ? LABEL_MIN_WIDTH : Math.round(rect.width)}px`;
     label.appendChild(el('span', 'label-name', component.component_name()));
     const args = simple_args(component);
     if (args) label.appendChild(el('span', 'label-args', args));
     layer.appendChild(label);
+
+    // A label on a narrow component may be wider than the component, so a component
+    // near the right edge can push its label off-screen. Slide it back until its
+    // right edge sits on the margin, never past the left edge.
+    const width = label.getBoundingClientRect().width || label.offsetWidth;
+    const limit = window.innerWidth - VIEWPORT_MARGIN;
+    label.style.left = `${left + width > limit ? Math.max(0, Math.round(limit - width)) : left}px`;
   }
 }
 
@@ -282,6 +299,12 @@ function close_modal(): void {
   state.modal_component = null;
 }
 
+/**
+ * The inspector. Three children: a fixed title bar, a scrolling body holding every
+ * section, and a fixed footer of lifecycle buttons. The modal sits top-right, but
+ * moves to the left when the inspected component is itself in the right half of the
+ * viewport - otherwise the panel covers the thing being inspected.
+ */
 function open_modal(component: Jqhtml_Component): void {
   const modal = state.modal!;
   modal.textContent = '';
@@ -289,6 +312,11 @@ function open_modal(component: Jqhtml_Component): void {
   const chain = chain_for(component.$[0]);
   const ancestors = chain.slice(1);
   const element = component.$[0] as Element;
+
+  modal.classList.toggle(
+    `${PREFIX}modal-left`,
+    element.getBoundingClientRect().left > window.innerWidth / 2
+  );
 
   // Title bar
   const title = el('div', 'title');
@@ -303,6 +331,10 @@ function open_modal(component: Jqhtml_Component): void {
   title.appendChild(close);
   modal.appendChild(title);
 
+  // The only scrolling element: the title bar and the footer stay put.
+  const body = el('div', 'body');
+  modal.appendChild(body);
+
   // Identity
   const ctor = component.constructor as typeof Jqhtml_Component;
   const hierarchy = ctor.get_class_hierarchy ? ctor.get_class_hierarchy() : [ctor.name];
@@ -311,15 +343,18 @@ function open_modal(component: Jqhtml_Component): void {
   row(identity, 'class', '', hierarchy.join(' → '));
   row(identity, 'element', '', describe_element(element));
   row(identity, '_cid', '', String(component._cid));
-  row(identity, 'lifecycle', '', READY_STATES[component._ready_state] || String(component._ready_state));
+  const lifecycle = READY_STATES[component._ready_state] || String(component._ready_state);
+  row(identity, 'lifecycle', '', (component as any)._debug_no_data
+    ? `${lifecycle} (no data - reload w/o data)`
+    : lifecycle);
   const nocache = element.getAttribute('data-nocache');
   if (nocache) row(identity, 'cache', '', `declined: ${nocache}`);
-  modal.appendChild(section('Identity', identity));
+  body.appendChild(section('Identity', identity));
 
   // Args / data / state
-  modal.appendChild(section('Args', object_table(component.args)));
-  modal.appendChild(section('Data', object_table(component.data)));
-  modal.appendChild(section('State', object_table(component.state)));
+  body.appendChild(section('Args', object_table(component.args)));
+  body.appendChild(section('Data', object_table(component.data)));
+  body.appendChild(section('State', object_table(component.state)));
 
   // Ancestry
   const list = el('div', 'list');
@@ -331,7 +366,7 @@ function open_modal(component: Jqhtml_Component): void {
     link.addEventListener('click', () => open_modal(ancestor));
     list.appendChild(link);
   }
-  modal.appendChild(section('Ancestry (DOM, nearest first)', list));
+  body.appendChild(section('Ancestry (DOM, nearest first)', list));
 
   // Instantiator - the component whose template wrote this tag. Differs from
   // the DOM parent for markup written in a slot body or default content.
@@ -350,9 +385,50 @@ function open_modal(component: Jqhtml_Component): void {
   } else {
     inst.appendChild(el('div', 'empty', 'none - created directly'));
   }
-  modal.appendChild(section('Instantiator', inst));
+  body.appendChild(section('Instantiator', inst));
+
+  // Footer: lifecycle controls. Clicks land inside the shadow host, so the
+  // overlay's own click hijack lets them through (is_ours).
+  const footer = el('div', 'footer');
+  footer.appendChild(el('span', 'footer-label', 'Lifecycle:'));
+  footer.appendChild(lifecycle_button(component, 'Reload', (c) => c.reload()));
+  footer.appendChild(lifecycle_button(component, 'Refresh', (c) => c.refresh()));
+  footer.appendChild(lifecycle_button(component, 'Rerender', (c) => c.render()));
+  footer.appendChild(lifecycle_button(component, 'Reload w/o data', (c) => (c as any)._reload_without_data()));
+  modal.appendChild(footer);
 
   modal.classList.add(`${PREFIX}modal-open`);
+}
+
+/**
+ * One footer button. Runs its lifecycle call on a live component, logs whatever it
+ * throws or rejects with, and re-opens the modal once the call settles so the panel
+ * (lifecycle row above all) describes the state the button just produced.
+ */
+function lifecycle_button(
+  component: Jqhtml_Component,
+  label: string,
+  run: (component: Jqhtml_Component) => any,
+): HTMLButtonElement {
+  const button = el('button', 'button footer-button', label) as HTMLButtonElement;
+  button.addEventListener('click', () => {
+    if (component.$.hasClass('_Component_Stopped')) return;   // dead component: nothing to do
+    let result: any;
+    try {
+      result = run(component);
+    } catch (error) {
+      console.error(`[JQHTML debug] ${label} threw on <${component.component_name()}>`, error);
+      return;
+    }
+    Promise.resolve(result)
+      .catch((error) => {
+        console.error(`[JQHTML debug] ${label} rejected on <${component.component_name()}>`, error);
+      })
+      .then(() => {
+        if (state.enabled && state.modal_component === component) open_modal(component);
+      });
+  });
+  return button;
 }
 
 // ---------------------------------------------------------------------------
