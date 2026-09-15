@@ -77,7 +77,11 @@
   white-space: normal;
   overflow-wrap: anywhere;
   overflow: hidden;
-  pointer-events: none;
+  // The layer stays pointer-events: none, so only the labels themselves catch the
+  // mouse: the pointer can travel from a component onto its label without the hover
+  // set being torn down, and a label is clickable as a shortcut to its inspector.
+  pointer-events: auto;
+  cursor: pointer;
 }
 
 @each $color in t.$depth-colors {

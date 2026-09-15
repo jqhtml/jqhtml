@@ -11,6 +11,15 @@
 @use 'sass:list';
 @use 'tokens' as t;
 
+// The component the inspector modal is currently showing. Declared BEFORE the hover
+// rules on purpose: it has the same specificity as `-hit`, so the hover outline wins
+// by source order while the pointer is on the component, and the depth rules
+// (`-hit.-depth-N`, one class more specific) win over both.
+html[data-jqhtml-debug] .#{t.$prefix}-selected {
+  outline: 2px solid t.$selected;
+  outline-offset: -2px;
+}
+
 html[data-jqhtml-debug] .#{t.$prefix}-hit {
   outline: 2px solid list.nth(t.$depth-colors, 1);
   outline-offset: -2px;

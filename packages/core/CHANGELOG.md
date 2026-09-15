@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.70 (2026-09-15)
+
+### Added
+
+* **debug overlay:** hover labels are `pointer-events: auto; cursor: pointer`. A mouseover
+  inside the overlay's shadow host never changes the hover set, and page mouseovers are
+  ignored while the pointer is on a label, so the outlines survive the trip onto a label.
+  Leaving a label clears the hover set only when the pointer lands outside the innermost
+  hovered component. Clicking a label inspects that label's component.
+* **debug overlay:** `Back` and `Parent` buttons in the inspector title bar, before
+  `Log to console` and `Close`. `Parent` shows when the component has a DOM parent
+  component; `Back` shows while the navigation stack is non-empty and pops it, skipping
+  entries whose component has since been stopped.
+* **debug overlay:** `.jqhtml-debug-selected` (amber `outline: 2px solid #b45309`,
+  `outline-offset: -2px`) marks the component the inspector is showing. It moves with the
+  inspector and is removed by `close_modal()` and `disable()`; clearing the hover set
+  leaves it alone, and the hover outline wins wherever both apply.
+
 ## 2.3.69 (2026-09-15)
 
 ### Added

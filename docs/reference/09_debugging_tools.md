@@ -125,7 +125,11 @@ While enabled:
   nothing on the page moves. A tab is as wide as its component, except that a component
   narrower than 400px still gets a tab of up to 400px so the name and args stay readable;
   a tab that would then run past the right edge of the window is slid back to sit against
-  it.
+  it. The tabs are part of the interaction: moving the pointer off the component and onto
+  one of its tabs leaves the outlines and tabs in place instead of collapsing them, and
+  **clicking a tab** opens the inspector for that tab's component - a direct way to inspect
+  an ancestor without hitting the innermost one first. The set is only replaced once the
+  pointer reaches something else on the page.
 - **Click** opens an inspector for the innermost component instead of running the
   page's click handlers: name and class chain, `_cid`, lifecycle state, args, data and
   state with types, the DOM ancestry (click an ancestor to inspect it), the instantiator
@@ -134,6 +138,16 @@ While enabled:
   The inspector opens in the top right, or in the top left when the inspected component
   itself sits in the right half of the window, so it never covers what you clicked. Its
   title bar and footer stay put while the sections between them scroll.
+- **Parent** and **Back** in the title bar walk the DOM chain. **Parent** appears whenever
+  the inspected component has a component above it and moves the inspector up one level;
+  **Back** appears once you have stepped somewhere (Parent, an Ancestry entry, the
+  Instantiator link) and returns you along the way you came, disappearing again at the
+  component you started from. Picking a new component on the page, or clicking a hover tab,
+  is a fresh start and clears the trail.
+- **The inspected component stays outlined in amber** for as long as the inspector is open,
+  so you can see what is being described while the pointer is elsewhere. Hovering that same
+  component shows the hover outline instead - the hover colour always wins - and the amber
+  returns when the pointer leaves. Closing the inspector (or `disable()`) removes it.
 - **Alt+click** passes through to the page. **Escape** closes the inspector.
 
 The inspector's footer is a **Lifecycle:** row that drives the component in place, each

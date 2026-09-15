@@ -8,6 +8,12 @@
  * data, state, ancestry, instantiator) instead of firing the click. Alt+click
  * passes through. `disable()` puts everything back.
  *
+ * The labels are part of the interaction, not just decoration: the pointer can
+ * move from a component onto one of its tabs without the hover set collapsing,
+ * and clicking a tab inspects that tab's component. The modal keeps an amber
+ * outline on whatever it is showing, and its title bar carries Parent / Back so
+ * the DOM chain can be walked without going back to the page.
+ *
  * Non-invasiveness, the design goal (details in ./CLAUDE.md):
  *   - The overlay's own UI lives in a shadow root on a host element appended to
  *     <body>, styled by shadow.scss. Page CSS cannot select into it and :host
@@ -33,6 +39,7 @@ const HOST_ATTR = 'data-jqhtml-debug-root';   // the shadow host
 const LIGHT_STYLE_ID = 'jqhtml-debug-light-styles';
 const HIT_CLASS = `${PREFIX}hit`;
 const DEPTH_CLASS = `${PREFIX}depth-`;
+const SELECTED_CLASS = `${PREFIX}selected`;   // on the element the modal is showing
 const DEPTH_COLORS = 6;                       // keep in step with $depth-colors in _tokens.scss
 const LABEL_HEIGHT = 18;
 const LABEL_MIN_WIDTH = 400;                  // a narrow component still gets a readable tab
@@ -47,7 +54,13 @@ interface Overlay_State {
   modal: HTMLElement | null;
   chain: Jqhtml_Component[];
   hit_elements: Element[];
+  /** True while the pointer sits on one of the hover labels: page hovers are ignored. */
+  label_hovered: boolean;
   modal_component: Jqhtml_Component | null;
+  /** Components walked away from, newest last. Non-empty <=> the Back button shows. */
+  nav_stack: Jqhtml_Component[];
+  /** The element currently wearing SELECTED_CLASS, so it can be stripped again. */
+  selected_element: Element | null;
 }
 
 const state: Overlay_State = {
@@ -58,7 +71,10 @@ const state: Overlay_State = {
   modal: null,
   chain: [],
   hit_elements: [],
+  label_hovered: false,
   modal_component: null,
+  nav_stack: [],
+  selected_element: null,
 };
 
 // ---------------------------------------------------------------------------
@@ -113,7 +129,7 @@ export const debug_overlay = {
       ? target
       : chain_for(target && target.jquery ? target[0] : target)[0];
     if (!component) return false;
-    open_modal(component);
+    select(component);
     return true;
   },
 };
@@ -178,8 +194,16 @@ function is_ours(event: Event): boolean {
 // Hover
 // ---------------------------------------------------------------------------
 
+/**
+ * A hover on the page replaces the hover set - except while the pointer is on
+ * our own UI. An event from inside the shadow host (a label, the modal) never
+ * clears or changes the hover, and neither does a page hover raised while the
+ * pointer is parked on a label: that is what lets a label be reached and clicked
+ * without the outlines it belongs to vanishing on the way.
+ */
 function on_mouseover(event: MouseEvent): void {
   if (is_ours(event)) return;
+  if (state.label_hovered) return;
   const chain = chain_for(event.target);
   if (chain[0] === state.chain[0]) return;
   set_hover(chain);
@@ -187,6 +211,30 @@ function on_mouseover(event: MouseEvent): void {
 
 function on_mouseout(event: MouseEvent): void {
   if (!event.relatedTarget) clear_hover();   // pointer left the document
+}
+
+/**
+ * The pointer left a label. If it landed back inside the component the label
+ * belongs to (the usual case - the label sits on the component's own corner),
+ * the hover set stays; anywhere else it goes. `elementFromPoint` reports our
+ * shadow host for a point covered by another label, so the host is skipped and
+ * the page element underneath is used.
+ */
+function on_label_leave(event: MouseEvent): void {
+  state.label_hovered = false;
+  const innermost = state.chain[0];
+  if (!innermost) return;
+  const under = element_under(event.clientX, event.clientY);
+  if (!under || !(innermost.$[0] as Element).contains(under)) clear_hover();
+}
+
+function element_under(x: number, y: number): Element | null {
+  const all = (document as any).elementsFromPoint;
+  const candidates: Element[] = all
+    ? all.call(document, x, y)
+    : ([document.elementFromPoint(x, y)].filter(Boolean) as Element[]);
+  for (const node of candidates) if (node !== state.host) return node;
+  return null;
 }
 
 function on_reposition(): void {
@@ -211,6 +259,7 @@ function clear_hover(): void {
   }
   state.hit_elements = [];
   state.chain = [];
+  state.label_hovered = false;
   if (state.layer) state.layer.textContent = '';
 }
 
@@ -226,6 +275,7 @@ function clear_hover(): void {
 function render_labels(): void {
   const layer = state.layer!;
   layer.textContent = '';
+  state.label_hovered = false;   // the element the pointer was on is gone
   const taken = new Map<string, number>();
   for (let depth = state.chain.length - 1; depth >= 0; depth--) {
     const component = state.chain[depth];
@@ -249,6 +299,14 @@ function render_labels(): void {
     label.appendChild(el('span', 'label-name', component.component_name()));
     const args = simple_args(component);
     if (args) label.appendChild(el('span', 'label-args', args));
+    // Each label knows its own component: it is a hover target that holds the set
+    // in place, and a click target that inspects THAT component, not the innermost.
+    label.addEventListener('mouseenter', () => { state.label_hovered = true; });
+    label.addEventListener('mouseleave', on_label_leave);
+    label.addEventListener('click', (event) => {
+      event.stopPropagation();   // the document handler already skips is_ours events
+      select(component);
+    });
     layer.appendChild(label);
 
     // A label on a narrow component may be wider than the component, so a component
@@ -282,7 +340,7 @@ function on_click(event: MouseEvent): void {
   event.stopImmediatePropagation();
   const chain = chain_for(event.target);
   if (!chain.length) { close_modal(); return; }
-  open_modal(chain[0]);
+  select(chain[0]);
 }
 
 function on_keydown(event: KeyboardEvent): void {
@@ -297,6 +355,52 @@ function close_modal(): void {
   state.modal.classList.remove(`${PREFIX}modal-open`);
   state.modal.textContent = '';
   state.modal_component = null;
+  state.nav_stack = [];
+  set_selected(null);
+}
+
+// ---------------------------------------------------------------------------
+// Selection and navigation
+//
+// Three ways in, and they differ only in what they do to the navigation stack:
+//   select()   - a FRESH selection (page click, label click, inspect()): the stack
+//                is dropped, so Back disappears.
+//   navigate() - a step along the chain (Parent, an Ancestry entry, the
+//                Instantiator link): the component being left is pushed.
+//   show()     - render only, stack untouched; what Back and the lifecycle
+//                buttons re-open with.
+// ---------------------------------------------------------------------------
+
+function select(component: Jqhtml_Component): void {
+  state.nav_stack = [];
+  show(component);
+}
+
+function navigate(component: Jqhtml_Component): void {
+  if (state.modal_component && state.modal_component !== component) {
+    state.nav_stack.push(state.modal_component);
+  }
+  show(component);
+}
+
+/** Pop to the last component still alive; a stopped one is skipped, not shown. */
+function go_back(): void {
+  while (state.nav_stack.length) {
+    const previous = state.nav_stack.pop()!;
+    if (previous.$.hasClass('_Component_Stopped')) continue;
+    show(previous);
+    return;
+  }
+  if (state.modal_component) show(state.modal_component);   // nothing left: drop Back
+}
+
+/** Move SELECTED_CLASS to `element`, or take it off the page entirely for null. */
+function set_selected(element: Element | null): void {
+  if (state.selected_element && state.selected_element !== element) {
+    state.selected_element.classList.remove(SELECTED_CLASS);
+  }
+  state.selected_element = element;
+  if (element) element.classList.add(SELECTED_CLASS);
 }
 
 /**
@@ -305,22 +409,36 @@ function close_modal(): void {
  * moves to the left when the inspected component is itself in the right half of the
  * viewport - otherwise the panel covers the thing being inspected.
  */
-function open_modal(component: Jqhtml_Component): void {
+function show(component: Jqhtml_Component): void {
   const modal = state.modal!;
   modal.textContent = '';
   state.modal_component = component;
   const chain = chain_for(component.$[0]);
   const ancestors = chain.slice(1);
   const element = component.$[0] as Element;
+  set_selected(element);
 
   modal.classList.toggle(
     `${PREFIX}modal-left`,
     element.getBoundingClientRect().left > window.innerWidth / 2
   );
 
-  // Title bar
+  // Title bar: the name, then [Back] [Parent] [Log to console] [Close]. Back is
+  // there only while something was navigated away from, Parent only while the
+  // component has a DOM parent component - the first Ancestry entry.
   const title = el('div', 'title');
   title.appendChild(el('span', 'title-name', `<${component.component_name()}>`));
+  if (state.nav_stack.length) {
+    const back = el('button', 'button', 'Back') as HTMLButtonElement;
+    back.addEventListener('click', go_back);
+    title.appendChild(back);
+  }
+  const parent = ancestors[0];
+  if (parent) {
+    const up = el('button', 'button', 'Parent') as HTMLButtonElement;
+    up.addEventListener('click', () => navigate(parent));
+    title.appendChild(up);
+  }
   const log = el('button', 'button', 'Log to console') as HTMLButtonElement;
   log.addEventListener('click', () => {
     console.log(`[JQHTML debug] <${component.component_name()}>`, component, element);
@@ -363,7 +481,7 @@ function open_modal(component: Jqhtml_Component): void {
     const link = el('div', 'link');
     link.appendChild(el('span', 'link-name', `<${ancestor.component_name()}>`));
     link.appendChild(el('span', 'link-cid', String(ancestor._cid)));
-    link.addEventListener('click', () => open_modal(ancestor));
+    link.addEventListener('click', () => navigate(ancestor));
     list.appendChild(link);
   }
   body.appendChild(section('Ancestry (DOM, nearest first)', list));
@@ -376,7 +494,7 @@ function open_modal(component: Jqhtml_Component): void {
     const link = el('div', 'link');
     link.appendChild(el('span', 'link-name', `<${instantiator.component_name()}>`));
     link.appendChild(el('span', 'link-cid', String(instantiator._cid)));
-    link.addEventListener('click', () => open_modal(instantiator));
+    link.addEventListener('click', () => navigate(instantiator));
     inst.appendChild(link);
     if (ancestors[0] && instantiator !== ancestors[0]) {
       inst.appendChild(el('div', 'note',
@@ -425,7 +543,9 @@ function lifecycle_button(
         console.error(`[JQHTML debug] ${label} rejected on <${component.component_name()}>`, error);
       })
       .then(() => {
-        if (state.enabled && state.modal_component === component) open_modal(component);
+        // `show`, not `select`: the lifecycle buttons re-render the panel in place
+        // and must not throw away the navigation stack behind it.
+        if (state.enabled && state.modal_component === component) show(component);
       });
   });
   return button;

@@ -35,6 +35,16 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     const body = () => shadow().querySelector('.jqhtml-debug-body');
     const footer_buttons = () => Array.from(shadow().querySelectorAll('.jqhtml-debug-footer-button'));
     const button_named = (label) => footer_buttons().find((b) => b.textContent === label);
+    const title_buttons = () => Array.from(shadow().querySelectorAll('.jqhtml-debug-title .jqhtml-debug-button'));
+    const title_button = (label) => title_buttons().find((b) => b.textContent === label);
+    const title_name = () => {
+      const node = shadow().querySelector('.jqhtml-debug-title-name');
+      return node ? node.textContent : '';
+    };
+    const label_named = (name) => labels().find((l) => l.textContent.includes(name));
+    const leave_label = (label, x, y) => label.dispatchEvent(new MouseEvent('mouseleave', { clientX: Math.round(x), clientY: Math.round(y) }));
+    const enter_label = (label) => label.dispatchEvent(new MouseEvent('mouseenter', {}));
+    const leave_page = (el) => el.dispatchEvent(new MouseEvent('mouseout', { bubbles: true, composed: true }));
     const right_edge = (label) => label.getBoundingClientRect().right;
     const lifecycle_row = () => {
       const key = Array.from(shadow().querySelectorAll('.jqhtml-debug-key')).find((k) => k.textContent === 'lifecycle');
@@ -216,11 +226,101 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     assert('late component label present', labels().some((l) => /Dbg_Marker/.test(l.textContent) && /\$id="late"/.test(l.textContent)));
 
     console.log('');
-    console.log('9. DISABLE REMOVES EVERYTHING BUT THE INSTALLED STYLES:');
+    console.log('8b. HOVER LABELS ARE STICKY AND CLICKABLE:');
+    fire(btn, 'mouseover');
+    assert('hover set established on the inner component', has(inner.$[0], 'jqhtml-debug-hit') && labels().length === 3);
+    let sticky_label = label_named('Dbg_Inner');
+    const label_style = getComputedStyle(sticky_label);
+    assert('a label catches the mouse (pointer-events: auto)', label_style.pointerEvents === 'auto');
+    assert('a label advertises itself as clickable (cursor: pointer)', label_style.cursor === 'pointer');
+    assert('the labels layer itself stays transparent to the mouse',
+      getComputedStyle(shadow().querySelector('.jqhtml-debug-layer')).pointerEvents === 'none');
+    fire(sticky_label, 'mouseover');
+    assert('moving the pointer onto a label keeps the outlines',
+      has(inner.$[0], 'jqhtml-debug-hit') && has(outer.$[0], 'jqhtml-debug-hit'));
+    assert('moving the pointer onto a label keeps the labels', labels().length === 3);
+    enter_label(sticky_label);
+    fire(outer.$[0], 'mouseover');
+    assert('a page hover is ignored while the pointer sits on a label',
+      has(inner.$[0], 'jqhtml-debug-hit') && has(inner.$[0], 'jqhtml-debug-depth-0') && labels().length === 3);
+    const btn_rect = btn.getBoundingClientRect();
+    leave_label(sticky_label, btn_rect.left + btn_rect.width / 2, btn_rect.top + btn_rect.height / 2);
+    assert('leaving a label back onto its own component keeps the hover set',
+      has(inner.$[0], 'jqhtml-debug-hit') && labels().length === 3);
+    const outer_rect = outer.$[0].getBoundingClientRect();
+    const inner_rect = inner.$[0].getBoundingClientRect();
+    sticky_label = label_named('Dbg_Inner');
+    enter_label(sticky_label);
+    leave_label(sticky_label, outer_rect.right - 5, inner_rect.top + inner_rect.height / 2);
+    assert('leaving a label onto an element outside that component clears the hover set',
+      !has(inner.$[0], 'jqhtml-debug-hit') && labels().length === 0);
+
+    console.log('');
+    console.log('8c. CLICKING A LABEL INSPECTS THAT LABEL\'S COMPONENT:');
+    fire(btn, 'mouseover');
+    const clicks_before_label = this.state.clicks;
+    label_named('Dbg_Inner').click();
+    assert('the modal opens for the clicked label\'s component', modal_open() && title_name() === '<Dbg_Inner>');
+    assert('the page click handler did not run', this.state.clicks === clicks_before_label);
+    assert('the inspected element carries the selection class', has(inner.$[0], 'jqhtml-debug-selected'));
+    assert('a label click is a fresh selection, so there is no Back button', !title_button('Back'));
+
+    console.log('');
+    console.log('8d. PARENT / BACK NAVIGATION IN THE TITLE BAR:');
+    assert('a nested component offers Parent', !!title_button('Parent'));
+    assert('title bar button order is Back? Parent? Log to console, Close',
+      JSON.stringify(title_buttons().map((b) => b.textContent)) ===
+      JSON.stringify(['Parent', 'Log to console', 'Close']));
+    title_button('Parent').click();
+    assert('Parent opens the DOM parent component', title_name() === '<Dbg_Outer>');
+    assert('Back appears once something has been navigated away from', !!title_button('Back'));
+    assert('the selection outline moved to the parent',
+      has(outer.$[0], 'jqhtml-debug-selected') && !has(inner.$[0], 'jqhtml-debug-selected'));
+    title_button('Parent').click();
+    assert('Parent again reaches the root component', title_name() === '<Test_Debug_Overlay>');
+    assert('the root component offers no Parent', !title_button('Parent'));
+    assert('Back is still offered two steps in', !!title_button('Back'));
+    title_button('Back').click();
+    assert('Back returns to the previous component', title_name() === '<Dbg_Outer>');
+    assert('Back is still offered one step in', !!title_button('Back'));
+    title_button('Back').click();
+    assert('Back returns to where the walk started', title_name() === '<Dbg_Inner>');
+    assert('Back disappears at the first component', !title_button('Back'));
+    assert('the selection outline came back with it',
+      has(inner.$[0], 'jqhtml-debug-selected') && !has(outer.$[0], 'jqhtml-debug-selected'));
+    const ancestry_link = Array.from(shadow().querySelectorAll('.jqhtml-debug-link')).find((l) => /Dbg_Outer/.test(l.textContent));
+    assert('the Ancestry list offers the parent', !!ancestry_link);
+    ancestry_link.click();
+    assert('clicking an Ancestry entry is a navigation', title_name() === '<Dbg_Outer>' && !!title_button('Back'));
+    fire(btn, 'click');
+    assert('a fresh page click resets the navigation stack',
+      title_name() === '<Dbg_Inner>' && !title_button('Back'));
+
+    console.log('');
+    console.log('9. THE INSPECTED COMPONENT KEEPS AN AMBER OUTLINE:');
+    leave_page(btn);
+    assert('the hover set is gone', !has(inner.$[0], 'jqhtml-debug-hit'));
+    assert('clearing the hover does not clear the selection', has(inner.$[0], 'jqhtml-debug-selected'));
+    assert('the selected component is outlined amber -> ' + getComputedStyle(inner.$[0]).outlineColor,
+      getComputedStyle(inner.$[0]).outlineColor === 'rgb(180, 83, 9)');
+    fire(btn, 'mouseover');
+    assert('the hover outline wins over the selection outline -> ' + getComputedStyle(inner.$[0]).outlineColor,
+      getComputedStyle(inner.$[0]).outlineColor === 'rgb(229, 50, 45)');
+    leave_page(btn);
+    assert('the amber outline returns once the hover ends', getComputedStyle(inner.$[0]).outlineColor === 'rgb(180, 83, 9)');
+    title_button('Close').click();
+    assert('closing the inspector removes the selection class', !has(inner.$[0], 'jqhtml-debug-selected'));
+    assert('no element is left selected', document.querySelectorAll('.jqhtml-debug-selected').length === 0);
+
+    console.log('');
+    console.log('10. DISABLE REMOVES EVERYTHING BUT THE INSTALLED STYLES:');
+    overlay.inspect(inner);
+    assert('inspect() selects the component it opens', has(inner.$[0], 'jqhtml-debug-selected'));
     overlay.disable();
     assert('is_enabled() false', overlay.is_enabled() === false);
     assert('<html data-jqhtml-debug> removed', !html.hasAttribute('data-jqhtml-debug'));
     assert('no element keeps a hit class', document.querySelectorAll('.jqhtml-debug-hit').length === 0);
+    assert('disable() removes the selection class', document.querySelectorAll('.jqhtml-debug-selected').length === 0);
     assert('shadow host detached', !host());
     assert('light stylesheet remains installed (inert)', !!document.getElementById('jqhtml-debug-light-styles'));
     fire(btn, 'mouseover');
@@ -230,7 +330,7 @@ class Test_Debug_Overlay extends Jqhtml_Component {
     assert('inspect() is a no-op while disabled', overlay.inspect(outer) === false);
 
     console.log('');
-    console.log('10. RE-ENABLE REUSES THE INSTALLATION:');
+    console.log('11. RE-ENABLE REUSES THE INSTALLATION:');
     overlay.enable();
     assert('host reattached', !!shadow());
     assert('exactly one light stylesheet', document.querySelectorAll('#jqhtml-debug-light-styles').length === 1);

@@ -7,6 +7,10 @@ $prefix: 'jqhtml-debug';
 // through this list (see DEPTH_COLORS in index.ts - keep the two in step).
 $depth-colors: (#e5322d, #2f6fe4, #1f9d55, #d97706, #7c3aed, #0e7490);
 
+// The inspected component's persistent outline while the modal is open. Amber, so
+// it never collides with a depth colour; the hover outline wins where both apply.
+$selected: #b45309;
+
 $font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 $font-size: 12px;
 $line-height: 1.4;

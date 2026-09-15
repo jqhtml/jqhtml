@@ -3,6 +3,20 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.70 (2026-09-15)
+
+### Added
+
+- Debug overlay: hover tabs are interactive. The pointer can move from a component onto
+  one of its tabs without the outlines collapsing, and clicking a tab opens the inspector
+  for that tab's component.
+- Debug overlay: **Parent** and **Back** buttons in the inspector title bar walk the DOM
+  component chain. Back tracks Parent, Ancestry and Instantiator steps and disappears at
+  the component the walk started from; picking a new component on the page clears it.
+- Debug overlay: the component the inspector is showing keeps an amber outline while the
+  inspector is open. The hover outline takes precedence where both apply.
+  See docs/reference/09_debugging_tools.md.
+
 ## 2.3.69 (2026-09-15)
 
 ### Added
