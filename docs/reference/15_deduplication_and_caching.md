@@ -105,8 +105,19 @@ different entry than the one the component actually joined.
   otherwise as soon as the last follower has collected the data
 - New components with same INVOCATION_KEY trigger new requests
 
-**Each component gets its own data:** the leader's result is stored as JSON text and
-parsed once per follower, so no two components in a group share an object graph.
+**Each component gets its own data:** the leader's result is stored as text and
+rebuilt once per follower, so no two components in a group share an object graph.
+
+**The copy is made by the cache serializer, not by `JSON.stringify`.** The leader's
+`this.data` holds live `Date`, `Map`, `Set` and `register_cache_class()` instances, and the
+follower's copy is produced by `Jqhtml_Local_Storage.serialize()` / `deserialize()` - the same
+code that stores and restores the localStorage cache and that normalizes every `on_load()`
+result into `this.data`. A follower therefore holds byte-identical, prototype-correct data:
+`instanceof` holds for every registered class, and anything the serializer cannot express is
+dropped identically on both sides. A plain JSON round trip would consult each instance's
+`toJSON()` and hand the follower a wire form nothing can restore, so the leader would render
+against instances and the follower against plain objects. Since a follower never runs
+`on_load()` and never revalidates, that copy is final - there is no later load to repair it.
 
 **Why not cache?**
 - Ensures fresh data on page state changes
@@ -553,10 +564,55 @@ this.data.contact.get_display_name()        // "John <john@example.com>"
 **Class registration requirements:**
 - Class must be registered before any component that uses it is created
 - Class name must be unique across registered classes—this is a convention you must follow manually, not something the framework validates. Registering two different classes under the same name silently overwrites the earlier registration with no warning or error.
-- Only own properties are serialized (not prototype methods)
+- With no options, only own enumerable properties are serialized (not prototype methods), and `toJSON()` is deliberately bypassed - the instance is rebuilt by `Object.create(prototype)` plus `Object.assign`
 - Nested class instances are supported
 
 **Without registration:** Unregistered class instances are serialized as plain objects. Methods will not be available after cache restoration.
+
+**Classes with a wire form (`to_plain` / `from_plain`):**
+
+A class whose state is not a bag of own enumerable properties - one that defines `toJSON()`
+for the network, or keeps state in private fields - tells the serializer how to rebuild
+itself:
+
+```javascript
+class Rich_Text {
+  constructor(raw) { this._raw = raw; }
+  toJSON() { return { __TEXT: 'Rich_Text', raw: this._raw, empty: this._raw.length === 0 }; }
+  is_empty() { return this._raw.length === 0; }
+}
+
+// to_plain defaults to instance.toJSON() when from_plain is given
+jqhtml.register_cache_class(Rich_Text, {
+  from_plain: (plain) => new Rich_Text(plain.raw)
+});
+
+class Money {
+  #cents;
+  constructor(cents) { this.#cents = cents; }
+  get cents() { return this.#cents; }
+  is_zero() { return this.#cents === 0; }
+}
+
+jqhtml.register_cache_class(Money, {
+  to_plain:   (money) => money.cents,
+  from_plain: (cents) => new Money(cents)
+});
+```
+
+| Option | Meaning | Default |
+|---|---|---|
+| `to_plain(instance)` | the plain value to store; walked by the serializer, so instances nested in it are handled | `instance.toJSON()` if defined, else own enumerable properties |
+| `from_plain(plain)` | rebuilds a live instance from the stored value | none - required whenever `to_plain` is given |
+
+Passing `to_plain` without `from_plain` throws at registration: the serializer cannot guess
+how to undo a custom wire form. A `to_plain` that throws for some instance drops that value
+(and warns once in development, like any other stripped value).
+
+Registered classes round-trip identically through the localStorage cache, the normalization
+of every `on_load()` result, and the leader-to-follower hand-off of load deduplication.
+`Date`, `Map` and `Set` are pre-registered through the same hook; there is no second
+mechanism.
 
 ### Data Mode Advantages
 
@@ -1643,7 +1699,7 @@ function generate_invocation_key(component_name, args) {
   [INVOCATION_KEY]: {
     status: 'loading',              // 'loading' | 'completed' | 'failed'
     promise: Promise<void>,         // Leader's on_load() promise
-    leader_data: any,               // Result after leader completes
+    leader_data: string | null,     // Leader's this.data as cache-serializer text
     waiting: Component[]            // Queue of follower components
   }
 }

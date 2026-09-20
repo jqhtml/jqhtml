@@ -1,0 +1,9 @@
+<Define:Coordinator_Follower_Class_Instances>
+  <div>
+    <h1>A deduplicated follower holds the same instances as its leader</h1>
+    <div $sid="c1"><Cfc_Item $item_id=7 /></div>
+    <div $sid="c2"><Cfc_Item $item_id=7 /></div>
+    <div $sid="c3"><Cfc_Item $item_id=7 /></div>
+    <div $sid="stage"></div>
+  </div>
+</Define:Coordinator_Follower_Class_Instances>

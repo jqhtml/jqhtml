@@ -129,7 +129,7 @@ import './jquery-plugin.js';
 // Local storage (internal only - not exported in public API, but exported for internal use)
 import { Jqhtml_Local_Storage, register_cache_class } from './local-storage.js';
 export { Jqhtml_Local_Storage, register_cache_class };
-export type { CacheMode } from './local-storage.js';
+export type { CacheMode, Cache_Class_Options } from './local-storage.js';
 
 // Load coordinator (internal only - not exported in public API, but exported for internal use)
 import { Load_Coordinator } from './load-coordinator.js';

@@ -1,0 +1,14 @@
+<%--
+Cfc_Item - renders by CALLING METHODS on the instances in this.data. A follower
+handed plain objects instead of instances throws "... is not a function" here.
+--%>
+<Define:Cfc_Item class="cfc-item">
+  <% if (this.data.loaded) { %>
+    <span class="price"><%= this.data.price.format() %></span>
+    <span class="body"><%= this.data.body.is_empty() ? 'empty' : this.data.body.raw %></span>
+    <span class="model"><%= this.data.model.label() %></span>
+    <span class="nested"><%= this.data.lookup.get('fee').is_zero() ? 'no-fee' : 'fee' %></span>
+  <% } else { %>
+    <span class="loading">loading</span>
+  <% } %>
+</Define:Cfc_Item>

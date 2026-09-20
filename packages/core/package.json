@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/core",
-  "version": "2.3.70",
+  "version": "2.3.71",
   "description": "Core runtime library for JQHTML",
   "type": "module",
   "main": "./dist/index.js",

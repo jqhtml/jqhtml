@@ -3,6 +3,24 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.71 (2026-09-20)
+
+### Bug Fixes
+
+- Load deduplication: a follower's copy of its leader's data goes through the cache serializer
+  instead of a plain JSON round trip, so `register_cache_class()` instances, `Date`, `Map` and
+  `Set` reach followers as live instances. Previously every follower rendered against plain
+  objects (the `toJSON()` wire form) and the first method call threw, intermittently, because
+  whether a follower exists is a render-timing race.
+
+### Features
+
+- `jqhtml.register_cache_class(Klass, { to_plain, from_plain })` registers a class whose wire
+  form is not its own properties, such as one that defines `toJSON()` or keeps state in
+  private fields. `to_plain` defaults to `toJSON()`. Such classes round-trip identically
+  through the localStorage cache, `on_load()` normalization and the deduplication hand-off.
+  `Date`, `Map` and `Set` now use the same hook.
+
 ## 2.3.70 (2026-09-15)
 
 ### Added

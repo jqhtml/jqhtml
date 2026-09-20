@@ -3,6 +3,35 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.71 (2026-09-20)
+
+### Bug Fixes
+
+* **load coordinator:** a deduplicated follower's copy of its leader's data is made by the
+  cache serializer (`Jqhtml_Local_Storage.serialize()` / `deserialize()`), not by
+  `JSON.stringify` / `JSON.parse`. The JSON round trip consulted every instance's `toJSON()`
+  and handed followers a wire form `normalize_for_cache()` could not recognise, so
+  `register_cache_class()` instances, `Date`, `Map` and `Set` arrived as plain objects on
+  every follower while the leader held live instances. The first method call on a follower's
+  data threw `... is not a function`, and only on page loads whose timing produced a follower.
+  Leader and followers now hold byte-identical, prototype-correct `this.data`.
+
+### Features
+
+* **cache serializer:** `register_cache_class(Klass, { to_plain, from_plain })` registers a
+  class whose wire form is not its own enumerable properties (one that defines `toJSON()`, or
+  keeps state in private fields). `to_plain` defaults to `instance.toJSON()` when `from_plain`
+  is given; `to_plain` without `from_plain` throws at registration. The plain form is walked
+  by the serializer, so instances nested inside it are rebuilt too. Registered classes
+  round-trip identically through the localStorage cache, the normalization of every
+  `on_load()` result, and the leader-to-follower hand-off. `Date`, `Map` and `Set` are
+  pre-registered through the same hook, with their stored wire forms unchanged.
+* **cache serializer:** `Jqhtml_Local_Storage.serialize(value)` and `deserialize(text)` expose
+  the class-aware text form for internal copy-by-value use.
+* **cache serializer:** the once-only development warning for an unregistered class now says
+  to register with `{ from_plain }` when the class defines `toJSON()`; a `to_plain` that throws
+  drops that value and warns the same way.
+
 ## 2.3.70 (2026-09-15)
 
 ### Added

@@ -17,11 +17,21 @@
  * 3. Leader completes → distribute data to all followers
  * 4. Clear coordination entry (no caching)
  *
+ * The hand-off is a copy, and it is made by the cache serializer
+ * (Jqhtml_Local_Storage.serialize()/deserialize()), never by JSON.stringify.
+ * A follower never runs on_load() and never revalidates, so whatever it is
+ * handed is final: the copy has to rebuild Date, Map, Set and every
+ * register_cache_class() instance exactly as the leader's this.data holds them.
+ * JSON.stringify would consult toJSON() and hand out a wire form that
+ * normalize_for_cache() cannot recognise - the follower would then render
+ * against plain objects while the leader renders against instances.
+ *
  * @internal This class is not exposed in the public API
  */
 
 import type { Jqhtml_Component } from './component.js';
 import { serialize_for_cache_key } from './cache-key-serializer.js';
+import { Jqhtml_Local_Storage } from './local-storage.js';
 
 interface CoordinationEntry {
     status: 'loading' | 'completed' | 'failed';
@@ -29,7 +39,10 @@ interface CoordinationEntry {
     resolve_promise: () => void;  // Resolves when coordination completes (after data is ready)
     reject_promise: (error: Error) => void;  // Rejects when the leader's on_load() throws
     leader_component: Jqhtml_Component;
-    /** The leader's final data as JSON TEXT, so every follower can parse its own object. */
+    /**
+     * The leader's final data as class-aware serializer TEXT (see file header), so
+     * every follower rebuilds its own object graph. null when it could not be expressed.
+     */
     leader_data: string | null;
     waiting: Jqhtml_Component[];
 }
@@ -273,14 +286,13 @@ export class Load_Coordinator {
             return;
         }
 
-        // Stored as TEXT so each follower parses its own object graph - sharing one
+        // Stored as TEXT so each follower rebuilds its own object graph - sharing one
         // decoded object would let one component's mutation reach every other.
-        try {
-            entry.leader_data = JSON.stringify(final_data);
-        } catch (error) {
-            // Unserializable data cannot be shared; followers load independently.
-            entry.leader_data = null;
-        }
+        // The cache serializer, not JSON.stringify: this.data holds live Date/Map/Set
+        // and register_cache_class() instances, and only the serializer that made
+        // them knows how to carry them across. null means the data as a whole could
+        // not be expressed; followers then load independently.
+        entry.leader_data = Jqhtml_Local_Storage.serialize(final_data);
         entry.status = 'completed';
 
         if ((window as any).jqhtml?.debug?.verbose) {
@@ -320,8 +332,9 @@ export class Load_Coordinator {
             entry.waiting.splice(follower_index, 1);
         }
 
-        // One parse per follower: each gets its OWN object, never a shared reference.
-        const data = JSON.parse(entry.leader_data);
+        // One deserialize per follower: each gets its OWN object graph, never a
+        // shared reference, with the same instances the leader's this.data holds.
+        const data = Jqhtml_Local_Storage.deserialize(entry.leader_data);
 
         if ((window as any).jqhtml?.debug?.verbose) {
             console.log(

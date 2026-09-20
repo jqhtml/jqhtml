@@ -16,7 +16,19 @@
  * ES6 class instances can be serialized and deserialized if registered via
  * register_cache_class(). Classes are wrapped as {__jqhtml_class__: "Name", __jqhtml_props__: {...}}
  * and restored to proper instances on retrieval. Nested class instances in objects
- * and arrays are handled recursively.
+ * and arrays are handled recursively. A class whose wire form is not its own
+ * properties (one that defines toJSON(), or keeps state in private fields)
+ * registers a {to_plain, from_plain} pair and is rebuilt through it. Date, Map and
+ * Set are pre-registered the same way - there is no second mechanism.
+ *
+ * ONE SERIALIZER. Every copy of on_load() data the framework makes goes through
+ * this file: the localStorage cache (set()/get()), the normalization of every
+ * on_load() result into this.data (normalize_for_cache()), and the copy a
+ * deduplicated follower takes of its leader's data (serialize()/deserialize(),
+ * used by load-coordinator.ts). Anything that survives one of those survives all
+ * of them, and anything dropped is dropped identically on all of them. A plain
+ * JSON.stringify anywhere on those paths would consult toJSON() and hand out a
+ * wire form nothing knows how to restore.
  *
  * Scoping Strategy:
  * Storage is scoped by a user-provided cache key (typically a session identifier,
@@ -99,8 +111,37 @@ import { get_config } from './config.js';
 // Class Registry for Serialization
 // ============================================================================
 
-// Registry mapping class names to constructors
-const class_registry: Record<string, new (...args: any[]) => any> = Object.create(null);
+/**
+ * How a registered class travels through the serializer.
+ *
+ * With no options, an instance's own enumerable properties go out and come back
+ * through Object.create(prototype) + Object.assign - right for a class whose
+ * state IS its own properties.
+ *
+ * A class whose wire form is something else names how to rebuild itself:
+ *
+ *   to_plain(instance)  -> the plain value to store. Default when from_plain is
+ *                          given: instance.toJSON() if the class defines one,
+ *                          otherwise its own enumerable properties. The result is
+ *                          walked by the serializer like any other value, so
+ *                          instances nested inside it are handled too.
+ *   from_plain(plain)   -> a live instance. Required whenever to_plain is given,
+ *                          because the serializer cannot guess how to undo a
+ *                          custom wire form.
+ */
+export interface Cache_Class_Options<T = any> {
+    to_plain?: (instance: T) => any;
+    from_plain?: (plain: any) => T;
+}
+
+interface Registered_Class {
+    klass: new (...args: any[]) => any;
+    to_plain: ((instance: any) => any) | null;
+    from_plain: ((plain: any) => any) | null;
+}
+
+// Registry mapping class names to constructors and their restore hooks
+const class_registry: Record<string, Registered_Class> = Object.create(null);
 
 // Markers for serialized class instances (unique to avoid collisions with user data)
 // Replaced at build time by rollup (see rollup.config.js).
@@ -114,13 +155,60 @@ const PROPS_MARKER = '__jqhtml_props__';
  * Must be called before attempting to cache instances of this class.
  *
  * @param klass - The class constructor to register
- * @throws Error if klass is not a named function/class
+ * @param options - How to convert instances to and from their plain form; see
+ *                  Cache_Class_Options. Omit for a class whose state is its own
+ *                  enumerable properties.
+ * @throws Error if klass is not a named function/class, or if to_plain is given
+ *         without the from_plain that undoes it
  */
-export function register_cache_class(klass: new (...args: any[]) => any): void {
+export function register_cache_class(
+    klass: new (...args: any[]) => any,
+    options: Cache_Class_Options = {}
+): void {
     if (typeof klass !== 'function' || !klass.name) {
         throw new Error('[JQHTML Cache] register_cache_class requires a named class constructor');
     }
-    class_registry[klass.name] = klass;
+    const to_plain = typeof options.to_plain === 'function' ? options.to_plain : null;
+    const from_plain = typeof options.from_plain === 'function' ? options.from_plain : null;
+    if (to_plain && !from_plain) {
+        throw new Error(
+            `[JQHTML Cache] register_cache_class(${klass.name}): to_plain needs a from_plain. ` +
+            `The serializer cannot rebuild an instance from a custom wire form on its own.`
+        );
+    }
+    class_registry[klass.name] = { klass, to_plain, from_plain };
+}
+
+// Built-ins travel through the same hook as user classes. Their wire forms are
+// the ones the cache has always stored (ISO string, entry pairs, item list), so
+// entries written before this existed still restore.
+register_cache_class(Date, {
+    to_plain: (date: Date) => date.toISOString(),
+    from_plain: (iso: string) => new Date(iso)
+});
+register_cache_class(Map, {
+    to_plain: (map: Map<any, any>) => Array.from(map.entries()),
+    from_plain: (entries: [any, any][]) => new Map(entries)
+});
+register_cache_class(Set, {
+    to_plain: (set: Set<any>) => Array.from(set),
+    from_plain: (items: any[]) => new Set(items)
+});
+
+/**
+ * Find the registry entry for a live value: by constructor name first, then by
+ * instanceof for the built-ins so a subclass of Date/Map/Set (whose name is not
+ * registered) still serializes as the built-in it is.
+ */
+function lookup_registered(value: any): { name: string; entry: Registered_Class } | null {
+    const ctor = value.constructor;
+    if (ctor && ctor.name && class_registry[ctor.name]) {
+        return { name: ctor.name, entry: class_registry[ctor.name] };
+    }
+    if (value instanceof Date) return { name: 'Date', entry: class_registry['Date'] };
+    if (value instanceof Map) return { name: 'Map', entry: class_registry['Map'] };
+    if (value instanceof Set) return { name: 'Set', entry: class_registry['Set'] };
+    return null;
 }
 
 /**
@@ -147,7 +235,8 @@ export type Strip_Kind =
     | 'symbol'
     | 'bigint'
     | 'circular'
-    | 'unregistered-class';
+    | 'unregistered-class'
+    | 'to-plain-threw';
 
 /** Called once per dropped/degraded value with its path and what it was. */
 export type Strip_Collector = (path: string, kind: Strip_Kind, detail?: string) => void;
@@ -296,54 +385,21 @@ function process_for_serialization(
             return result;
         }
 
-        // Handle Date objects specially
-        if (value instanceof Date) {
-            return {
-                [CLASS_MARKER]: 'Date',
-                [PROPS_MARKER]: value.toISOString()
-            };
-        }
-
-        // Handle Map objects
-        if (value instanceof Map) {
-            const entries: [any, any][] = [];
-            for (const [k, v] of value) {
-                const entry_path = collector ? `${path}.get(${String(k)})` : '';
-                const processedKey = process_for_serialization(k, verbose, seen, entry_path, collector);
-                const processedValue = process_for_serialization(v, verbose, seen, entry_path, collector);
-                entries.push([processedKey, processedValue]);
+        // Registered classes - Date, Map and Set included - go out as
+        // {__jqhtml_class__, __jqhtml_props__} through their restore hook.
+        const registered = lookup_registered(value);
+        if (registered) {
+            const plain = registered_plain_form(registered, value, verbose, seen, path, collector);
+            if (plain === undefined) {
+                return undefined; // to_plain threw; the value is dropped, and reported
             }
             return {
-                [CLASS_MARKER]: 'Map',
-                [PROPS_MARKER]: entries
+                [CLASS_MARKER]: registered.name,
+                [PROPS_MARKER]: plain
             };
         }
 
-        // Handle Set objects
-        if (value instanceof Set) {
-            const items: any[] = [];
-            let index = 0;
-            for (const item of value) {
-                items.push(process_for_serialization(
-                    item, verbose, seen, collector ? `${path}[Set ${index++}]` : '', collector
-                ));
-            }
-            return {
-                [CLASS_MARKER]: 'Set',
-                [PROPS_MARKER]: items
-            };
-        }
-
-        // Get the constructor
         const ctor = value.constructor;
-
-        // Handle registered class instances
-        if (ctor && ctor.name && class_registry[ctor.name]) {
-            return {
-                [CLASS_MARKER]: ctor.name,
-                [PROPS_MARKER]: process_own_properties(value, verbose, seen, path, collector)
-            };
-        }
 
         // Handle plain objects (constructor is Object or no constructor)
         if (ctor === Object || ctor === undefined || ctor === null) {
@@ -367,6 +423,57 @@ function process_for_serialization(
         // Pop this object off the ancestor path now that its subtree is done.
         seen.delete(value);
     }
+}
+
+/**
+ * The plain value stored for a registered instance.
+ *
+ * No from_plain: own enumerable properties (toJSON() is deliberately bypassed,
+ * because Object.assign is the only way back and it needs the properties).
+ * With from_plain: to_plain(instance), or toJSON() when the class defines one,
+ * or own properties as the last resort. Whatever comes back is walked by the
+ * serializer like any other value.
+ *
+ * Returns undefined when to_plain threw - the caller drops the value.
+ */
+function registered_plain_form(
+    registered: { name: string; entry: Registered_Class },
+    value: any,
+    verbose: boolean,
+    seen: WeakSet<object>,
+    path: string,
+    collector?: Strip_Collector
+): any {
+    const { name, entry } = registered;
+
+    if (!entry.from_plain) {
+        return process_own_properties(value, verbose, seen, path, collector);
+    }
+
+    let plain: any;
+    try {
+        if (entry.to_plain) {
+            plain = entry.to_plain(value);
+        } else if (typeof value.toJSON === 'function') {
+            plain = value.toJSON();
+        } else {
+            return process_own_properties(value, verbose, seen, path, collector);
+        }
+    } catch (e) {
+        collector?.(path, 'to-plain-threw', name);
+        if (verbose) {
+            console.warn(`[JQHTML Cache] to_plain for class "${name}" threw - value will be omitted:`, e);
+        }
+        return undefined;
+    }
+
+    // A toJSON() that returns `this` has no separate wire form; own properties it is.
+    if (plain === value) {
+        return process_own_properties(value, verbose, seen, path, collector);
+    }
+
+    const processed = process_for_serialization(plain, verbose, seen, path, collector);
+    return processed === undefined ? null : processed;
 }
 
 /**
@@ -437,7 +544,11 @@ function strip_advice(kind: Strip_Kind, detail?: string): string {
         case 'unregistered-class':
             return `it is an instance of the unregistered class "${detail}", so it was degraded to a plain ` +
                    `object and its methods are gone. Call jqhtml.register_cache_class(${detail}) at startup ` +
-                   `to get real instances back.`;
+                   `to get real instances back - with { from_plain } if the class defines toJSON() or keeps ` +
+                   `state outside its own properties.`;
+        case 'to-plain-threw':
+            return `the to_plain hook registered for class "${detail}" threw, so the value was dropped. ` +
+                   `Make to_plain total over every instance the class can produce.`;
     }
 }
 
@@ -516,33 +627,9 @@ function process_for_deserialization(value: any, verbose: boolean): any {
         const class_name = value[CLASS_MARKER];
         const props = value[PROPS_MARKER];
 
-        // Handle built-in types
-        if (class_name === 'Date') {
-            return new Date(props);
-        }
-
-        if (class_name === 'Map') {
-            const map = new Map();
-            for (const [k, v] of props) {
-                map.set(
-                    process_for_deserialization(k, verbose),
-                    process_for_deserialization(v, verbose)
-                );
-            }
-            return map;
-        }
-
-        if (class_name === 'Set') {
-            const set = new Set();
-            for (const item of props) {
-                set.add(process_for_deserialization(item, verbose));
-            }
-            return set;
-        }
-
-        // Look up registered class
-        const klass = class_registry[class_name];
-        if (!klass) {
+        // Look up registered class (Date, Map and Set are registered like any other)
+        const entry = class_registry[class_name];
+        if (!entry) {
             if (verbose) {
                 console.warn(
                     `[JQHTML Cache] Cannot restore class "${class_name}" - not registered. ` +
@@ -554,10 +641,14 @@ function process_for_deserialization(value: any, verbose: boolean): any {
             return process_for_deserialization(props, verbose);
         }
 
-        // Create instance without calling constructor and assign properties
+        // Restore through from_plain when the class has one; otherwise create an
+        // instance without calling the constructor and assign the properties back.
         try {
-            const instance = Object.create(klass.prototype);
             const processed_props = process_for_deserialization(props, verbose);
+            if (entry.from_plain) {
+                return entry.from_plain(processed_props);
+            }
+            const instance = Object.create(entry.klass.prototype);
             Object.assign(instance, processed_props);
             return instance;
         } catch (e) {
@@ -880,6 +971,31 @@ export class Jqhtml_Local_Storage {
         }
 
         this._remove_item(key);
+    }
+
+    /**
+     * Serialize a value to its class-aware TEXT form - the same text set() stores.
+     *
+     * This is the copy-by-value primitive the rest of the framework uses whenever
+     * data has to cross from one component to another (load-coordinator.ts hands a
+     * leader's data to its followers through it). Plain JSON.stringify is not a
+     * substitute: it consults toJSON() and produces a wire form that deserialize()
+     * cannot recognise, so a registered class would come back as a plain object.
+     *
+     * @returns The text, or null when the value as a whole cannot be expressed.
+     */
+    static serialize(value: any): string | null {
+        return serialize_value(value, this._is_verbose());
+    }
+
+    /**
+     * Rebuild a value from text produced by serialize(), restoring Date, Map, Set
+     * and every register_cache_class() class. Returns null when the text is not
+     * restorable (a registered from_plain threw at the root) - the same signal
+     * get() gives for a corrupt entry.
+     */
+    static deserialize(text: string): any {
+        return deserialize_value(text, this._is_verbose());
     }
 
     /**
