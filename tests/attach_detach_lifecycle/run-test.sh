@@ -5,4 +5,5 @@ node ../../jqhtml-render-harness/test-runner.js \
   test.jqhtml \
   watched_widget.jqhtml \
   plain_widget.jqhtml \
+  host_widget.jqhtml \
   test.js

@@ -562,8 +562,9 @@ server actually stored.
   then calls `on_stop()` if defined. Reached automatically by every jQuery removal
   (`.remove()`, `.empty()`, `.html(x)`, `.text(x)`, `.replaceWith()`) via the
   `jQuery.cleanData` hook, and by parent re-renders.
-- **`is_attached()`** — the component's recorded attachment state, as reported by the
-  `attach` / `detach` events (false until the first check after `ready`).
+- **`is_attached()`** — live: `true` when the root is in the document right now and the
+  component is not stopped. Correct before the first `attach` fires and for untracked
+  components; can run a moment ahead of the matching event.
 
 `render()` and `reload()` invalidate the sticky `ready` state first, so a `.ready()` or
 `.on('ready')` registered mid-cycle waits for the NEW render instead of resolving against

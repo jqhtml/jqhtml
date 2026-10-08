@@ -1,0 +1,5 @@
+<Define:Host_Widget>
+  <div class="host-widget">
+    <div class="host-child"><Watched_Widget $label="nested" /></div>
+  </div>
+</Define:Host_Widget>

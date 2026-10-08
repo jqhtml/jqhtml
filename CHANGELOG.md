@@ -3,6 +3,18 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.74 (2026-10-08)
+
+### Bug Fixes
+
+- `is_attached()` is now a live answer: `true` when the root is in the document right now
+  and the component is not stopped. In 2.3.72 it returned the recorded state behind the
+  `attach`/`detach` events, which was `false` inside `on_create()`/`on_load()`/`on_ready()`
+  for an in-document component (the first check runs after the `ready` handlers) and stayed
+  `true` for an untracked component removed natively. The events, their timing, strict
+  alternation and `detach`-before-`stop` are unchanged; `is_attached()` never starts
+  tracking and can run a moment ahead of the matching event.
+
 ## 2.3.72 (2026-10-08)
 
 ### Features

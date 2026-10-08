@@ -15,6 +15,7 @@ class Attach_Detach_Test extends Jqhtml_Component {
     await w1.ready();
     assert('attach fires after on_ready (hook order)', same(w1.state.log, ['ready', 'on_attach']));
     assert('is_attached() true once attached', w1.is_attached() === true);
+    assert('is_attached() is live: true inside on_ready, before attach fired', w1.state.attached_in_ready === true);
     let late = 0;
     w1.on('attach', () => late++);
     assert('late .on(attach) gets the sticky fire', late === 1);
@@ -95,6 +96,7 @@ class Attach_Detach_Test extends Jqhtml_Component {
     $p4[0].remove();                 // native removal: no cleanData, no stop
     await tick();
     assert('native removal does not stop (documented hole)', p4.state.log.length === 0);
+    assert('is_attached() is live: false after native removal with no tracking', p4.is_attached() === false);
     let p4_detach = 0;
     p4.on('detach', () => p4_detach++);
     assert('late .on(detach) after native removal fires detach immediately', p4_detach === 1 && p4.is_attached() === false);
@@ -110,6 +112,7 @@ class Attach_Detach_Test extends Jqhtml_Component {
     const w2 = $w2.component();
     await w2.ready();
     assert('born detached: no attach after ready', same(w2.state.log, ['ready']) && w2.is_attached() === false);
+    assert('born detached: is_attached() false inside on_ready', w2.state.attached_in_ready === false);
     $w2.appendTo($arena);
     await tick();
     assert('born detached: attach once inserted', same(w2.state.log, ['ready', 'on_attach']));
@@ -126,6 +129,91 @@ class Attach_Detach_Test extends Jqhtml_Component {
       same(k.state.log, ['ready', 'on_attach', 'on_detach', 'on_stop']));
     await tick();
     assert('tracker count is zero at the end', jqhtml.tracked_attachment_count() === 0);
+
+    // --- 11. Every removal path, checked at the EVENT level (stop + detach events, class),
+    //         on a tracked component, with ordering detach -> on_stop -> stop event.
+    const removal_paths = {
+      'remove()':            ($el) => $el.remove(),
+      'remove(selector)':    ($el) => $el.remove('.Watched_Widget'),
+      'replaceWith() self':  ($el) => $el.replaceWith('<div>swap</div>'),
+      'replaceAll()':        ($el) => $('<div>swap</div>').replaceAll($el),
+      'ancestor remove()':   ($el) => $el.parent().remove(),
+      'ancestor empty()':    ($el) => $el.parent().empty(),
+      'ancestor html(x)':    ($el) => $el.parent().html('<i>x</i>'),
+      'ancestor text(x)':    ($el) => $el.parent().text('x'),
+      'ancestor replaceWith()': ($el) => $el.parent().replaceWith('<div>swap</div>'),
+    };
+    for (const [name, remove] of Object.entries(removal_paths)) {
+      const $box = $('<div>').appendTo($arena);
+      const $el = $('<div>').appendTo($box).component('Watched_Widget', { label: name });
+      const c = $el.component();
+      await c.ready();
+      const order = [];
+      c.on('detach', () => order.push('detach_event'));
+      c.on('stop', () => order.push('stop_event'));
+      order.length = 0;                       // drop the sticky 'attach'-era noise (none expected, but be explicit)
+      remove($el);
+      assert(name + ': stop event fired', order.includes('stop_event'));
+      assert(name + ': detach event fired before stop event', same(order, ['detach_event', 'stop_event']));
+      assert(name + ': hooks in order on_detach -> on_stop',
+        same(c.state.log.slice(-2), ['on_detach', 'on_stop']));
+      assert(name + ': _Component_Stopped class set', c.$.hasClass('_Component_Stopped'));
+      assert(name + ': is_attached() false', c.is_attached() === false);
+      $box.remove();
+    }
+
+    // --- 12. Nested components: ancestor removal stops parent AND child, parent first
+    const $nest = $('<div>').appendTo($arena);
+    const $outer = $('<div>').appendTo($nest).component('Plain_Widget', { label: 'outer' });
+    const outer = $outer.component();
+    await outer.ready();
+    const $inner = $('<div>').appendTo($outer).component('Watched_Widget', { label: 'inner' });
+    const inner = $inner.component();
+    await inner.ready();
+    const nested_order = [];
+    outer.on('stop', () => nested_order.push('outer'));
+    inner.on('stop', () => nested_order.push('inner'));
+    $nest.remove();
+    assert('nested: both parent and child receive stop on ancestor remove()', same(nested_order, ['outer', 'inner']));
+    assert('nested: child got detach before its stop', same(inner.state.log.slice(-2), ['on_detach', 'on_stop']));
+
+    // --- 13. Parent render() re-render: old tracked child is detached + stopped, new child attaches
+    const $h = $('<div>').appendTo($arena).component('Host_Widget');
+    const host = $h.component();
+    await host.ready();
+    const first_child = $h.find('.Watched_Widget').component();
+    assert('host: child booted and attached', first_child.is_attached() === true && same(first_child.state.log, ['ready', 'on_attach']));
+    let first_child_stop = 0;
+    first_child.on('stop', () => first_child_stop++);
+    await host.render();
+    const second_child = $h.find('.Watched_Widget').component();
+    assert('host render(): old child is a different instance', second_child !== first_child);
+    assert('host render(): old child detached then stopped', same(first_child.state.log, ['ready', 'on_attach', 'on_detach', 'on_stop']) && first_child_stop === 1);
+    assert('host render(): new child attached after its ready', same(second_child.state.log, ['ready', 'on_attach']));
+    $h.remove();
+    assert('host remove(): host and new child both stopped',
+      same(host.state.log, ['on_stop']) && same(second_child.state.log.slice(-2), ['on_detach', 'on_stop']));
+
+    // --- 14. .component('Name') on an element already holding a component stops the old one
+    const $slot = $('<div>').appendTo($arena).component('Watched_Widget', { label: 'first' });
+    const old = $slot.component();
+    await old.ready();
+    $slot.component('Plain_Widget', { label: 'second' });
+    assert('.component() re-init: old component detached then stopped', same(old.state.log, ['ready', 'on_attach', 'on_detach', 'on_stop']));
+    assert('.component() re-init: element now holds the new component', $slot.component() !== old && $slot.component().component_name() === 'Plain_Widget');
+    $slot.remove();
+
+    // --- 15. No resurrection: a stopped component reinserted into the document fires nothing
+    const $z = $('<div>').appendTo($arena).component('Watched_Widget', { label: 'z' });
+    const z = $z.component();
+    await z.ready();
+    $z.remove();                            // stops it (detach -> stop)
+    const len = z.state.log.length;
+    $z.appendTo($arena);                    // the dead node goes back in
+    await tick();
+    assert('stopped component reinserted: no attach, nothing fires', z.state.log.length === len && z.is_attached() === false);
+    assert('stopped component reinserted: observer not re-armed for it', jqhtml.tracked_attachment_count() === 0);
+    $z[0].remove();
 
     console.log('SUMMARY: ' + passed + ' passed, ' + failed + ' failed');
     window.testPassed = (failed === 0);

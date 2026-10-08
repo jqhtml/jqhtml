@@ -433,7 +433,7 @@ this.sid('name')  // Get child component instance by scoped ID
 | `refresh()` | Yes | Conditional | Only if data changed | If args changed | Polling / background sync without flicker. Debounced (shares queue with reload) |
 | `ready(cb?)` | No | No | No | No | Promise (or callback) resolving when component completes its lifecycle |
 | `stop()` | No | No | No | No | Stop lifecycle before removal: fires `detach` first if attached, always adds `_Component_Stopped`, de-registers from the parent and fires `stop`; calls `on_stop()` when overridden; does NOT remove DOM. Reached automatically by every jQuery removal (`.remove()`, `.empty()`, `.html(x)`, `.text(x)`, `.replaceWith()`) via the `jQuery.cleanData` hook and by parent re-renders; NOT by native DOM removal. A hook that throws during boot stops the component the same way, so ancestors are never left waiting |
-| `is_attached()` | No | No | No | No | The component's recorded attachment state, exactly as the `attach`/`detach` events reported it (false until the first check after `ready`) |
+| `is_attached()` | No | No | No | No | Live: `true` when the root is in the document right now and the component is not stopped. Correct before the first `attach` and for untracked components; may run a moment ahead of the matching event |
 
 `redraw()` is an alias for `render()`.
 

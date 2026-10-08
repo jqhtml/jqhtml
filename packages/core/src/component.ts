@@ -1992,15 +1992,20 @@ export class Jqhtml_Component {
   // -------------------------------------------------------------------------
 
   /**
-   * Whether this component currently considers itself attached to the document.
+   * Whether this component's root is in the document right now.
    *
-   * This is the component's recorded state, not a live isConnected read: it is
-   * false until the first check after 'ready', and from then on flips only when a
-   * transition is observed (or on stop()). It is exactly the state 'attach' and
-   * 'detach' have reported.
+   * A live answer - one isConnected read - so it is correct at every point in the
+   * lifecycle (including on_create()/on_load()/on_ready(), before the first 'attach')
+   * and for untracked components (a natively-removed component that nothing watches
+   * still answers false). A stopped component always answers false.
+   *
+   * It does NOT read the recorded state behind 'attach'/'detach' (_attached), and it
+   * never starts tracking. The two can disagree briefly: is_attached() can be true
+   * before the first 'attach' has fired, and changes a moment before the matching
+   * event, since the events come from the document observer.
    */
   is_attached(): boolean {
-    return this._attached;
+    return !this._stopped && !!this.$[0].isConnected;
   }
 
   /**

@@ -1123,11 +1123,12 @@ jQuery; attachment tracking does not.
 | `on_attach()` | hook, sync | Root entered the document |
 | `on_detach()` | hook, sync | Root left the document, or the component is being stopped while attached |
 | `'attach'` / `'detach'` | events, sticky | Fired after the matching hook; `.on()`/`.once()` as for any event |
-| `is_attached()` | method | The component's recorded state - exactly what the events have reported |
+| `is_attached()` | method | Live: `true` when the root is in the document right now and the component is not stopped. One `isConnected` read; never starts tracking |
 
 **The state machine**:
 
-1. Every component starts with `is_attached() === false`.
+1. Every component starts with its recorded state detached (this is the state behind the
+   events, not what `is_attached()` returns - see below).
 2. The first check runs **after `on_ready()` and after the `ready` handlers have run**.
    If the root is in the document, the component flips to attached, `on_attach()` runs,
    and `attach` fires. This happens whether or not anything is listening, so a later
@@ -1218,6 +1219,15 @@ function watch_component(component, channel, on_message) {
   // references it, it should be collectable.
 }
 ```
+
+**`is_attached()` is live, the events are observed.** `is_attached()` reads the root's
+`isConnected` and is therefore correct at every point in the lifecycle - inside
+`on_create()`, `on_load()` and `on_ready()` before the first `attach` has fired, and for
+untracked components, where a natively-removed root answers `false` with nothing watching
+it. A stopped component answers `false`. The two can disagree briefly: `is_attached()` can
+be `true` before the first `attach`, and it changes a moment before the matching event,
+because the events come from the document observer and fire per mutation batch. Use
+`is_attached()` to ask "am I in the document?"; use the events to be told when that changes.
 
 **Rules**:
 - `on_attach()` and `on_detach()` MUST be synchronous. A returned Promise is warned about
