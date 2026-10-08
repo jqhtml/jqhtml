@@ -1,0 +1,6 @@
+<Define:Attach_Detach_Test>
+  <div class="attach-detach-test">
+    <div $sid="arena"></div>
+    <div $sid="container"></div>
+  </div>
+</Define:Attach_Detach_Test>

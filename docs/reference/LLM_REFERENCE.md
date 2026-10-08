@@ -351,7 +351,9 @@ that content returns null. Use body-preserving `extends=` on the `<Define:>` tag
 5. **`on_loaded()`** — runs on the real component, not the detached proxy
 6. **`on_ready()`** — all children guaranteed ready (bottom-up, async)
 
-Plus **`on_stop()`** — teardown when the component is destroyed (sync).
+Plus **`on_stop()`** — teardown when the component is destroyed (sync) — and
+**`on_attach()` / `on_detach()`** — the root entered / left the document (sync, opt-in;
+first checked after `ready`, `detach` always precedes `stop`).
 
 **The full sequence, spelled out**: `on_create` (no DOM, sync) → render + `on_render`
 (sync — with no loaded data, or with cached data on a cache hit) → `on_load` (async, runs
@@ -368,8 +370,8 @@ an imperatively-drawn indicator dies on the post-load re-render. The shape: a fl
 `on_create()` and cleared when data lands, with `on_render()` drawing or removing the
 indicator to match.
 
-**Synchronous requirements**: `on_create()`, `on_render()`, `on_stop()` and
-`on_viewport_resize()` MUST be synchronous. `on_load()`, `on_loaded()` and `on_ready()`
+**Synchronous requirements**: `on_create()`, `on_render()`, `on_stop()`, `on_attach()`,
+`on_detach()` and `on_viewport_resize()` MUST be synchronous. `on_load()`, `on_loaded()` and `on_ready()`
 may be async.
 
 ### `on_render` — the full contract
@@ -410,7 +412,8 @@ Most component bugs are code in the wrong hook.
 | Interact with a child component (methods, state, its events) | `on_ready` | Children guaranteed ready only here |
 | Read the finalized `this.data` for post-draw logic | `on_ready` | `on_render` may see a stale cached stub or default data |
 | Start a socket/subscription/observer | `on_ready` | One-time, needs a stable tree |
-| Teardown (sockets, observers, timers) | `on_stop` | Symmetric with `on_ready` setup |
+| Teardown of local resources (timers, DOM listeners) | `on_stop` | Symmetric with `on_ready` setup; best effort — skipped on native DOM removal |
+| Register / unregister with something OUTSIDE the component (realtime channel, server subscription, external registry) | `on_attach` / `on_detach` | Follow the node in and out of the document regardless of how it was removed; `detach` also fires inside `stop()` |
 
 ### Two hooks the six stages do not cover
 
@@ -555,7 +558,12 @@ server actually stored.
 - **`render('sid')`** — re-render ONLY the element carrying that `$sid`, which must be
   marked `$redrawable` in the template. Child DOM elsewhere is untouched — use for
   counters, badges and live fragments instead of a full `render()`.
-- **`stop()`** — destroy the component and all children; calls `on_stop()` if defined.
+- **`stop()`** — destroy the component and all children; fires `detach` first if attached,
+  then calls `on_stop()` if defined. Reached automatically by every jQuery removal
+  (`.remove()`, `.empty()`, `.html(x)`, `.text(x)`, `.replaceWith()`) via the
+  `jQuery.cleanData` hook, and by parent re-renders.
+- **`is_attached()`** — the component's recorded attachment state, as reported by the
+  `attach` / `detach` events (false until the first check after `ready`).
 
 `render()` and `reload()` invalidate the sticky `ready` state first, so a `.ready()` or
 `.on('ready')` registered mid-cycle waits for the NEW render instead of resolving against
@@ -959,8 +967,13 @@ Remedies included. Most of these are silent, not thrown — the exceptions are m
 22. **No inline `<script>` or `<style>` tags in a `.jqhtml` template.** Behavior goes in the
     companion `.js` or a `<% %>` block; styling goes in the component's stylesheet, wrapped
     in its own class. *(Throws.)*
-23. **`on_stop()` is not guaranteed to fire** — a node removed outside the framework skips
-    it. Do not put cleanup there that would be catastrophic if skipped.
+23. **`on_stop()` is best effort.** It fires for every jQuery removal and every framework
+    path, but a node removed with native DOM methods (`el.remove()`, `innerHTML = ''`, a
+    non-jQuery library) skips it, and JavaScript has no destructor to fall back on. Cleanup
+    whose leak matters beyond the component — a realtime subscription, an entry in an
+    external registry — belongs in `on_detach()` (or `.on('detach')`), which observes the
+    document itself and also fires first thing inside `stop()`. Re-subscribe in
+    `on_attach()` and `refresh()` once, since updates while detached were never delivered.
 24. **Undefined components render silently.** A typo'd component name does not error; it
     renders an empty div with that name as its class. If a region is mysteriously blank,
     check the spelling of the tag.

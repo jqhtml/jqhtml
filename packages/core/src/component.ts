@@ -18,6 +18,7 @@ import { Load_Coordinator } from './load-coordinator.js';
 import { Jqhtml_Local_Storage } from './local-storage.js';
 import { event_on, event_once, event_trigger, event_on_registered, event_invalidate } from './component-events.js';
 import { setup_data_property, execute_on_load_detached } from './data-proxy.js';
+import { track_attachment, untrack_attachment } from './dom-attachment.js';
 import { read_cache_in_create, check_cache_on_reload, write_html_cache_snapshot, write_cache_on_loaded, generate_cache_key, warn_uncacheable_component } from './component-cache.js';
 import { debug_attributes_enabled } from './config.js';
 import { COMPONENT_NAME_PATTERN, is_component_name, dynamic_component_name } from './component-name.js';
@@ -199,6 +200,13 @@ export class Jqhtml_Component {
   private __first_load_started: boolean = false;    // Latch: true once the first load phase begins (enforces one-shot + throw-after)
   private __gate_resume: (() => void) | null = null; // Resolver to release an in-progress gate wait early (reload/refresh/stop)
 
+  // DOM attachment state machine - see _attachment_check() / dom-attachment.ts.
+  // _attached is the component's OWN belief about whether it is in the document;
+  // it flips at most once per direction, and 'attach' / 'detach' fire only on a flip.
+  private _attached: boolean = false;
+  private _attachment_checked: boolean = false;   // First check has run (after the first 'ready' dispatch)
+  private _attachment_tracking: boolean = false;  // Something is interested: on_attach/on_detach overridden, or .on('attach'|'detach')
+
   constructor(element?: any, args: Record<string, any> = {}) {
     // Detect custom on_load() override immediately
     // Prototype chain is set up before constructor runs, so this.on_load
@@ -285,6 +293,13 @@ export class Jqhtml_Component {
     // No special meaning to framework - mutable anywhere, not cached, not frozen
     (this as any).state = {};
 
+    // Overriding on_attach()/on_detach() is interest in attachment tracking. Tracking
+    // itself only starts after the first 'ready' dispatch (see _attachment_check()).
+    if (this.on_attach !== Jqhtml_Component.prototype.on_attach ||
+        this.on_detach !== Jqhtml_Component.prototype.on_detach) {
+      this._attachment_tracking = true;
+    }
+
     this._log_lifecycle('construct', 'complete');
   }
 
@@ -299,7 +314,9 @@ export class Jqhtml_Component {
       on_render: 'Use render() to trigger a re-render.',
       on_load: 'Use reload() to refresh data.',
       on_ready: 'Called automatically when ready.',
-      on_stop: 'Use stop() to stop the component.'
+      on_stop: 'Use stop() to stop the component.',
+      on_attach: 'Called automatically when the component enters the document.',
+      on_detach: 'Called automatically when the component leaves the document.'
     };
 
     const impls: Record<string, Function> = {};
@@ -1905,8 +1922,12 @@ export class Jqhtml_Component {
     this._log_lifecycle('destroy', 'start');
     this.$.addClass('_Component_Stopped');
 
-    // Unregister from lifecycle manager
-    this._lifecycle_manager.unregister_component(this);
+    // A component that believes it is attached is detached first, so 'detach' always
+    // precedes 'stop' and subscribers can rely on strict attach/detach alternation.
+    // A component that never fired 'attach' (stopped before ready, or born and kept
+    // off-document) fires no 'detach' either. Either way it leaves the tracker.
+    if (this._attached) this._transition_attachment(false);
+    untrack_attachment(this);
 
     // Call user's on_stop() hook with authorization (sync) - only when actually
     // overridden, since _call_lifecycle_sync() on the base no-op costs per child
@@ -1963,6 +1984,94 @@ export class Jqhtml_Component {
   on_loaded(): void | Promise<void> {}  // Override to process loaded data (e.g., clone this.data to this.state)
   async on_ready(): Promise<void> {}
   on_stop(): void {}
+  on_attach(): void {}   // Sync. Root entered the document (first checked after 'ready')
+  on_detach(): void {}   // Sync. Root left the document, or the component is being stopped while attached
+
+  // -------------------------------------------------------------------------
+  // DOM attachment state machine
+  // -------------------------------------------------------------------------
+
+  /**
+   * Whether this component currently considers itself attached to the document.
+   *
+   * This is the component's recorded state, not a live isConnected read: it is
+   * false until the first check after 'ready', and from then on flips only when a
+   * transition is observed (or on stop()). It is exactly the state 'attach' and
+   * 'detach' have reported.
+   */
+  is_attached(): boolean {
+    return this._attached;
+  }
+
+  /**
+   * Flip the recorded state and fire the matching hook + event. The opposite
+   * sticky event is invalidated first, so a late subscriber only ever sees the
+   * current state. Hook errors are isolated; the event still fires.
+   * @private
+   */
+  private _transition_attachment(attached: boolean): void {
+    this._attached = attached;
+    const event_name = attached ? 'attach' : 'detach';
+    const hook_name = attached ? 'on_attach' : 'on_detach';
+    this.invalidate(attached ? 'detach' : 'attach');
+
+    if ((this as any)[hook_name] !== Jqhtml_Component.prototype[hook_name]) {
+      try {
+        const result = this._call_lifecycle_sync(hook_name);
+        if (result && typeof (result as any).then === 'function') {
+          console.warn(
+            `[JQHTML] Component "${this.component_name()}" returned a Promise from ${hook_name}(). ` +
+            `${hook_name}() must be synchronous code. Remove 'async' from the function declaration.`
+          );
+        }
+      } catch (error) {
+        console.error(`[JQHTML] Error in ${hook_name}() for ${this.component_name()}:`, error);
+      }
+    }
+
+    this.trigger(event_name);
+  }
+
+  /**
+   * Compare the root's live connectivity with the recorded state and transition
+   * on a difference. Idempotent. Called by the document observer on every
+   * mutation batch for tracked components, and directly by the framework after
+   * 'ready' and when interest is registered late.
+   * @private
+   */
+  _attachment_check(): void {
+    if (this._stopped) return;
+    const connected = !!this.$[0].isConnected;
+    if (connected !== this._attached) this._transition_attachment(connected);
+  }
+
+  /**
+   * The first check, run once the 'ready' handlers have completed. Fires 'attach'
+   * if the component was born attached, even with no listener, so a later
+   * .on('attach') gets the sticky fire. Deferred interest starts tracking here.
+   * @private
+   */
+  private _attachment_first_check(): void {
+    const first = !this._attachment_checked;
+    this._attachment_checked = true;
+    this._attachment_check();
+    if (first && this._attachment_tracking) track_attachment(this);
+  }
+
+  /**
+   * Register interest in attach/detach. Before the first ready check this only
+   * records the interest; after it, tracking starts immediately and a check runs
+   * at once, so a late subscriber on a natively-removed component sees 'detach'.
+   * @private
+   */
+  private _watch_attachment(): void {
+    if (this._attachment_tracking) return;
+    this._attachment_tracking = true;
+    if (this._attachment_checked && !this._stopped) {
+      track_attachment(this);
+      this._attachment_check();
+    }
+  }
 
   /**
    * Called with the viewport width in CSS pixels:
@@ -2050,6 +2159,7 @@ export class Jqhtml_Component {
    * @see component-events.ts for full documentation
    */
   on(event_name: string, callback: (component: Jqhtml_Component, data?: any) => void): this {
+    if (event_name === 'attach' || event_name === 'detach') this._watch_attachment();
     return event_on(this, event_name, callback);
   }
 
@@ -2059,15 +2169,23 @@ export class Jqhtml_Component {
    * @see component-events.ts for full documentation
    */
   once(event_name: string, callback: (component: Jqhtml_Component, data?: any) => void): this {
+    if (event_name === 'attach' || event_name === 'detach') this._watch_attachment();
     return event_once(this, event_name, callback);
   }
 
   /**
    * Trigger a lifecycle event - delegates to component-events.ts
    * @see component-events.ts for full documentation
+   *
+   * 'ready' is special: once its handlers have run, the component runs its first
+   * attachment check (and every later one, idempotently). Doing it here rather than
+   * at each of the call sites that trigger 'ready' guarantees the order
+   * on_ready() -> 'ready' handlers -> 'attach', so everything on_ready() set up is
+   * complete before anyone learns the component is in the document.
    */
   trigger(event_name: string, data?: any): void {
     event_trigger(this, event_name, data);
+    if (event_name === 'ready' && !this._stopped) this._attachment_first_check();
   }
 
   /**

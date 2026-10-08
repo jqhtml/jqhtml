@@ -23,7 +23,6 @@ export type LifecyclePhase = 'render' | 'create' | 'load' | 'ready';
 
 export class LifecycleManager {
   private static instance: LifecycleManager;
-  private active_components: Set<Jqhtml_Component> = new Set();
 
   static get_instance(): LifecycleManager {
     if (!LifecycleManager.instance) {
@@ -33,11 +32,17 @@ export class LifecycleManager {
   }
 
   constructor() {
-    // No automatic cleanup on DOM removal - components stop explicitly via:
-    // 1. Parent component re-render (calls .empty() which stops children)
-    // 2. Manual .empty(), .html(), .text() calls (overridden to stop children)
+    // Components stop explicitly via:
+    // 1. Parent component re-render (stops descendants before clearing innerHTML)
+    // 2. Any jQuery removal that reaches jQuery.cleanData (.remove(), .empty(),
+    //    .html(x), .text(x), .replaceWith(), .replaceAll()) - hooked in jquery-plugin.ts
     // 3. Explicit .stop() call
-    // This allows components to be moved in DOM without lifecycle interruption
+    // Native DOM removal is NOT observed for stop; 'detach' (dom-attachment.ts) is the
+    // signal for that. Moving a component within the document never stops it.
+    //
+    // There is deliberately no registry of live components here. The DOM (via
+    // element.data('_component')) is the only owner; a registry would pin every
+    // component that left the document without being stopped.
   }
 
   /**
@@ -49,8 +54,6 @@ export class LifecycleManager {
    * - _load_render_only: on_create + render + on_load + re-render. No on_render, no on_loaded, no on_ready.
    */
   async boot_component(component: Jqhtml_Component): Promise<void> {
-    this.active_components.add(component);
-
     try {
       // Create phase - SYNCHRONOUS, runs BEFORE first render
       component.create();
@@ -223,12 +226,5 @@ export class LifecycleManager {
         console.error(`[JQHTML] on_stop() threw while unwinding a failed boot:`, stop_error);
       }
     }
-  }
-
-  /**
-   * Unregister a component (called on destroy)
-   */
-  unregister_component(component: Jqhtml_Component): void {
-    this.active_components.delete(component);
   }
 }

@@ -29,7 +29,10 @@ export declare class Jqhtml_Component {
     on_create(): void;
     on_load(): Promise<void>;
     on_ready(): Promise<void>;
-    on_destroy(): void;
+    on_stop(): void;
+    on_attach(): void;
+    on_detach(): void;
+    is_attached(): boolean;
 
     // Public API
     gate_load(promise: Promise<any>): void;

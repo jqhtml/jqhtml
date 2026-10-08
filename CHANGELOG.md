@@ -3,6 +3,32 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.72 (2026-10-08)
+
+### Features
+
+- `attach` / `detach` lifecycle events, `on_attach()` / `on_detach()` hooks and
+  `is_attached()`. A component's root entering or leaving the document is reported
+  whatever the removal path, including native DOM removal that `stop()` cannot see. The
+  first check runs after `on_ready()` and the `ready` handlers; transitions strictly
+  alternate and fire once each; `stop()` on an attached component fires `detach` first.
+  Tracking is opt-in (override a hook or `.on('attach'|'detach')`) and lazy: one
+  document-level `MutationObserver` re-checks `isConnected` per tracked component per
+  mutation batch, holds them by `WeakRef`, and disconnects when nothing is tracked.
+  Diagnostics: `jqhtml.tracked_attachment_count()`, `jqhtml.attachment_observer_active()`.
+
+### Bug Fixes
+
+- `stop()` now runs for every jQuery removal. `jQuery.cleanData` - the routine `.remove()`,
+  `.empty()`, `.html(x)`, `.text(x)`, `.replaceWith()` and `.replaceAll()` all pass the
+  removed subtree through - stops each component it finds before jQuery drops its data.
+  Previously only `.empty()`/`.html()`/`.text()` were covered, and a `.remove()` orphaned
+  the component with `on_stop()` never called. The three per-method overrides are gone;
+  `.html()` keeps only its hand-written `data-sid` guard.
+- Removed the lifecycle manager's write-only `active_components` set. It held a strong
+  reference to every booted component until `_stop()`, so any component that left the
+  document without being stopped was pinned forever together with its detached subtree.
+
 ## 2.3.71 (2026-09-20)
 
 ### Bug Fixes

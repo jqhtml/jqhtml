@@ -135,6 +135,10 @@ export type { CacheMode, Cache_Class_Options } from './local-storage.js';
 import { Load_Coordinator } from './load-coordinator.js';
 export { Load_Coordinator };
 
+// DOM attachment tracking diagnostics (backs the 'attach' / 'detach' events)
+import { tracked_attachment_count, attachment_observer_active } from './dom-attachment.js';
+export { tracked_attachment_count, attachment_observer_active };
+
 // SSR Preload data system
 import {
   start_data_capture,
@@ -317,7 +321,12 @@ const jqhtml = {
   get_captured_data,
   stop_data_capture,
   set_preload_data,
-  clear_preload_data
+  clear_preload_data,
+
+  // Attachment tracking diagnostics - how many components are watched for
+  // attach/detach and whether the document observer is currently installed
+  tracked_attachment_count,
+  attachment_observer_active
 };
 
 // Auto-register on window for browser environments

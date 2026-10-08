@@ -285,8 +285,24 @@ class My_Component extends Jqhtml_Component {
   }
 
   on_stop() {
-    // Cleanup: timers, intervals, listeners. Synchronous.
+    // Cleanup: timers, intervals, listeners. Synchronous. Best effort: fires on every
+    // jQuery removal and framework path, NOT on native DOM removal.
     clearInterval(this.state.update_interval);
+  }
+
+  on_attach() {
+    // Root entered the document. First checked after on_ready() + 'ready' handlers,
+    // then on every observed change. Opt-in: overriding this turns tracking on.
+    // Synchronous. For resources that exist only while in the DOM; refresh() once
+    // to catch up on what was missed while detached.
+    this.state.unsubscribe = realtime.subscribe(this.args.channel, () => this.refresh());
+    this.refresh();
+  }
+
+  on_detach() {
+    // Root left the document (any removal path, including native), or the component
+    // is being stopped while attached - detach always precedes stop. Synchronous.
+    this.state.unsubscribe?.();
   }
 
   on_viewport_resize(viewport_width) {
@@ -416,11 +432,12 @@ this.sid('name')  // Get child component instance by scoped ID
 | `reload()` | Yes | Yes | Conditional | If args changed | Re-fetch and re-render — the standard update method. Debounced |
 | `refresh()` | Yes | Conditional | Only if data changed | If args changed | Polling / background sync without flicker. Debounced (shares queue with reload) |
 | `ready(cb?)` | No | No | No | No | Promise (or callback) resolving when component completes its lifecycle |
-| `stop()` | No | No | No | No | Stop lifecycle before removal: always adds `_Component_Stopped`, de-registers from the parent and fires `stop`; calls `on_stop()` when overridden; does NOT remove DOM. A hook that throws during boot stops the component the same way, so ancestors are never left waiting |
+| `stop()` | No | No | No | No | Stop lifecycle before removal: fires `detach` first if attached, always adds `_Component_Stopped`, de-registers from the parent and fires `stop`; calls `on_stop()` when overridden; does NOT remove DOM. Reached automatically by every jQuery removal (`.remove()`, `.empty()`, `.html(x)`, `.text(x)`, `.replaceWith()`) via the `jQuery.cleanData` hook and by parent re-renders; NOT by native DOM removal. A hook that throws during boot stops the component the same way, so ancestors are never left waiting |
+| `is_attached()` | No | No | No | No | The component's recorded attachment state, exactly as the `attach`/`detach` events reported it (false until the first check after `ready`) |
 
 `redraw()` is an alias for `render()`.
 
-**Synchronous requirements:** `on_create()`, `on_render()`, `on_stop()`, `on_viewport_resize()`, `stop()` MUST be sync. `on_load()`, `on_loaded()`, `on_ready()` CAN be async.
+**Synchronous requirements:** `on_create()`, `on_render()`, `on_stop()`, `on_attach()`, `on_detach()`, `on_viewport_resize()`, `stop()` MUST be sync. `on_load()`, `on_loaded()`, `on_ready()` CAN be async.
 
 **`on_viewport_resize(viewport_width)`** - Not a lifecycle stage; a notification. Fires after every `on_render()`, after every `on_ready()`, and on window resize (debounced 30ms) for every component in the document. The argument is `window.innerWidth` in CSS pixels - it agrees with CSS media queries; for the component's own width use `this.$.width()`. Detached and stopped components are skipped, and a handler that throws is logged without stopping the fan-out. Prefer CSS media/container queries; use this only when layout needs real measurement (canvas sizing, chart redraw, virtual scroll windowing, text truncation).
 
@@ -439,6 +456,8 @@ component.reload();
 await component.ready();
 ```
 
+**`on_attach()` / `on_detach()` and the `attach` / `detach` events** - the root entered / left the document, whatever the removal path. Every component starts detached; the first check runs after `on_ready()` and the `ready` handlers, and fires `attach` (sticky) if the root is in the document. Transitions strictly alternate and fire once each; `stop()` on an attached component fires `detach` first. Tracking is opt-in and lazy: it starts only for components that override a hook or receive `.on('attach'|'detach')`, via one document-level `MutationObserver` that re-checks `isConnected` per tracked component (held by `WeakRef`) per mutation batch. A synchronous move inside the document is not a transition. Use these, not `on_stop()`, for registrations that live outside the component (realtime subscriptions, external registries): unsubscribe in `on_detach()`, resubscribe plus one `refresh()` in `on_attach()`.
+
 ### Lifecycle Event Callbacks
 
 ```javascript
@@ -446,7 +465,7 @@ $('#my-component').component().on('ready', (component) => { ... });
 $('#my-component').component().once('loaded', (component) => { ... });
 ```
 
-**Supported events:** `render`, `rendered`, `create`, `load`, `loaded`, `ready`, `stop`. Events are sticky — if the event already occurred, the callback fires immediately. `.once()` fires exactly once. `component.rendered(cb?)` mirrors `ready()` but resolves when the synchronous render chain completes, before the ready phase.
+**Supported events:** `render`, `rendered`, `create`, `load`, `loaded`, `ready`, `attach`, `detach`, `stop`. Events are sticky — if the event already occurred, the callback fires immediately. `.once()` fires exactly once. `component.rendered(cb?)` mirrors `ready()` but resolves when the synchronous render chain completes, before the ready phase.
 
 ---
 

@@ -340,25 +340,44 @@ Custom input components (date pickers, masked inputs, formatted fields) can prov
 
 Besides `.val()` (which YOU can override per-component), JQHTML itself overrides several core jQuery prototype methods with framework-specific safety and cleanup logic. These overrides apply globally, everywhere jQuery is used - not just inside components. Understanding them prevents confusing runtime errors and unexpected child-component teardown.
 
-### .empty() / .html() / .text() Auto-Stop Child Components
+### jQuery Removal Stops Components (the `jQuery.cleanData` hook)
 
-`.empty()` is overridden to recursively `stop()` any child components (elements with the `Component` class) before clearing their DOM. This ensures a child's `on_stop()` hook (if it defines one) runs and its `'stop'` event fires when a subtree is torn down - even via plain jQuery calls, not just `component.stop()`.
-
-`.html(value)` and `.text(value)` (setter mode only - getters are untouched) call `.empty()` internally before writing the new content, so they inherit the same child-stopping behavior:
+Every jQuery method that takes an element out of the tree - `.remove()`, `.empty()`,
+`.html(value)`, `.text(value)`, `.replaceWith()`, `.replaceAll()` - passes the removed
+subtree through `jQuery.cleanData()` to drop the elements' data and handlers. JQHTML
+hooks that one routine: each removed element carrying the `Component` class has its
+component stopped (`on_stop()` runs, `'stop'` fires) before jQuery discards its data.
+Descendants are in the same list, so an ancestor removal stops the whole subtree, parent
+before child, with no extra traversal.
 
 ```javascript
 class Panel extends Jqhtml_Component {
   on_ready() {
-    // Any child components inside #content are automatically stopped
-    // (on_stop() fires, 'stop' event fires) before the DOM is cleared
+    // Child components inside #content are stopped before the DOM changes,
+    // whichever of these you use:
     this.$sid('content').empty();
     this.$sid('content').html('<p>New content</p>');
     this.$sid('content').text('Replaced');
+    this.$sid('content').find('.Row').remove();
+    this.$sid('content').replaceWith('<div>gone</div>');
   }
 }
 ```
 
-**Why this matters:** you don't need to manually walk child components and call `.stop()` before clearing a container - `.empty()`/`.html()`/`.text()` do it for you. But it also means these calls are not "free" DOM writes - they walk and stop every `.Component` descendant first.
+**What does NOT stop a component:**
+
+- `.detach()` - by jQuery's own definition it keeps the data store so the node can be
+  reinserted. The component stays alive. If it is tracking attachment it receives
+  `'detach'` (and `'attach'` again on reinsertion).
+- Moving a node (`.appendTo()`, `.insertBefore()`, …) - not a removal.
+- Native DOM removal: `el.remove()`, `removeChild()`, `innerHTML = ''`, or any non-jQuery
+  library doing those. jQuery never sees it, so `stop()` never runs. The `'detach'`
+  event is the reliable signal for that case - see
+  [attach / detach](14_lifecycle_complete_specification.md#attach--detach---dom-attachment-events).
+
+**Why this matters:** you don't walk child components and call `.stop()` before clearing
+a container; and a removal is not a "free" DOM write - jQuery is already walking the
+subtree, and JQHTML stops each component it finds on the way.
 
 ### data-sid Is Not a Hand-Writable Attribute
 
@@ -670,7 +689,7 @@ class ProductList extends Jqhtml_Component {
 
 **This is the JQHTML philosophy**: Direct DOM manipulation via jQuery, no virtual DOM, no reconciliation.
 
-**Note:** `.empty()`, `.html()`, and `.text()` are overridden by JQHTML to stop child components before clearing the DOM, and `.append()`/`.find()`/`.on()` guard against hand-written `data-sid` misuse - see [JQHTML's Own jQuery Method Overrides](#jqhtmls-own-jquery-method-overrides) above.
+**Note:** every jQuery removal (`.remove()`, `.empty()`, `.html()`, `.text()`, `.replaceWith()`) stops the components it removes via the `jQuery.cleanData` hook, and `.append()`/`.find()`/`.on()` guard against hand-written `data-sid` misuse - see [JQHTML's Own jQuery Method Overrides](#jqhtmls-own-jquery-method-overrides) above.
 
 ## Key Concepts
 

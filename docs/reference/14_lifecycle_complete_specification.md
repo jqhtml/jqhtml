@@ -1049,7 +1049,29 @@ waiting on a component that will never fire `ready` again.
 - Component is no longer needed
 - Need to release resources (timers, listeners, etc.)
 
-**Not guaranteed**: `on_stop()` only runs when component is explicitly stopped via framework methods. It does NOT run if the DOM node is removed without going through the framework (e.g., orphaned nodes, direct jQuery `.remove()` without calling `.component().stop()` first). Do not rely on `on_stop()` for critical cleanup that would cause problems if skipped.
+**When `stop()` is reached automatically**:
+- a parent re-renders (its descendants are stopped before the subtree is cleared)
+- `.component('Name')` is called on an element that already holds a component
+- any jQuery call that removes the element from the tree: `.remove()`, `.empty()`,
+  `.html(value)`, `.text(value)`, `.replaceWith()`, `.replaceAll()`. JQHTML hooks
+  `jQuery.cleanData`, the single routine every one of those passes through, so the
+  component and every component inside it are stopped before jQuery drops their data
+- a lifecycle hook throws during boot
+
+**Best effort, not guaranteed**: `stop()` is only as reliable as the removal path. A
+node removed with native DOM methods - `el.remove()`, `parent.removeChild(el)`,
+`container.innerHTML = ''`, or a non-jQuery library doing any of those - never reaches
+`cleanData`, so the component is simply orphaned: `_stopped` stays false, `on_stop()`
+never runs, and the `stop` event never fires. `.detach()` is not a removal either, by
+jQuery's own definition (it keeps the data store so the node can be reinserted), and it
+does not stop the component. There is no destructor in JavaScript to fall back on: once
+the component object is garbage-collected there is nothing left to call `on_stop()` on.
+
+Put cleanup in `on_stop()` that is cheap to skip (an interval, a listener on a node that
+is being thrown away anyway). For anything whose leak matters beyond the component -
+a server-side subscription, an entry in a registry held by someone else, a realtime
+channel - use the `attach` / `detach` events below, which do not depend on how the node
+leaves the tree, and treat `on_stop()` as the final belt over those braces.
 
 ```javascript
 class LiveChart extends Jqhtml_Component {
@@ -1083,10 +1105,129 @@ class LiveChart extends Jqhtml_Component {
 }
 
 // Later, when removing component:
-const chart = $('#live-chart').component();
-chart.stop();  // Synchronous cleanup
-$('#live-chart').remove();  // Now safe to remove DOM
+$('#live-chart').remove();  // stop() runs on the way out via jQuery.cleanData
 ```
+
+---
+
+### attach / detach - DOM Attachment Events
+
+**Purpose**: Tell a component when its root element enters or leaves the document,
+independent of HOW that happened. `stop()` depends on the removal going through
+jQuery; attachment tracking does not.
+
+**API**:
+
+| Member | Kind | Meaning |
+|--------|------|---------|
+| `on_attach()` | hook, sync | Root entered the document |
+| `on_detach()` | hook, sync | Root left the document, or the component is being stopped while attached |
+| `'attach'` / `'detach'` | events, sticky | Fired after the matching hook; `.on()`/`.once()` as for any event |
+| `is_attached()` | method | The component's recorded state - exactly what the events have reported |
+
+**The state machine**:
+
+1. Every component starts with `is_attached() === false`.
+2. The first check runs **after `on_ready()` and after the `ready` handlers have run**.
+   If the root is in the document, the component flips to attached, `on_attach()` runs,
+   and `attach` fires. This happens whether or not anything is listening, so a later
+   `.on('attach')` receives the sticky fire. If the root is off-document (a component
+   built with `$('<div>').component(...)` and not yet inserted), nothing fires.
+3. From then on the state flips only on an observed change, **at most once per direction**:
+   `attach` and `detach` strictly alternate. Each transition invalidates the opposite
+   sticky event, so a late subscriber sees only the current state.
+4. `stop()` on an attached component runs the detach transition first (`on_detach()`,
+   `detach`), then `on_stop()`, then `stop`. A component that never attached fires no
+   `detach` on stop.
+
+**How changes are observed** - opt-in and lazy:
+
+- A component is *interested* when it overrides `on_attach()` or `on_detach()`, or when
+  anything calls `.on('attach'|'detach')` / `.once(...)` on it.
+- Interest registered before the first ready check takes effect at that check. Interest
+  registered afterwards takes effect immediately and runs a check at once - so subscribing
+  to `detach` on a component whose node was already removed natively fires `detach` on the
+  spot.
+- Interested components are watched by one document-level `MutationObserver`
+  (`childList` + `subtree`), installed on the first interest and disconnected when the
+  last interested component stops. The observer does not read mutation records; on each
+  batch it re-checks every tracked component's `isConnected`. Cost is proportional to the
+  number of interested components, not to the size of the page or of the removal, and zero
+  when nothing has opted in.
+- Because the observer delivers once per microtask, a **synchronous move** within the
+  document (`$el.appendTo(elsewhere)`, a `.detach()` followed by an `.appendTo()` in the
+  same task) is never a transition. Only a root that is actually off-document when the
+  batch flushes is detached.
+- Tracked components are held weakly. A component removed natively and then dropped by
+  everything else is collectable; the tracker never pins a detached subtree.
+
+**Timing summary**:
+
+```
+boot:   on_create → render → on_render → on_load → [render] → on_ready → 'ready' → on_attach → 'attach'
+detach: (mutation batch flushes with root off-document) → on_detach → 'detach'
+attach: (mutation batch flushes with root in document)  → on_attach → 'attach'
+stop:   [on_detach → 'detach' if attached] → on_stop → 'stop'
+```
+
+**Example - a realtime monitor whose server subscription follows the component**:
+
+```javascript
+// A hypothetical realtime bus: subscribe(channel, handler) returns an unsubscribe function.
+class Order_Status extends Jqhtml_Component {
+  async on_load() {
+    this.data.order = await fetch(`/api/orders/${this.args.order_id}`).then(r => r.json());
+  }
+
+  on_attach() {
+    // Subscribe only while visible. Then refresh once: anything that changed while we
+    // were off-document was never delivered, so the data we are showing may be stale.
+    this.state.unsubscribe = realtime.subscribe(`orders.${this.args.order_id}`, () => this.refresh());
+    this.refresh();
+  }
+
+  on_detach() {
+    // Fires on .detach(), on native removal, and first thing inside stop().
+    // After this nothing references the component but the DOM node itself.
+    this.state.unsubscribe?.();
+    this.state.unsubscribe = null;
+  }
+
+  on_stop() {
+    // Nothing left to do for the subscription - on_detach() already ran. Only local cleanup here.
+    clearInterval(this.state.blink_timer);
+  }
+}
+```
+
+The same shape works from the outside, for a framework layer that manages subscriptions
+for components that know nothing about it:
+
+```javascript
+function watch_component(component, channel, on_message) {
+  let unsubscribe = null;
+  component.on('attach', () => {          // sticky: fires at once if already attached
+    unsubscribe = realtime.subscribe(channel, on_message);
+    component.refresh();                   // catch up on anything missed while detached
+  });
+  component.on('detach', () => {          // also fires inside stop()
+    unsubscribe?.();
+    unsubscribe = null;
+  });
+  // Hold the component weakly, or not at all: once it is detached and nothing else
+  // references it, it should be collectable.
+}
+```
+
+**Rules**:
+- `on_attach()` and `on_detach()` MUST be synchronous. A returned Promise is warned about
+  and not awaited.
+- Neither hook can be called manually (same guard as the other `on_*` hooks).
+- Do not use `attach` to mean "ready": it fires after ready and only for components in
+  the document. Use `ready()` to wait for a component.
+- Do not do first-time setup in `on_attach()`. It can fire many times over a component's
+  life; `on_ready()` fires once per render. `on_attach()` is for resources that should
+  exist only while the component is in the document.
 
 ---
 
@@ -2149,6 +2290,8 @@ This behavior is essential for lifecycle events. Without it, subscribing to `'re
 | `'loaded'` | After `on_loaded()` completes (data frozen, DOM accessible) |
 | `'rendered'` | Once, after final render chain completes (before ready phase) |
 | `'ready'` | After `on_ready()` completes (component fully initialized), or at the end of a `refresh()` that did not re-render (no `on_ready()` in that case) |
+| `'attach'` | Root entered the document; first checked after `'ready'`. Opt-in tracking, see [attach / detach](#attach--detach---dom-attachment-events) |
+| `'detach'` | Root left the document, or first thing inside `stop()` when attached |
 | `'stop'` | When component is stopped/destroyed |
 
 ```javascript

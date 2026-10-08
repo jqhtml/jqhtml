@@ -347,9 +347,42 @@ export function init_jquery_plugin(jQuery: any): void {
   };
 
   // Store original jQuery methods
-  const originalEmpty = jQuery.fn.empty;
   const originalHtml = jQuery.fn.html;
-  const originalText = jQuery.fn.text;
+
+  // ---------------------------------------------------------------------------
+  // Stop components on every jQuery-driven removal by hooking jQuery.cleanData.
+  //
+  // jQuery routes .remove(), .empty(), .html(x), .text(x), .replaceWith() and
+  // .replaceAll() through jQuery.cleanData(elems) to drop the data store and
+  // handlers of every element about to leave the tree - and `elems` is already the
+  // flattened subtree, in document order (parent before child). Stopping here is
+  // therefore one classList check per removed element, no extra traversal, and
+  // covers every jQuery removal path at once. It is the same hook jQuery UI's
+  // widget factory uses for the same reason.
+  //
+  // It MUST be installed on the original jQuery object: jQuery's own code calls
+  // cleanData through its closure-local reference, not through our wrapper. The
+  // wrapper's copied static is updated below so both names agree.
+  //
+  // .detach() does NOT call cleanData, by jQuery's own design (it keeps data for
+  // reinsertion), and native DOM removal (el.remove(), innerHTML = '') bypasses
+  // jQuery entirely. Neither stops a component; the 'detach' lifecycle event is
+  // the signal for those. Moving a component (.appendTo) is not a removal.
+  // ---------------------------------------------------------------------------
+  const originalCleanData = _jqhtml_original_jquery.cleanData;
+  const cleanDataWithComponentStop = function(elems: ArrayLike<any>): void {
+    for (let i = 0; i < elems.length; i++) {
+      const el = elems[i];
+      if (el.nodeType !== 1 || !el.classList.contains('Component')) continue;
+      const component = _jqhtml_original_jquery.data(el, '_component');
+      if (component && !component._stopped) {
+        component._stop(); // Not recursive: every descendant is in elems too
+      }
+    }
+    return originalCleanData(elems);
+  };
+  _jqhtml_original_jquery.cleanData = cleanDataWithComponentStop;
+  jQuery.cleanData = cleanDataWithComponentStop;
 
   // ---------------------------------------------------------------------------
   // Guard against hand-creating elements with data-sid via jQuery.
@@ -409,59 +442,15 @@ export function init_jquery_plugin(jQuery: any): void {
   };
 
   /**
-   * Override jQuery.fn.empty() to stop child components before clearing DOM
-   * This ensures component cleanup hooks fire when DOM is cleared
-   */
-  jQuery.fn.empty = function(this: any): any {
-    return this.each(function(this: HTMLElement) {
-      // Stop all child components before clearing DOM
-      jQuery(this).find('.Component').each(function(this: HTMLElement) {
-        const component = jQuery(this).data('_component');
-        if (component && !component._stopped) {
-          component._stop(); // Stop just the component, DOM will be cleared anyway
-        }
-      });
-
-      // Call original empty
-      originalEmpty.call(jQuery(this));
-    });
-  };
-
-  /**
-   * Override jQuery.fn.html() to stop child components when setting new content
-   * When used as setter, calls .empty() first to properly cleanup components
+   * Override jQuery.fn.html() setter to reject hand-written data-sid before the
+   * DOM is mutated. Component stopping is handled by the cleanData hook above.
    */
   jQuery.fn.html = function(this: any, value?: any): any {
-    // Getter - just pass through
     if (arguments.length === 0) {
       return originalHtml.call(this);
     }
-
-    // Reject hand-written data-sid before mutating the DOM
     assert_no_manual_sid(value, '.html()');
-
-    // Setter - empty first (which stops components), then set content
-    return this.each(function(this: HTMLElement) {
-      jQuery(this).empty();
-      originalHtml.call(jQuery(this), value);
-    });
-  };
-
-  /**
-   * Override jQuery.fn.text() to stop child components when setting new content
-   * When used as setter, calls .empty() first to properly cleanup components
-   */
-  jQuery.fn.text = function(this: any, value?: any): any {
-    // Getter - just pass through
-    if (arguments.length === 0) {
-      return originalText.call(this);
-    }
-
-    // Setter - empty first (which stops components), then set content
-    return this.each(function(this: HTMLElement) {
-      jQuery(this).empty();
-      originalText.call(jQuery(this), value);
-    });
+    return originalHtml.call(this, value);
   };
 
   // Store original jQuery.fn.on

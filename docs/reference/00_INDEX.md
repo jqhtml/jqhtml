@@ -236,7 +236,8 @@ Comprehensive lifecycle documentation:
 - **Automatic re-render**: After on_load() if this.data changes
 - **Depth-ordered parallelization**: Siblings parallel, levels sequential
 - **render(), reload(), stop()**: Lifecycle manipulation methods
-- **Synchronous requirements**: on_create(), on_render(), on_stop() must be synchronous
+- **attach / detach**: DOM attachment events, on_attach()/on_detach(), is_attached(); stop() reliability and its limits
+- **Synchronous requirements**: on_create(), on_render(), on_stop(), on_attach(), on_detach() must be synchronous
 - **Future caching feature**: Why conventions matter
 - **Parent-child coordination**: Form example with child event hooks
 
