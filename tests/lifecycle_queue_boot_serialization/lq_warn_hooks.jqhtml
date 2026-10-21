@@ -1,0 +1,5 @@
+<%-- Lq_Warn_Hooks - calls load() from on_create() and refresh() from its first
+on_render(). Both are queued behind the running lifecycle step and warn. --%>
+<Define:Lq_Warn_Hooks class="lq-warn-hooks">
+  <span><%= this.data.n %></span>
+</Define:Lq_Warn_Hooks>

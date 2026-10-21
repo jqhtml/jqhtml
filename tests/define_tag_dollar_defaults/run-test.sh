@@ -15,6 +15,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test_container.jqhtml" \
   "$SCRIPT_DIR/test_container.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -33,3 +34,6 @@ echo "3. PARTIAL OVERRIDE:"
 echo "   Invocation can override some args"
 echo "   Non-overridden args use Define defaults"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

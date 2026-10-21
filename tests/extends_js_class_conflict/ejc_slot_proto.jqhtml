@@ -1,0 +1,4 @@
+<%-- Ejc_Slot_Proto - slot-only, NO extends=, class extends Ejc_Grid_B: inherits B through the prototype chain. --%>
+<Define:Ejc_Slot_Proto>
+  <Slot:body><span class="ejc-slot">Ejc_Slot_Proto</span></Slot:body>
+</Define:Ejc_Slot_Proto>

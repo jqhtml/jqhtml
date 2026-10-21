@@ -145,6 +145,7 @@ class Child_Component extends Jqhtml_Component {
     console.log('FINAL RESULT:');
     console.log('========================================');
 
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log('✅ ALL TYPE TESTS PASSED');
       console.log('   - Quoted attributes are strings');

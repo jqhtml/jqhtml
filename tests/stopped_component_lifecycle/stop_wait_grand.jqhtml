@@ -1,0 +1,6 @@
+<%--
+Stop_Wait_Grand - slow on_load(), so its parent is still waiting when it is stopped.
+--%>
+<Define:Stop_Wait_Grand>
+  <span><%= this.data.label || 'loading' %></span>
+</Define:Stop_Wait_Grand>

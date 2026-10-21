@@ -83,14 +83,32 @@ INVOCATION_KEY = component_name::serialized_args
 
 ### Error Handling
 
-If the leader's `on_load()` throws, the coordinator rejects the promise every follower is
-waiting on, then deletes the coordination entry:
+If the leader's load fails, the coordinator rejects the promise every follower is
+waiting on, then deletes the coordination entry. A leader load fails when its `on_load()`
+throws, when `on_load()` leaves `this.data` as something other than an object (`null`, a
+string, a number), or when its `on_loaded()` throws:
 
 - Each follower's load fails with the leader's error, exactly as if its own `on_load()`
   had thrown - the failure reaches the same boot error handling either way
+- Every component in the group - leader and each follower - runs its OWN
+  `on_load_error(error)` with that same error object. A leader's fallback data is never
+  handed to its followers as a successful load; an override on each component decides
+  that component's fallback (see `14_lifecycle_complete_specification.md`, section 4c)
 - No follower is left waiting: a leader that fails settles its group
 - The entry is removed, so the next component with that INVOCATION_KEY becomes a new
   leader and calls `on_load()` again (the failure is not cached)
+- Fallback data is never cached, and an instance whose `on_load()` has failed stops
+  reading and writing the cache for the rest of its lifespan. Deduplication itself is
+  not caching and keeps working for it
+
+### Stopped Leader or Follower
+
+A leader stopped while its `on_load()` is in flight (removed, or replaced by a parent
+re-render) still completes the group: its followers receive the data it fetched and
+continue normally. The stopped leader itself takes nothing - its `this.data` is not
+assigned, nothing is written to the cache, and `on_loaded()`, `on_ready()` and the
+`loaded`/`ready` events never run for it. A follower stopped while waiting leaves the
+group without adopting the data.
 
 A component's key is captured when it joins the group, not recomputed when the leader
 finishes. `this.args` may legally change while `on_load()` runs - a parent can set
@@ -459,6 +477,8 @@ jqhtml.set_cache_key(cache_key);
 
 **Scope validation:** When `set_cache_key()` is called, the framework checks if the key changed since last page load. If changed, all JQHTML cache entries are automatically cleared (other localStorage data is preserved).
 
+The check runs only in `set_cache_key()`, never on a cache write. Every entry key carries the jqhtml version and the cache key, so tabs open with different scopes (an old deploy next to a new one, two users in one browser) write separate entries side by side and each reads only its own. The clear at `set_cache_key()` is what removes entries of scopes no longer in use; a tab still using such a scope just re-caches.
+
 **Framework version is part of the scope.** `set_cache_key()` does not validate against the
 caller's key alone — it composes a scope marker of `<core_version>::<cache_key>` and validates
 against that. Upgrading `@jqhtml/core` therefore changes the scope and clears all JQHTML cache
@@ -475,9 +495,18 @@ Two consequences for the documented convention above:
 - A jqhtml version in the cache key is redundant. `set_cache_key('myapp_v2.3.0_...')` reads as
   though it refers to the framework; it should identify the application's own build.
 
-The version is deliberately kept in the scope marker rather than in each stored key, so the
-per-entry key format (`jqhtml::<cache_key>::<developer_key>`) stays readable and does not
-repeat the version in every entry. Implementation: `_scope_marker` and `_validate_scope()` in
+**Entry keys carry the version too.** Each localStorage entry is stored as
+`jqhtml::<developer_key>::<jqhtml_version>::<cache_key>`, for example
+`jqhtml::User_Profile::{"id":5}::2.3.75::user_123`. The part after the developer key is the
+scope marker itself, so the version appears once. The clear on upgrade runs once, in the tab
+that calls `set_cache_key()`; a tab still open on the older version keeps writing afterwards.
+Because those entries carry the older version in their keys, the newer tab never reads them,
+even when both use the same app cache key.
+
+Entries in the pre-2.3.75 format (`jqhtml::<developer_key>::<cache_key>`) are never read. The
+first `set_cache_key()` after the upgrade clears them along with every other jqhtml entry,
+because the stored scope marker names the old version; the quota cleanup also clears them.
+Implementation: `_scope_marker`, `_build_key()` and `_validate_scope()` in
 `packages/core/src/local-storage.ts`.
 
 ### Cache Entry Size Limit
@@ -809,10 +838,12 @@ HTML mode only caches components that modify `this.data` during `on_load()` (dyn
 
 Before caching HTML, parent components wait for all children's `on_render()` to complete.
 This ensures the cached snapshot includes fully rendered child content. The wait is
-event-driven: each child resolves it when it fires `render` having completed its post-load
-render (or when it fires `stop`). A child with no `on_load()` has no post-load render at
-all - its data cannot change, so its first render is its final one and it satisfies the
-wait immediately.
+event-driven: each child resolves it when its DOM is final - when it fires `render` having
+completed its post-load render, or `rendered` at the end of its boot render chain - or when
+it fires `stop`. A child whose `on_load()` leaves its data equal to its `on_create()`
+defaults does not re-render, so its first render is its final one and `rendered` releases
+the wait. A child with no `on_load()` has no post-load render at all - its data cannot
+change, so its first render is its final one and it satisfies the wait immediately.
 
 **A `reload()` that injects cached HTML always re-renders.** The injected snapshot is
 markup only: the children it replaced were stopped, and nothing in it is live. The
@@ -861,7 +892,8 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 3. Store cache_key in this._cache_key for later use
 4. Get cache_mode from Jqhtml_Local_Storage.get_cache_mode()
 5. Snapshot this.data for on_load() restoration BEFORE any cache read:
-   __initial_data_snapshot = deep_clone(this.data)
+   __initial_data_text = Jqhtml_Local_Storage.snapshot(this.data)
+   (the cache serializer: Date/Map/Set/registered classes and undefined-valued keys survive)
    (the restore point is the on_create() state, never cached data)
 6. IF cache_mode is 'data':
    a. Read cached_data from localStorage using cache_key
@@ -890,8 +922,9 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 4. process_instructions() creates DOM and boots child components
 5. Call on_render() synchronously
 6. Trigger 'render' event
-7. Store _args_on_last_render = deep_clone(this.args)
-8. Store _data_on_last_render = JSON.stringify(this.data)
+7. IF custom on_load(): store _args_on_last_render = JSON.stringify(this.args)
+8. IF custom on_load(): store _data_on_last_render = serialized this.data (_data_text())
+   (without on_load() nothing reads them: reload()/refresh() just re-render)
 ```
 
 **Key behavior:** In data mode, first render uses hydrated cached data (or empty defaults if cache miss).
@@ -905,9 +938,9 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 **Pseudocode:**
 
 ```
-1. IF not first load: Restore this.data from __initial_data_snapshot
+1. IF not first load: Restore this.data from __initial_data_text
 2. Unfreeze this.data (__data_frozen = false)
-3. Snapshot data_before_load = JSON.stringify(this.data)
+3. Snapshot data_before_load = serialized this.data (_data_text())
 4. Check load deduplication (leader/follower coordination)
 5. IF leader:
    a. Create restricted proxy (blocks this.$, this.$sid, etc.)
@@ -925,11 +958,11 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
    e. Functions, promises, DOM/jQuery/component values are stripped; cycles are cut
    f. Development warns once per (component, path); production converts silently
 8. Freeze this.data (__data_frozen = true)
-9. Compare data_after_load = JSON.stringify(this.data)
+9. Compare data_after_load = the text the result was normalized through
 10. IF data changed AND data is not empty '{}':
     a. Get cache_mode from Jqhtml_Local_Storage
     b. IF cache_mode is 'data':
-       - Write this.data to localStorage via Jqhtml_Local_Storage.set(cache_key, this.data)
+       - Write that same text to localStorage (Jqhtml_Local_Storage.set_serialized(cache_key, text))
        - ES6 classes serialized with __jqhtml_class__ wrapper
     c. IF cache_mode is 'html':
        - Set flag: this._should_cache_html_after_ready = true
@@ -1109,7 +1142,7 @@ When reviewing or modifying cache-related code in `component.ts`, compare the im
 
 **Why `_wait_for_children_on_render()`:**
 
-The standard `_wait_for_children_ready()` waits for children to be fully ready, but the HTML snapshot needs to be taken after children have executed their `on_render()` with populated `this.data`. The `_on_render_complete` flag is set after a component's post-`on_load()` render, ensuring proper synchronization.
+The standard `_wait_for_children_ready()` waits for children to be fully ready, but the HTML snapshot needs to be taken after children have executed their `on_render()` with populated `this.data`. The `_on_render_complete` flag is set after a component's post-`on_load()` render, or at the end of its boot render chain when the load left the data unchanged and no re-render happened, ensuring proper synchronization.
 
 ---
 
@@ -1121,26 +1154,39 @@ The standard `_wait_for_children_ready()` waits for children to be fully ready, 
 
 ```
 1. Check if args changed since last render (_args_on_last_render)
-2. IF args changed:
-   a. Generate new cache_key from current args
+2. Generate cache_key from current args and store it in _cache_key - ALWAYS, null
+   included, so every write below goes to the current args' entry (args that cannot
+   be keyed write nothing; they never write under the previous args' key).
+   The element's data-nocache marker follows the key exactly as at boot and in load():
+   a null key sets data-nocache="<arg>:<reason>" and gives the dev warning (gated by
+   warn_uncacheable_args); a non-null key removes any data-nocache left by earlier args
+3. IF args changed AND cache_key is not null AND no on_load() of this instance failed:
+   a. (cache_key from step 2)
    b. IF cache_mode is 'data':
       - Read cache for new args
       - IF cache hit: hydrate this.data, call render(), set rendered_from_cache = true
    c. IF cache_mode is 'html':
       - Read HTML cache for new args
       - IF cache hit: store in _cached_html, call render(), set rendered_from_cache = true
-3. Restore this.data to __initial_data_snapshot
-4. Call on_load() to fetch fresh data
-5. IF data changed AND non-empty:
+4. Restore this.data to __initial_data_text
+5. Call on_load() to fetch fresh data
+6. IF (data changed AND non-empty, OR data unchanged but cache_key differs from the key
+   the current data is cached under) AND cache_key is not null AND no load has failed:
+   (a reload with new args whose data equals the previous load's still files it under
+   the new key; the same key with unchanged data writes nothing)
    a. IF cache_mode is 'data': Write this.data to cache immediately
    b. IF cache_mode is 'html': Set _should_cache_html_after_ready = true
-6. IF should_render (based on force_refresh flag and data change):
+7. IF should_render (based on force_refresh flag and data change):
    - Call _render()
-7. Wait for children ready
-8. IF rendered: Call on_ready()
+8. Wait for children ready
+9. IF _should_cache_html_after_ready: snapshot this.$.html() to cache_key + '::html'
+   —— SNAPSHOT POINT: as at boot, children rendered, before on_ready() ——
+10. IF rendered: Call on_ready()
 ```
 
 **Key behavior:** `reload()` leverages cache for instant render when args change (stale-while-revalidate).
+In html mode the entry is refreshed with the post-reload markup, so a later boot with the
+same args starts from what the reload rendered, not from the boot-time markup.
 
 ---
 
@@ -1235,11 +1281,13 @@ HTML Mode:
 
 **reload() Flow with Smart Cache Integration:**
 
-**Important:** `reload()` is automatically debounced:
-- Multiple rapid calls are coalesced into a single execution
-- If called while `on_load()` is running, additional calls are queued
-- Only the most recent call executes if multiple are queued
-- All callers receive the same promise, resolved when execution completes
+**Important:** `reload()` goes through the component's lifecycle queue (see "The
+Lifecycle Queue" in `14_lifecycle_complete_specification.md`):
+- Called while the component is busy - including during its first `on_load()` - it waits
+  and runs afterwards, reading `this.args` when it starts
+- Rapid identical calls waiting next to each other merge into one run; every merged caller
+  gets that run's result
+- The cache key it writes under is the key of the args it ran with
 
 **1. Args Change Detection**
 - Compare `this.args` with snapshot from last render (`_args_on_last_render`)
@@ -1549,7 +1597,9 @@ class UserCard extends Jqhtml_Component {
 // Simplified from packages/core/src/data-proxy.ts execute_on_load_detached()
 
 // Clone this.data from the snapshot captured after on_create()
-const data_clone = JSON.parse(JSON.stringify(component.__initial_data_snapshot ?? {}));
+const data_clone = component.__initial_data_text !== null
+  ? (Jqhtml_Local_Storage.restore_snapshot(component.__initial_data_text) ?? {})
+  : {};
 
 // Read-only proxy over the real this.args (recursively wraps nested objects)
 const readonly_args = create_readonly_proxy(component.args);
@@ -1717,7 +1767,7 @@ function generate_invocation_key(component_name, args) {
 
 - **Component Lifecycle:** `docs/reference/14_lifecycle_complete_specification.md` - Full lifecycle including reload() behavior
 - **Debugging Tools:** `docs/reference/09_debugging_tools.md` - Verbose mode and debugging
-- **Error Handling:** `docs/internal/11-13-ON_LOAD_ERROR_HANDLING.md` (design phase)
+- **Error Handling:** `on_load_error(error)` - `docs/reference/14_lifecycle_complete_specification.md`, section 4c
 
 ## Skipping Revalidation with use_cached_data
 

@@ -8,6 +8,7 @@ cd "$(dirname "$0")"
 
 # Use the unified test runner
 ../../jqhtml-render-harness/test-runner.js test.jqhtml test.js
+HARNESS_STATUS=$?
 
 echo ""
 echo "✅ Test complete!"
@@ -23,3 +24,6 @@ echo "Test 4: Should show 'Items Found' with numbered items 1-3"
 echo ""
 echo "This validates that brace-style control flow works correctly"
 echo "after removing colon-style syntax support."
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

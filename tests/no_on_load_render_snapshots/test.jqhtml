@@ -1,0 +1,6 @@
+<Define:No_On_Load_Render_Snapshots>
+  <div>
+    <h1>Components without on_load(): render() / reload() / refresh() unchanged</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:No_On_Load_Render_Snapshots>

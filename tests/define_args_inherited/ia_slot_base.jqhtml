@@ -1,0 +1,8 @@
+<%--
+Ia_Slot_Base - parent of a slot-only JS subclass (class Ia_Slot_Child extends
+Ia_Slot_Base, no extends=). Its $ arg defaults must reach Ia_Slot_Child through the
+prototype chain.
+--%>
+<Define:Ia_Slot_Base $size="slot base size" $level="slot base">
+  <div class="ia-slot-body"><%= this.args.size %> | <%= content('body') %></div>
+</Define:Ia_Slot_Base>

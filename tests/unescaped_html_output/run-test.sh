@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/html_output_component.jqhtml" \
   "$SCRIPT_DIR/html_output_component.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -33,3 +34,6 @@ echo "   - Script tag should be escaped"
 echo "   - Should NOT execute alert()"
 echo "   - Should display as literal text"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

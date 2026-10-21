@@ -2,12 +2,13 @@
 
 import { Lexer } from './lexer.js';
 import { Parser } from './parser.js';
+import { add_hidden_close_note } from './errors.js';
 
 export { Lexer, Token, TokenType } from './lexer.js';
 export { Parser } from './parser.js';
 export { COMPONENT_NAME_PATTERN, COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
 export { CodeGenerator, generate } from './codegen.js';
-export { compileTemplate, CompileOptions, CompiledOutput } from './compiler.js';
+export { compileTemplate, CompileOptions, CompiledOutput, SourceMapObject } from './compiler.js';
 export {
   NodeType,
   ASTNode,
@@ -24,12 +25,13 @@ export { JQHTMLParseError, ErrorCollector } from './errors.js';
 
 // Convenience function for parsing with error context
 export function parse(source: string, filename?: string) {
+  const lexer = new Lexer(source, filename);
   try {
-    const lexer = new Lexer(source);
     const tokens = lexer.tokenize();
     const parser = new Parser(tokens, source, filename);
     return parser.parse();
   } catch (error: any) {
+    add_hidden_close_note(error, lexer.hidden_closes);
     // If it's already a JQHTMLParseError, just re-throw it
     if (error.name === 'JQHTMLParseError') {
       throw error;

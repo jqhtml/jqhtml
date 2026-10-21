@@ -52,6 +52,15 @@ function parseArgs(argv) {
       }
     } else if (arg === '--sourcemap') {
       args.sourcemap = true;
+    } else if (arg.startsWith('--sourcemap=')) {
+      const kind = arg.slice('--sourcemap='.length);
+      if (kind === 'inline') {
+        args.sourcemap = true;
+      } else if (kind === 'external') {
+        args.sourcemap = 'external';
+      } else {
+        throw new Error(`Invalid sourcemap: ${kind}. Must be inline or external`);
+      }
     } else if (arg === '--status-json') {
       args.statusJson = true;
     } else if (!arg.startsWith('-')) {
@@ -72,7 +81,10 @@ Usage: jqhtml-compile <input.jqhtml> [options]
 Options:
   --output, -o <file>  Write output to file instead of stdout
   --format <format>    Output format: iife|esm|cjs|umd (default: iife)
-  --sourcemap         Include inline sourcemap
+  --sourcemap         Include inline sourcemap (same as --sourcemap=inline)
+  --sourcemap=external
+                      Write the sourcemap to <output>.map and reference it from the
+                      output (requires --output)
   --status-json       Output errors as JSON for programmatic parsing
   --version, -v       Show version number
   --help, -h          Show this help message
@@ -82,6 +94,7 @@ Examples:
   jqhtml compile component.jqhtml --output component.js
   jqhtml compile component.jqhtml --format esm --sourcemap
   jqhtml compile component.jqhtml -o dist/component.js --format umd
+  jqhtml compile component.jqhtml -o dist/component.js --sourcemap=external
 
 Output formats:
   iife - Self-executing function that registers with window.jqhtml
@@ -101,6 +114,10 @@ async function compile(inputFile, options) {
       throw new Error(`Input file not found: ${inputPath}`);
     }
 
+    if (options.sourcemap === 'external' && !options.output) {
+      throw new Error('--sourcemap=external requires --output: the map is written next to the output file');
+    }
+
     const source = fs.readFileSync(inputPath, 'utf-8');
     const filename = path.basename(inputPath);
 
@@ -111,7 +128,12 @@ async function compile(inputFile, options) {
       version: VERSION
     });
 
-    const formattedCode = compiled.code;
+    let formattedCode = compiled.code;
+    const map_name = compiled.map ? path.basename(options.output) + '.map' : null;
+    if (compiled.map) {
+      compiled.map.file = path.basename(options.output);
+      formattedCode += `\n//# sourceMappingURL=${map_name}`;
+    }
 
     if (options.statusJson) {
       // Output as JSON for programmatic consumption
@@ -121,6 +143,9 @@ async function compile(inputFile, options) {
       };
       if (options.output) {
         result.outputFile = options.output;
+      }
+      if (compiled.map) {
+        result.map = compiled.map;
       }
       console.log(JSON.stringify(result));
     } else if (options.output) {
@@ -134,7 +159,10 @@ async function compile(inputFile, options) {
       }
 
       fs.writeFileSync(outputPath, formattedCode, 'utf-8');
-      console.log(`✓ Compiled ${inputFile} → ${options.output}`);
+      if (compiled.map) {
+        fs.writeFileSync(path.join(outputDir, map_name), JSON.stringify(compiled.map), 'utf-8');
+      }
+      console.log(`✓ Compiled ${inputFile} → ${options.output}${compiled.map ? ` (+ ${map_name})` : ''}`);
     } else {
       // Output the compiled code to stdout without trailing newline
       process.stdout.write(formattedCode);
@@ -166,9 +194,7 @@ async function compile(inputFile, options) {
       if (error.context) {
         console.error(`  context: ${error.context}`);
       }
-      if (error.suggestion) {
-        console.error(`  suggestion: ${error.suggestion}`);
-      }
+      // A JQHTMLParseError's message already ends with its suggestion
     }
     return 1; // Error
   }

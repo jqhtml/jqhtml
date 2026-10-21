@@ -1,0 +1,4 @@
+<%-- Ejc_Late - extends= names a template registered only LATER, by the test. Class extends Ejc_Grid_B. --%>
+<Define:Ejc_Late extends="Ejc_Late_Target">
+  <Slot:body><span class="ejc-slot">Ejc_Late</span></Slot:body>
+</Define:Ejc_Late>

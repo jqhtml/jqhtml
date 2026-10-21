@@ -1,0 +1,25 @@
+<%--
+Define_Args_Inherited - a parent <Define>'s $ arg defaults (defineArgs) are inherited
+along the template chain (extends= and JS class inheritance), the nearest <Define>
+winning; data- attributes and args at the invocation win over all.
+
+Defect: the constructor copied defineArgs from the component's own template only, so a
+child never received its parent's $size.
+--%>
+<Define:Define_Args_Inherited>
+  <div>
+    <h1>Define $ arg defaults are inherited</h1>
+    <Ia_Mid $sid="mid" />
+    <Ia_Sized $sid="sized" />
+    <Ia_Leaf $sid="leaf" />
+    <Ia_Slot_Child $sid="slot_child" />
+    <Ia_Leaf $sid="invoked" $size="invocation size" $level="invocation level" />
+    <Ia_Leaf $sid="data_invoked" data-size="data size" data-level="data level" />
+    <Ia_Data_Mid $sid="data_mid" />
+    <Ia_Data_Leaf $sid="data_leaf" />
+    <Ia_Arg_Mid $sid="arg_mid" />
+    <Ia_Arg_Leaf $sid="arg_leaf" />
+    <Ia_Loaded $sid="loaded" />
+    <div $sid="stage"></div>
+  </div>
+</Define:Define_Args_Inherited>

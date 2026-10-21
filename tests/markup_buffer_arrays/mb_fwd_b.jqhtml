@@ -1,0 +1,5 @@
+<Define:Mb_Fwd_B>
+  <Mb_Fwd_C>
+    <Slot:item $params="item"><%= content('item', item) %></Slot:item>
+  </Mb_Fwd_C>
+</Define:Mb_Fwd_B>

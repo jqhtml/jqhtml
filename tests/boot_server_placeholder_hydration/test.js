@@ -198,6 +198,7 @@ class Test_Boot extends Jqhtml_Component {
     console.log(`[Test_Boot] RESULTS: ${passed} passed, ${failed} failed`);
     console.log('═══════════════════════════════════════════════════════════');
 
+    window.testPassed = (failed === 0);
     if (failed === 0) {
       console.log('[Test_Boot] ✅ ALL TESTS PASSED');
       $results.prepend('<h3 style="color: green;">✅ ALL TESTS PASSED</h3>');

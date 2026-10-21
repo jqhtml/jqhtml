@@ -7,17 +7,37 @@
 
 import { Lexer } from './lexer.js';
 import { Parser } from './parser.js';
-import { CodeGenerator } from './codegen.js';
+import { SourceMapGenerator } from 'source-map';
+import { CodeGenerator, ComponentCode, add_render_mappings } from './codegen.js';
+import { js_string, js_string_single } from './js_literal.js';
+import { add_hidden_close_note } from './errors.js';
 
 export interface CompileOptions {
   format: 'iife' | 'esm' | 'cjs' | 'umd';
-  sourcemap: boolean;
+  /**
+   * true: an inline sourcemap (a data: URL comment at the end of `code`) - the default
+   * way to ship one. 'external': no comment; the map is returned as `map` for the
+   * caller to write or hand on. false: none.
+   */
+  sourcemap: boolean | 'external';
   version?: string;
+}
+
+/** A version 3 source map. */
+export interface SourceMapObject {
+  version: number;
+  file?: string;
+  sources: string[];
+  sourcesContent?: (string | null)[];
+  names: string[];
+  mappings: string;
 }
 
 export interface CompiledOutput {
   code: string;
   componentName: string;
+  /** Only with `sourcemap: 'external'`. */
+  map?: SourceMapObject;
 }
 
 /**
@@ -44,15 +64,19 @@ export function compileTemplate(
     );
   }
 
-  // 1. Parse the template
-  const lexer = new Lexer(source);
-  const tokens = lexer.tokenize();
-  const parser = new Parser(tokens, source, filename);
-  const ast = parser.parse();
-
-  // 2. Generate code WITHOUT sourcemap (we'll create it after wrapping)
-  const generator = new CodeGenerator();
-  const result = generator.generate(ast, filename, source);
+  // 1. Parse the template, and 2. generate code WITHOUT sourcemap (we'll create it
+  // after wrapping). A failure is explained by any %> a // comment hid.
+  const lexer = new Lexer(source, filename);
+  let result;
+  try {
+    const tokens = lexer.tokenize();
+    const parser = new Parser(tokens, source, filename);
+    const ast = parser.parse();
+    const generator = new CodeGenerator();
+    result = generator.generate(ast, filename, source);
+  } catch (error) {
+    throw add_hidden_close_note(error, lexer.hidden_closes);
+  }
 
   // 3. Get component info
   const componentName = result.components.keys().next().value;
@@ -66,17 +90,23 @@ export function compileTemplate(
 
   // 4. Apply format wrapping and version injection
   const version = options.version || getPackageVersion();
-  let output = formatOutput(
+  const formatted = formatOutput(
     component,
     componentName,
     options.format,
     version
   );
+  let output = formatted.code;
 
   // 5. Generate sourcemap AFTER wrapping (if requested)
+  if (options.sourcemap === 'external') {
+    const map = generateSourcemapForWrappedCode(output, component, formatted, source, filename);
+    return { code: output, componentName, map };
+  }
   if (options.sourcemap) {
-    const sourcemap = generateSourcemapForWrappedCode(output, source, filename);
-    output = output + '\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,' + sourcemap;
+    const map = generateSourcemapForWrappedCode(output, component, formatted, source, filename);
+    output = output + '\n//# sourceMappingURL=data:application/json;charset=utf-8;base64,' +
+      Buffer.from(JSON.stringify(map)).toString('base64');
   }
 
   return {
@@ -109,17 +139,29 @@ function serializeAttributeObject(obj: Record<string, any>): string {
     // Check if value is a parsed attribute object with type info
     if (value && typeof value === 'object' && (value.identifier || value.expression)) {
       // Identifier or expression - output as raw JavaScript (no quotes)
-      entries.push(`"${key}": ${value.value}`);
+      entries.push(`${js_string(key)}: ${value.value}`);
     } else if (value && typeof value === 'object' && value.quoted) {
       // Quoted string - output as string literal
-      entries.push(`"${key}": ${JSON.stringify(value.value)}`);
+      entries.push(`${js_string(key)}: ${js_string(value.value)}`);
     } else {
       // Simple value - output as-is via JSON.stringify
-      entries.push(`"${key}": ${JSON.stringify(value)}`);
+      entries.push(`${js_string(key)}: ${typeof value === 'string' ? js_string(value) : JSON.stringify(value)}`);
     }
   }
 
   return `{${entries.join(', ')}}`;
+}
+
+// Stands in for the render function while the wrapper is built, so where the render
+// function lands is measured, not searched for. Author text in the wrapper is always a
+// JSON-escaped literal, which never contains a raw NUL.
+const RENDER_SLOT = '\u0000render\u0000';
+
+/** The wrapped module, and where its render function starts (1-based line, 0-based column). */
+interface FormattedOutput {
+  code: string;
+  render_line: number;
+  render_column: number;
 }
 
 /**
@@ -127,19 +169,19 @@ function serializeAttributeObject(obj: Record<string, any>): string {
  * Moved from CLI compiler's formatOutput function
  */
 function formatOutput(
-  componentInfo: any,
+  componentInfo: ComponentCode,
   componentName: string,
   format: string,
   version: string
-): string {
+): FormattedOutput {
   const name = componentInfo.name;
 
   // Build the component definition
   let componentDef = `{
   __jqhtml_template: true,
-  _jqhtml_version: '${version}',
-  name: '${componentInfo.name}',
-  tag: '${componentInfo.tagName}',
+  _jqhtml_version: ${js_string_single(version)},
+  name: ${js_string_single(componentInfo.name)},
+  tag: ${js_string_single(componentInfo.tagName)},
   defaultAttributes: ${serializeAttributeObject(componentInfo.defaultAttributes)},`;
 
   // Add defineArgs if present ($ attributes from Define tag)
@@ -149,10 +191,10 @@ function formatOutput(
 
   // Add extends if present (template inheritance)
   if (componentInfo.extends) {
-    componentDef += `\n  extends: '${componentInfo.extends}',`;
+    componentDef += `\n  extends: ${js_string_single(componentInfo.extends)},`;
   }
 
-  componentDef += `\n  render: ${componentInfo.render_function.trimEnd()},
+  componentDef += `\n  render: ${RENDER_SLOT},
   dependencies: ${JSON.stringify(componentInfo.dependencies)}
 }`;
 
@@ -213,82 +255,59 @@ module.exports.template_${name} = template_${name};`;
       throw new Error(`Unknown format: ${format}`);
   }
 
-  return output;
+  const at = output.indexOf(RENDER_SLOT);
+  const before = output.slice(0, at);
+  return {
+    code: before + componentInfo.render_function.trimEnd() + output.slice(at + RENDER_SLOT.length),
+    render_line: before.split('\n').length,
+    render_column: before.length - before.lastIndexOf('\n') - 1
+  };
 }
 
 /**
- * Generate a sourcemap for already-wrapped code
- * This generates sourcemaps AFTER the wrapper has been applied
+ * Generate the sourcemap for the wrapped module.
+ *
+ * Render line N is source line N (codegen places every node on the line it is written
+ * on), so the render function's segments come from codegen as they are, shifted to
+ * where the wrapper put the function. Each emitted node has its own segment, at its
+ * generated column, naming its source line and column. Wrapper lines map to the
+ * <Define> tag.
  */
-function generateSourcemapForWrappedCode(wrappedCode: string, sourceContent: string, filename: string): string {
-  // Count lines in wrapped output and source
+function generateSourcemapForWrappedCode(
+  wrappedCode: string,
+  component: ComponentCode,
+  formatted: FormattedOutput,
+  sourceContent: string,
+  filename: string
+): SourceMapObject {
   const outputLines = wrappedCode.split('\n').length;
-  const sourceLines = sourceContent.split('\n').length;
+  const renderLines = component.render_function.trimEnd().split('\n').length;
+  const map = new SourceMapGenerator();
+  map.setSourceContent(filename, sourceContent);
 
-  // Find where the render function (template content) starts
-  const renderLineOffset = findRenderFunctionLine(wrappedCode);
-  if (renderLineOffset === 0) {
-    // Couldn't find render function, generate a basic mapping
-    console.warn('Could not find render function in wrapped output');
-    const mappings = new Array(outputLines).fill('AAAA').join(';');
-    const sourcemap = {
-      version: 3,
-      sources: [filename],
-      sourcesContent: [sourceContent],
-      mappings: mappings,
-      names: []
-    };
-    return Buffer.from(JSON.stringify(sourcemap)).toString('base64');
+  const wrapper_line = (line: number) => map.addMapping({
+    generated: { line, column: 0 },
+    source: filename,
+    original: component.define_position
+  });
+
+  for (let line = 1; line < formatted.render_line; line++) {
+    wrapper_line(line);
+  }
+  add_render_mappings(map, component, filename, formatted.render_line, formatted.render_column);
+  for (let line = formatted.render_line + renderLines; line <= outputLines; line++) {
+    wrapper_line(line);
   }
 
-  // Build mappings:
-  // 1. Lines before render content → all map to source line 1
-  // 2. Template content lines → map 1:1 to source lines
-  // 3. Lines after template content → all map to last source line
+  const sourcemap = map.toJSON();
 
-  const mappings = [];
-
-  // Wrapper lines before template content
-  for (let i = 0; i < renderLineOffset - 1; i++) {
-    mappings.push('AAAA'); // Map to source line 1, column 0
-  }
-
-  // Template content lines (1:1 mapping)
-  // First line of template maps to source line 1
-  mappings.push('AAAA'); // Source line 1
-
-  // Remaining source lines map sequentially, BOUNDED BY THE GENERATED OUTPUT.
-  // A template whose body renders nothing compiles to a one-line render function, so
-  // the source can be far longer than the code it produces - a comment-only header of
-  // 40 lines still emits the same handful of output lines. A segment naming a
+  // A map that disagrees with its own code is never safe to emit: a segment naming a
   // generated line that does not exist is a phantom line, and consumers that rebuild
   // output from the map (source-map's SourceNode.fromStringWithSourceMap, which most
   // bundlers use for concatenation) materialise each phantom as a bare `undefined`
-  // identifier. That is executable JavaScript, and at top level it throws.
-  for (let i = 1; i < sourceLines && mappings.length < outputLines; i++) {
-    mappings.push('AACA'); // Each subsequent source line
-  }
-
-  // Any remaining wrapper lines after template content
-  const remainingLines = outputLines - mappings.length;
-  for (let i = 0; i < remainingLines; i++) {
-    mappings.push('AAAA'); // Map to last source line
-  }
-
-  // Create the sourcemap object
-  const sourcemap = {
-    version: 3,
-    sources: [filename],
-    sourcesContent: [sourceContent],
-    mappings: mappings.join(';'),
-    names: []
-  };
-
-  // A map that disagrees with its own code is never safe to emit: downstream
-  // consumers trust the segment count and materialise whatever it claims. With the
-  // bound above in place this is an invariant, so treat a violation as a compiler
-  // bug rather than a warning to be scrolled past.
-  const finalCount = mappings.length;
+  // identifier - executable JavaScript that throws at top level. Every generated line
+  // has a segment, so this is an invariant; a violation is a compiler bug.
+  const finalCount = sourcemap.mappings.split(';').length;
   if (finalCount !== outputLines) {
     throw new Error(
       `Sourcemap line mismatch for ${filename}: output has ${outputLines} lines, ` +
@@ -296,23 +315,5 @@ function generateSourcemapForWrappedCode(wrappedCode: string, sourceContent: str
     );
   }
 
-  return Buffer.from(JSON.stringify(sourcemap)).toString('base64');
-}
-
-/**
- * Find the line number where template content starts in the wrapped output
- * Returns 1-based line number
- */
-function findRenderFunctionLine(outputCode: string): number {
-  const lines = outputCode.split('\n');
-  for (let i = 0; i < lines.length; i++) {
-    // Look for the render function definition
-    if (lines[i].includes('render: function render(')) {
-      // Template content starts on the line AFTER the function declaration
-      // The function declaration ends with "{ let _output = []; ..."
-      // The next line is either empty or starts with template content
-      return i + 2; // i+1 for 1-based, +1 for next line after declaration
-    }
-  }
-  return 0; // Not found
+  return sourcemap;
 }

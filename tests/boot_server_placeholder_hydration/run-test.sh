@@ -24,6 +24,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/content_receiver.jqhtml" \
   "$SCRIPT_DIR/async_bootable.jqhtml" \
   --delay=5
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -49,3 +50,6 @@ echo ""
 echo "Test 5: jqhtml:ready event"
 echo "  - Event should fire on document after boot completes"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

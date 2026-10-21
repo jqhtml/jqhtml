@@ -1,0 +1,19 @@
+<Define:JsRegions tag="section">
+  <%
+    // Whole-line comment with a quote: don't break, and %> stays hidden
+    // never put <% %> control-flow in a comment line
+    const path = this.args.path || 'a/b/c'; // trailing comment
+    const quote_free = "it's \"quoted\"".replace(/['"]/g, '');
+  %>
+  <b><%= this.args.label // label shown in bold %> is still a comment
+  %></b>
+  <% let count = 1; // note %> <i>still a comment</i>
+  %> <i>after a trailing comment</i>
+  <span><% if (count) { %>yes<% } // end if %></span>
+  %></span>
+  <p><%= path.replace(/\//g, ' > ') %></p>
+  <p><%= quote_free.replace(/"/g, '') %></p>
+  <% const shown = /%>/.test('%>') ? 'regex hides %>' : 'no'; %><em><%= shown %></em>
+  <p><%= `${path.split('/').map(p => `<${p}>`).join('')}` %></p>
+  <p><%= (count + 1) / 2 %></p>
+</Define:JsRegions>

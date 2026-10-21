@@ -1,0 +1,8 @@
+<Define:Hcu_Parent>
+  <span $sid="title"><%= this.data.title %></span>
+  <% if (this.args.seed) { %>
+    <Hcu_Seed_Leaf $sid="child" />
+  <% } else { %>
+    <Hcu_Child $sid="child" />
+  <% } %>
+</Define:Hcu_Parent>

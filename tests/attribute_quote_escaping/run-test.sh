@@ -12,6 +12,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test.js" \
   "$SCRIPT_DIR/aqe_child.jqhtml" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -22,3 +23,6 @@ echo "1. A double quote inside an interpolated attribute value is encoded, so th
 echo "   stays one attribute on plain tags, tracked tags, id-bearing tags and components"
 echo "2. A hand-written id is emitted verbatim, even on a tracked element (@click)"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

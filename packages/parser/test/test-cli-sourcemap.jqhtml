@@ -1,9 +1,0 @@
-<Define:CliTest>
-  <div class="test">
-    <h1>CLI Test</h1>
-    <%= this.data.message %>
-    <% if (this.data.show) { %>
-      <span>Visible</span>
-    <% } %>
-  </div>
-</Define:CliTest>

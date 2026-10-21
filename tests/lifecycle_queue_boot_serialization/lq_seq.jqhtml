@@ -1,0 +1,5 @@
+<%-- Lq_Seq - each on_load() takes the next delay from window.__lq_seq.delays and
+reports the args.tag it started with. --%>
+<Define:Lq_Seq class="lq-seq">
+  <span><%= this.data.value %></span>
+</Define:Lq_Seq>

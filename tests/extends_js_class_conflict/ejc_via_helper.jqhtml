@@ -1,0 +1,4 @@
+<%-- Ejc_Via_Helper - class extends a template-less helper (Ejc_Helper extends Jqhtml_Component): no templated ancestors, so extends= decides. --%>
+<Define:Ejc_Via_Helper extends="Ejc_Grid_A">
+  <Slot:body><span class="ejc-slot">Ejc_Via_Helper</span></Slot:body>
+</Define:Ejc_Via_Helper>

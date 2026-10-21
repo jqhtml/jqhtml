@@ -6,8 +6,8 @@
  * inside such a comment flipped the lexer's string tracking, which then
  * swallowed the real %> and produced "Unterminated code block - expected %>".
  *
- * Rule: in a code block, if "//" is the first non-space character sequence on
- * a line, everything from "//" to end of line is ignored for parsing.
+ * Rule: in a code block, everything from "//" to the end of its line is ignored
+ * for parsing, wherever the "//" is on the line - a %> inside it included.
  */
 
 import { Lexer, Parser, CodeGenerator } from '../dist/index.js';
@@ -84,6 +84,20 @@ let n = 42;
     assert.doesNotThrow(() => compile(template));
     const result = compile(template);
     assert.ok(result.code.includes('let n = 42'), 'Real code after a comment-with-%> should be preserved');
+  });
+
+  it('should ignore %> inside a trailing // comment on any line of the block', () => {
+    const template = `<Define:Test>
+<% let m = 1; // first line %>
+  m++; // later line %>
+%>
+<div><%= m %></div>
+</Define:Test>`;
+
+    assert.doesNotThrow(() => compile(template));
+    const result = compile(template);
+    assert.ok(result.code.includes('m++;'), 'Code after a comment-with-%> should be preserved');
+    assert.ok(!result.code.includes('later line'), 'Comment text should be stripped');
   });
 
   it('should still preserve real string literals containing //', () => {

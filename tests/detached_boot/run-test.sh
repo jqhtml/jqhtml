@@ -23,6 +23,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/slow_noop_defaults.jqhtml" \
   "$SCRIPT_DIR/slow_noop_defaults.js" \
   --delay=5
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -35,3 +36,6 @@ echo "8-13. Content correctness for all component types"
 echo "14-16. Mid-load DOM append: loading component renders after append"
 echo "17-19. Mid-load DOM append: slow noop renders after append"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

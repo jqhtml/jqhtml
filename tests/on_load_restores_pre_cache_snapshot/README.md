@@ -17,7 +17,7 @@ Guarded by `VALID_MODES = ['data']` - there is no `this.data` cache to hydrate
 from in `none` or `html` mode, so group A logs a SKIP there. Group B below is
 mode-independent and always runs.
 
-## B. load() on a component with no on_load() runs nothing (all modes)
+## B. load() on a component with no on_load() leaves this.data alone (all modes)
 
 `load()` had no `__has_custom_on_load` guard. A template-only component has no
 `__initial_data_snapshot` (create() skips it), so the detached execution produced
@@ -25,7 +25,9 @@ mode-independent and always runs.
 of a component that defines no data fetching at all.
 
 `Snap_Plain` sets `this.data.label = 'x'` in `on_create()` and overrides nothing
-else. `await plain.load()` must return `false` and leave `label === 'x'`.
+else. `await plain.load()` must return `false` and leave `label === 'x'`. (It does
+run `on_loaded()` and fire `loaded`, as every `load()` does - see
+`tests/loaded_without_on_load/`.)
 
 ## Source
 

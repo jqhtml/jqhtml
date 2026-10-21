@@ -1,0 +1,5 @@
+<Define:Test_Compiler_Text_Edge_Cases>
+  <div>
+    <Compiler_Text_Probe />
+  </div>
+</Define:Test_Compiler_Text_Edge_Cases>

@@ -1,0 +1,5 @@
+<Define:Runtime_Overhead_Invariants>
+  <div $sid="multi" $alpha=1 $beta="x" data-gamma="y" $skipped=undefined>multi</div>
+  <button $sid="btn" @click=this.on_btn>go</button>
+  <div $sid="stage"></div>
+</Define:Runtime_Overhead_Invariants>

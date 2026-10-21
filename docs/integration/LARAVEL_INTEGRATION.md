@@ -16,6 +16,12 @@ A Laravel package that enables seamless integration between Blade templates and 
 
 ## Fallback / SEO Rendering: Use @jqhtml/ssr
 
+> **Not production ready.** `@jqhtml/ssr` in its current form is not safe to deploy: it
+> runs code supplied by requests, does not isolate concurrent renders from each other, and
+> does not restrict which servers a render may call. Do not use it in production or expose
+> it to any network. A redesigned, hardened SSR is planned for a future jqhtml release;
+> check the CHANGELOG for the version that announces it.
+
 Real fallback/SEO content should come from **`@jqhtml/ssr`** (`packages/ssr`), not from a
 hand-written PHP reimplementation of every component's markup. `@jqhtml/ssr` is a Node.js
 server (`bin: jqhtml-ssr`, `src/server.js`, "Server-Side Rendering for JQHTML components

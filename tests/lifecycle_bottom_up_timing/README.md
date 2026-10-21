@@ -88,44 +88,21 @@ This allows us to see:
 
 ## Validation Criteria
 
-### Bottom-Up Ordering (DOM Children Before DOM Parents)
+`test.js` (the `Lifecycle_Test` entry component) asserts the ORDER of the entries each
+component pushes to `window.__bottom_up_log` (`<Name> START` / `<Name> END`), never the
+timestamps, so a slow machine cannot fail it:
 
-1. ✅ **All 6 grandchildren complete BEFORE any sibling starts**
-   - Last child END timestamp < First sibling START timestamp
-   - Proves Level 2 DOM children finish before Level 1 DOM parents begin
+1. **Every component ran once under its own name** - 20 entries, a START before each END.
+   Siblings and children get their names from `$id` (`<Sibling_Component $sid="A" $id="A" />`,
+   `<Child_Component $sid="A_child1" $id="A_child1" />`); `$sid` alone does not set
+   `this.args.id`.
+2. **Bottom-up** - each sibling STARTs after both of its own children END, and the root
+   STARTs after all three siblings END.
+3. **Parallel within a level** - all 6 children START before any child ENDs, and all 3
+   siblings START before any sibling ENDs (sequential execution would interleave them).
 
-2. ✅ **All 3 siblings complete BEFORE root starts**
-   - Last sibling END timestamp < Root START timestamp
-   - Proves Level 1 DOM children finish before Level 0 DOM parent begins
-
-### Parallel Execution Within Same Level
-
-3. ✅ **All 6 grandchildren start within ~10ms of each other**
-   - Start timestamps differ by milliseconds, not seconds
-   - Proves children execute in parallel, not sequentially
-
-4. ✅ **All 6 grandchildren end within ~10ms of each other**
-   - End timestamps differ by milliseconds
-   - Confirms they all took ~1000ms (parallel duration)
-
-5. ✅ **All 3 siblings start within ~10ms of each other**
-   - Start timestamps nearly identical
-   - Proves siblings execute in parallel
-
-6. ✅ **All 3 siblings end within ~10ms of each other**
-   - End timestamps nearly identical
-   - Confirms parallel execution
-
-### Total Duration
-
-7. ✅ **Total time ≈ 3 seconds (NOT 10 seconds)**
-   - 3 levels × 1 second per level = 3 seconds
-   - If components ran sequentially: 10 components × 1 second = 10 seconds
-   - Proves parallelization works correctly
-
-8. ✅ **Each component duration ≈ 1000ms**
-   - Confirms async operations complete correctly
-   - No race conditions or premature completion
+Bottom-up is per subtree: Sibling_A may start while Sibling_B's children are still running.
+The console still prints the timestamps for a human reading the log.
 
 ## Running the Test
 
@@ -143,7 +120,7 @@ The test uses `--delay=5` flag to wait 5 additional seconds after all components
 - **`child.jqhtml` + `child.js`** - Leaf components (Level 2)
 - **`sibling.jqhtml` + `sibling.js`** - Middle components (Level 1)
 - **`root.jqhtml` + `root.js`** - Top component (Level 0)
-- **`test.jqhtml`** - Entry point that renders Root_Component
+- **`test.jqhtml` + `test.js`** - Entry point that renders Root_Component and asserts the order
 - **`run-test.sh`** - Test runner script
 
 ### Test Runner Features Used
@@ -213,7 +190,7 @@ This test validates the lifecycle architecture and DOM hierarchy tracking:
 ## Related Tests
 
 - **`js_class_support/`** - Proves paired `.js` files work
-- **`redrawable_and_scoped_ids/`** - Validates $sid scoping behavior
+- **`redrawable_and_scoped_sids/`** - Validates $sid scoping behavior
 
 ## Notes
 

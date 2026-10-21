@@ -4,13 +4,15 @@
 
 ## What this demonstrates
 
-`Component_Queue` serializes `render()` / `load()` / `reload()` / `refresh()` per component.
+`Component_Queue` serializes `render()` / `load()` / `reload()` / `refresh()` per component
+(boot is its first entry - see `tests/lifecycle_queue_boot_serialization/`).
 This test pins down what a caller gets back and when.
 
-1. **Same-type collapse returns the right value.** Three `load()` calls fired synchronously
-   run `on_load()` twice (the one already running plus one collapsed run) and **all three**
-   promises resolve `true`. The pending executor is replaced by the newest call, and every
-   collapsed caller is settled with the value of the run that actually happened.
+1. **Identical adjacent calls merge and return the right value.** Three `load()` calls fired
+   synchronously run `on_load()` twice (the one already running plus one merged run) and
+   **all three** promises resolve `true`. The second and third merge into the waiting entry
+   (never into the running one), which reads `this.args` when it starts, and every merged
+   caller is settled with the value of the run that actually happened.
 2. **A different type does not evict a pending one.** `load()` then `render()` both run, in
    call order - including when both are queued behind a running `reload()`. The DOM ends up
    showing the loaded data.
@@ -18,10 +20,11 @@ This test pins down what a caller gets back and when.
    promise resolves before the second queued `reload()`'s `on_load()` begins.
 4. **A throwing executor rejects only its own callers.** The queue continues with the next
    entry.
-5. **Regression: `reload()` precedence survives the collapse.** A `refresh()` queued behind
-   a `reload()` still renders, because both share the `'reload'` queue type and
-   `next_reload_force_refresh` keeps the force-render. A lone `refresh()` with unchanged data
-   still renders nothing. See also `tests/reload_debouncing/`.
+5. **`refresh()` and `reload()` never merge.** A `refresh()` queued behind a `reload()` is its
+   own entry and keeps its own render rule: with unchanged data the `reload()` renders and
+   the `refresh()` does not. A lone `refresh()` with unchanged data renders nothing either.
+   (Until 2.3.75 a `refresh()` behind a `reload()` inherited the reload's forced render.)
+   See also `tests/reload_debouncing/`.
 
 32 assertions. Every wait is raced against a timeout, because the failure mode of a queue
 bug is a promise that never settles.

@@ -1,0 +1,8 @@
+<%--
+Ejc_Full_Own - a FULL template (markup of its own, no slots). Its class extends
+Ejc_Grid_B and extends="Ejc_Grid_B" agrees, so there is no conflict: its own markup
+renders and neither parent's markup does.
+--%>
+<Define:Ejc_Full_Own extends="Ejc_Grid_B">
+  <div class="ejc-own-marker">OWN</div>
+</Define:Ejc_Full_Own>

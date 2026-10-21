@@ -1,0 +1,4 @@
+<Define:Mb_Box>
+  <ul class="rows"><% for (let i = 0; i < this.args.records.length; i++) { %><%= content('row', this.args.records[i], i) %><% } %></ul>
+  <div class="default"><%= content() %></div>
+</Define:Mb_Box>

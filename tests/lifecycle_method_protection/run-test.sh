@@ -22,6 +22,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/parent_calls_child_lifecycle.jqhtml" \
   "$SCRIPT_DIR/child_component.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -39,3 +40,6 @@ echo ""
 echo "Test 7: Parent cannot call child's lifecycle methods"
 echo "  - Attempting to call child.on_load() should throw error"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

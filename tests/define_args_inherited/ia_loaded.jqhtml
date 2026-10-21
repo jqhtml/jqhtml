@@ -1,0 +1,8 @@
+<%--
+Ia_Loaded extends Ia_Base and has an on_load() (ia_loaded.js), so it is cached: the
+inherited $size must be what on_load() reads and what the cache key is built from.
+--%>
+<Define:Ia_Loaded extends="Ia_Base">
+  <span class="ia-size"><%= this.args.size %></span>
+  <span class="ia-loaded"><%= this.data.seen_size %></span>
+</Define:Ia_Loaded>

@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/load_test_component.jqhtml" \
   "$SCRIPT_DIR/load_test_component.js" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -27,3 +28,6 @@ echo "5. this.data is frozen after load()"
 echo "6. Multiple load() calls work correctly"
 echo "7. render() after load() updates DOM with latest data"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

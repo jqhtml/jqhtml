@@ -12,6 +12,7 @@ echo ""
 
 # Run the test
 node ../../jqhtml-render-harness/test-runner.js "$TEST_DIR/test.jqhtml"
+HARNESS_STATUS=$?
 
 echo ""
 echo "=================================================="
@@ -22,3 +23,6 @@ echo "Rule 2: Multiple whitespace collapsed to single space"
 echo "Rule 3: Minified markup (no spaces) respected"
 echo "Rule 4: Leading/trailing spaces in text preserved"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

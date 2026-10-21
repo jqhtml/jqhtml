@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/data_restore_test.jqhtml" \
   "$SCRIPT_DIR/data_restore_test.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -31,3 +32,6 @@ echo ""
 echo "3. INITIAL VALUES:"
 echo "   Values set in on_create() persist"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

@@ -1,0 +1,3 @@
+<Define:Es_List tag="ul">
+  <% for (const record of this.args.records) { const _item = content('row', record); if (_item) { %><li class="item"><%= _item %></li><% } } %>
+</Define:Es_List>

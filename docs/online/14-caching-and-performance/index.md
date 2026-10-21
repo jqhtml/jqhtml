@@ -294,6 +294,10 @@ the cache scope. This means an upgrade never serves entries written by an older 
 cached shape may no longer match what the current version expects — the first load after an
 upgrade repopulates from the network.
 
+The version is also part of each stored entry's key, so a browser tab still open on the older
+version, writing after the upgrade under the same cache key, never has its entries read by
+the newer one.
+
 ## Debugging Cache Behavior
 
 Enable verbose mode to see cache operations in the console:
@@ -374,3 +378,4 @@ Both flags cascade from parent to children automatically.
 - 2026-03-06: Added preloading SPA routes section (_load_only, _load_render_only)
 - 2026-07-21: Documented `cache_mode` parameter of `set_cache_key()` and HTML cache mode; scoped the "render always runs" claim in "What Gets Cached" to data cache mode. Fixed `JqhtmlComponent` references to `Jqhtml_Component`.
 - 2026-08-19: Documented that the jqhtml version forms part of the cache scope, so upgrading the framework clears prior entries automatically and callers need only version their OWN build in the cache key. Replaced Best Practice #4 ("use primitive args") which contradicted the Which Args Can Be Keyed section added earlier the same day.
+- 2026-10-20: Documented that each stored entry key also carries the jqhtml version, so a tab on an older version sharing the cache key is never read from.

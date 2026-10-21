@@ -1,0 +1,28 @@
+<Define:Style_Merge_Css_Values>
+  <div style="display: none">
+    <%-- 1. Define defaults merged with an invocation style --%>
+    <Smc_Base $sid="plain_merge" style="color: blue" />
+    <%-- 2. Quoted data URI, ';' and ':' inside a CSS string, single-quoted attribute --%>
+    <Smc_Base $sid="data_uri" style='list-style-image: url("data:image/png;base64,iVBORw0KGgo="); content: "a;b:c"' />
+    <%-- 3. Backslash-escaped quote and ';' inside a CSS string, double-quoted attribute --%>
+    <Smc_Base $sid="escaped" style="content: 'it\'s; fine'; margin: 1px" />
+    <%-- 4. Unquoted url() with ';', var() fallback with a nested url(), a comment --%>
+    <Smc_Base $sid="blocks" style="cursor: url(data:image/png;base64,AAAA), auto; border-image-source: var(--img, url(a;b.png)); /* c; d: e */ padding: 3px" />
+    <%-- 5. Property names compare case-insensitively, custom properties case-sensitively --%>
+    <Smc_Base $sid="names" style="COLOR: blue; --gap: 9px" />
+    <%-- 6. !important is carried with the value --%>
+    <Smc_Base $sid="important" style="color: blue !important" />
+    <%-- 7. Nearest <Define> wins (extends chain), invocation wins over both --%>
+    <Smc_Near $sid="near" />
+    <Smc_Near $sid="near_invoked" style="color: purple" />
+    <%-- 9. A losing shorthand does not reset the winner's longhand --%>
+    <Smc_Base $sid="shorthand" style="background-image: url(http://x.test/inv.png)" />
+    <%-- 10. !important: a later normal declaration does not replace it --%>
+    <Smc_Important $sid="important_define" style="color: blue; margin: 2px" />
+    <Smc_Important $sid="important_both" style="color: blue !important" />
+    <%-- 11. Character references are resolved before the CSS split (&quot; holds a ';') --%>
+    <Smc_Base $sid="entity" style="content: &quot;a;b&quot;; color: blue" />
+    <%-- 8. A tracked element (@click) re-applies its own style after the HTML pass --%>
+    <b $sid="tracked" style="background: url(http://x.test/t.png); font-family: 'T;1', serif; color: red" @click=this.on_click>t</b>
+  </div>
+</Define:Style_Merge_Css_Values>

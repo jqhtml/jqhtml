@@ -18,6 +18,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/child_b.jqhtml" \
   "$SCRIPT_DIR/child_b.js" \
   --delay=4
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -37,3 +38,6 @@ echo "10. Child B on_render() does NOT fire"
 echo "11. Child B on_loaded() does NOT fire"
 echo "12. Child B on_ready() does NOT fire"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

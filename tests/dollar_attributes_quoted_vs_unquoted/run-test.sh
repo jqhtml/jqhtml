@@ -15,6 +15,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/child_component.jqhtml" \
   "$SCRIPT_DIR/child_component.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -34,3 +35,6 @@ echo ""
 echo "3. CRITICAL DISTINCTION:"
 echo "   Quotes determine parsing: string literal vs JS expression"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

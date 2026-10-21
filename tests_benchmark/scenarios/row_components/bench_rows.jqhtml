@@ -1,0 +1,7 @@
+<Define:Bench_Rows tag="table" class="bench-rows">
+  <tbody>
+    <% for (let r of this.args.rows) { %>
+      <Bench_Row $row=r />
+    <% } %>
+  </tbody>
+</Define:Bench_Rows>

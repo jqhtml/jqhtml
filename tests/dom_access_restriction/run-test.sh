@@ -21,6 +21,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/valid_args.jqhtml" \
   "$SCRIPT_DIR/valid_methods.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -36,14 +37,14 @@ echo "   - Should throw error when accessing this.$ in on_load()"
 echo "   - Error message: 'Cannot access this.$ during on_load()'"
 echo "   - Status should show 'PASS'"
 echo ""
-echo "✅ Test 3 (Access this.\$id):"
-echo "   - Should throw error when accessing this.\$id() in on_load()"
-echo "   - Error message: 'Cannot access this.\$id during on_load()'"
+echo "✅ Test 3 (Access this.\$sid):"
+echo "   - Should throw error when accessing this.\$sid() in on_load()"
+echo "   - Error message: 'Cannot access this.\$sid during on_load()'"
 echo "   - Status should show 'PASS'"
 echo ""
-echo "✅ Test 4 (Access this.id):"
-echo "   - Should throw error when accessing this.id() in on_load()"
-echo "   - Error message: 'Cannot access this.id during on_load()'"
+echo "✅ Test 4 (Access this.sid):"
+echo "   - Should throw error when accessing this.sid() in on_load()"
+echo "   - Error message: 'Cannot access this.sid during on_load()'"
 echo "   - Status should show 'PASS'"
 echo ""
 echo "✅ Test 5 (Set Property):"
@@ -57,7 +58,10 @@ echo "   - Value should be 42"
 echo "   - Status should show 'PASS - user_id = 42'"
 echo ""
 echo "✅ Test 7 (Call Methods):"
-echo "   - Should successfully call this.component_name() in on_load()"
-echo "   - Value should be 'Valid_Methods'"
-echo "   - Status should show 'PASS - name = Valid_Methods'"
+echo "   - Should throw error when calling this.component_name() in on_load()"
+echo "   - Error message: 'Cannot access this.component_name during on_load()'"
+echo "   - Status should show 'PASS'"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

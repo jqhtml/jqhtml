@@ -99,8 +99,16 @@ You provide ONLY styling classes in the `class=""` attribute.
 **Default attributes resolve through the same chain templates do** — explicit `extends=""`
 first, then the JS class prototype chain. A slot-only JS subclass
 (`class Users_Grid extends Grid_Abstract`) inherits the parent `<Define>`'s `class=""` and
-attributes as well as its template. A parent default is applied only where the invocation
-did not set that attribute at all; an invocation `tabindex="0"` or `title=""` is SET and wins.
+attributes as well as its template. When two `<Define>`s in the chain set the same
+attribute, the nearer one wins (child over parent, per property for `style`; `class`
+merges). A `<Define>` default is applied only where the invocation did not set that
+attribute at all; an invocation `tabindex="0"` or `title=""` is SET and wins.
+
+**`$` arg defaults are inherited along the same chain.** A child that does not set `$size`
+gets its parent's (or grandparent's) `<Define $size=...>` in `this.args`; the nearest
+`<Define>` that sets it wins. `$foo` and `data-foo` defaults are one arg, nearer wins either
+spelling. Precedence: farthest `<Define>` < nearer `<Define>`s < own `<Define>` <
+invocation `data-` attribute < invocation `$` arg.
 
 **Template inheritance:** a parent template is looked up (via the `extends=""` attribute, then the JS class prototype chain) only when the child's template body is **slot-only** (contains nothing but `<Slot:>` tags at the top level). A body with any top-level HTML is used as-is. See "Slot-Based Template Inheritance" below.
 
@@ -115,6 +123,8 @@ did not set that attribute at all; an invocation `tabindex="0"` or `title=""` is
 ```
 
 **`<%br= %>`** — Escaped output with newline-to-BR conversion. Use for user-entered text that contains line breaks. HTML is escaped for security, but `\n` characters become `<br />`.
+
+**An array prints the literal text `(Array)`** in all three output forms — data is never spliced in as markup. Join it or loop over it. Only what `content()` returns splices.
 
 ### Control Flow
 
@@ -140,6 +150,13 @@ did not set that attribute at all; an invocation `tabindex="0"` or `title=""` is
 ```
 **Why:** The parser cannot distinguish `>` closing a tag from `>` inside JavaScript expressions.
 
+**Plain attributes are quoted strings** on every tag, `<Define:>` included: `title=x` and
+`title=(x)` are compile errors. Only `$` and `@` attributes take a JavaScript value.
+
+**No `<script>` or `<style>`:** the elements, `tag="script"`/`tag="style"`, and the text
+`<script` / `</script` anywhere the template emits it (compiled templates may be inlined
+in a `<script>` block) are compile errors. `<%-- --%>` comments are exempt.
+
 **Void elements auto-close (HTML5 standard):** `<input type="text">`, `<img src="logo.png">`, `<br>`, `<hr>`, `<meta>`, `<link>` auto-close. Components still need explicit self-closing: `<User_Card />`
 
 ### Advanced: Dynamic Component Tags and Value Printers
@@ -149,7 +166,7 @@ expression evaluates to (render-time, same rule as a literal tag; closing expres
 match textually). `jqhtml.add_object_printer(fn)` lets `<%= %>` render an object: `fn`
 returns `undefined` (decline), a string (escaped per the construct) or
 `{component: {name, args, attrs}}` (mounted, no content). Primitives and arrays never enter
-the chain; attribute position never uses it; an unhandled object throws. Both are advanced
+the chain (an array prints the literal text `(Array)`); attribute position never uses it; an unhandled object throws. Both are advanced
 and documented in `docs/reference/22_value_printers_and_dynamic_tags.md` - prefer literal
 tags and primitive interpolation.
 
@@ -273,10 +290,20 @@ class My_Component extends Jqhtml_Component {
   }
 
   on_loaded() {
-    // Called AFTER on_load() completes, on the REAL component.
+    // Called AFTER on_load() completes, on the REAL component. Runs for EVERY
+    // component: without an on_load(), where on_load() would have completed.
     // this.data is FROZEN; this.$, this.state, this.args accessible.
     // Use to clone this.data into this.state for local manipulation.
     this.state.items = [...this.data.items];
+  }
+
+  on_load_error(error) {
+    // on_load() threw (boot, load(), reload() or refresh()). Same access as on_load().
+    // Not overridden: the error is printed and a boot stops the component (load()/
+    // reload()/refresh() reject). Overridden: no print; the component continues with
+    // the this.data set here. super.on_load_error(error) keeps the print; a throw
+    // takes the not-overridden path. Can be async. Fallback data is never cached.
+    this.data.error = error.message;
   }
 
   async on_ready() {
@@ -321,15 +348,17 @@ class My_Component extends Jqhtml_Component {
 3. `_render()` — creates DOM, instantiates and boots child components
 4. `on_render()` — after DOM update, BEFORE children boot (synchronous)
 5. `.trigger('render')`
-6. `load()` → calls `on_load()` (async)
-7. `on_loaded()` — after data applied; `this.data` frozen, `this.$`/`this.state` accessible
-8. `.trigger('loaded')`
+6. `load()` → calls `on_load()` (async); if it throws → `on_load_error(error)` (fallback `this.data` and continue if overridden, otherwise print and stop). Skipped when `on_load()` is not overridden
+7. `on_loaded()` — after data applied; `this.data` frozen, `this.$`/`this.state` accessible. Every component, with or without `on_load()`
+8. `.trigger('loaded')` — every component, with or without `on_load()` or `on_loaded()`
 9. [If `this.data` changed] — re-run `_render` → `on_render` → `trigger('render')`
 10. [Wait for all children ready] — bottom-up: children complete before parent
 11. `ready()` → calls `on_ready()` (async)
-12. `.trigger('ready')`
+12. `.trigger('ready')` (if calls were queued during boot: once they have all run)
 
-**Key behaviors:** children boot in parallel; ready is bottom-up; components boot immediately on creation; no queues or batching.
+**Key behaviors:** children boot in parallel; ready is bottom-up; components boot immediately on creation; no batching across components.
+
+**One lifecycle queue per component.** Every cycle - boot, or a queued `render()`, `load()`, `reload()`, `refresh()` - holds the component's lock from its start through the end of its own `on_ready()`. Calls made meanwhile (during the first `on_load()`, or from inside `on_ready()`) wait and run afterwards in call order, reading `this.args` when they start - so a `reload()` with new args made during the first `on_load()` runs after it and its data wins. A call merges only into the call waiting immediately before it, and only when it is the same method with the same arguments (`refresh()` is `reload(false)`); the merged caller gets that call's result. Nothing merges into a running call or across methods: `reload, refresh, reload` is three runs. Each caller's promise resolves when its own operation finishes. If boot ends with calls still queued, `ready` fires once, after they have all run. Pattern: `on_ready() { if (cond) { this.reload(); return; } ... }` - an unawaited call from `on_ready()` runs after `on_ready()` returns, and `on_ready()` runs again on the reloaded state. An AWAITED call during `on_ready()` (`await this.render()`, `const changed = await this.load()`) is pulled forward and runs at once, nested; other queued calls still wait. Do not call these from `on_create()`/`on_render()` (they cannot run there; dev mode warns), and never `await` one inside the component's own `on_loaded()`: it cannot start until `on_loaded()` returns, so it deadlocks. In dev mode the awaited promise warns: `[JQHTML] reload() was awaited while My_Component's on_loaded() is still running. If on_loaded() awaits this call it will deadlock: call it without await. Code outside the component should await comp.ready() before awaiting reload() or refresh().` (naming the real method). Code outside the component awaiting a call during `on_load()` just waits its turn.
 
 ### this.data Freeze/Unfreeze Cycle
 
@@ -345,7 +374,9 @@ assignment; the error names the path (`this.data.items[2]`). Reads are untouched
 `JSON.stringify`, `Array.isArray`, `.length`, spread, `for..of`, `.map`/`.filter`,
 `Object.keys` and identity (`this.data.items === this.data.items`) all behave as before.
 `Date`, `Map`, `Set` and `register_cache_class()` instances pass through unwrapped, because
-a Proxy cannot satisfy their internal slots. Mutable bookkeeping belongs in `this.state`.
+a Proxy cannot satisfy their internal slots. `Object.defineProperty`, `Object.setPrototypeOf`
+and `Object.freeze`/`seal`/`preventExtensions` throw too, and a property descriptor's `value`
+is the read-only view. Mutable bookkeeping belongs in `this.state`.
 
 ### on_load() Access Restrictions
 
@@ -389,7 +420,7 @@ Input parameters (from `$` attributes). Mutable everywhere except `on_load()` (r
 ### this.data — Loaded Data from APIs
 Set defaults in `on_create()`, populate in `on_load()`. Freeze/unfreeze cycle as above — the restore snapshot is taken the moment `on_create()` returns, before any cache is read, so `on_load()` always restarts from the `on_create()` state even on a warm cache. Modifications trigger automatic re-renders. Cached by component name + `this.args`.
 
-**`this.data` is jqhtml's own serialized copy of what `on_load()` returned**, round-tripped through the cache serializer before assignment in every cache mode (including `none`). So nothing you still hold a reference to is aliased into `this.data`, and a fresh load and a cache hit produce the same thing by construction. Dates, `Map`, `Set` and classes registered with `jqhtml.register_cache_class()` survive. Anything else is stripped: functions, promises, DOM nodes, jQuery objects and component instances are dropped, an unregistered class instance becomes a plain object of its own properties, and cycles are cut. Development warns once per component and path, naming where the value belongs (`this.args` for callbacks, `this.state` for DOM nodes/timers/files/sockets, `register_cache_class()` for model instances); production converts silently.
+**`this.data` is jqhtml's own serialized copy of what `on_load()` returned**, round-tripped through the cache serializer before assignment in every cache mode (including `none`). So nothing you still hold a reference to is aliased into `this.data`, and a fresh load and a cache hit produce the same thing by construction. What `on_create()` leaves in `this.data` is replaced by its serialized copy the same way when `on_create()` returns, so `this.state.list = this.data.list = []` does not alias `this.data`. Dates, `Map`, `Set` and classes registered with `jqhtml.register_cache_class()` survive. Anything else is stripped: functions, promises, DOM nodes, jQuery objects and component instances are dropped, an unregistered class instance becomes a plain object of its own properties, and cycles are cut. Development warns once per component and path, naming where the value belongs (`this.args` for callbacks, `this.state` for DOM nodes/timers/files/sockets, `register_cache_class()` for model instances); production converts silently. After `on_create()` the development warning checks only the top-level properties of `this.data`; nested values are not walked.
 
 ### this.state — Component-Local State
 No framework meaning — a convention for component-specific values (timers, flags, WebSocket connections). Mutable anywhere, never frozen, never cached, no automatic re-renders.
@@ -427,17 +458,19 @@ this.sid('name')  // Get child component instance by scoped ID
 
 | Method | Calls on_load() | Calls on_ready() | Redraws DOM | Checks Cache | Use Case |
 |--------|-----------------|------------------|-------------|--------------|----------|
-| `load()` | Yes | No | No | No | Re-fetch data only; developer controls next step. Returns `true` if data changed, and `false` immediately — running nothing — when `on_load()` is not overridden |
+| `load()` | Yes | No | No | No | Re-fetch data only; developer controls next step. Returns `true` if data changed. Without an `on_load()` override it leaves `this.data` as `on_create()` set it, runs `on_loaded()`, fires `loaded` and returns `false` |
 | `render(sid?)` | No | Yes | Always | No | Re-render with current data (pass a `$sid` to re-render one `$redrawable`) |
-| `reload()` | Yes | Yes | Conditional | If args changed | Re-fetch and re-render — the standard update method. Debounced |
-| `refresh()` | Yes | Conditional | Only if data changed | If args changed | Polling / background sync without flicker. Debounced (shares queue with reload) |
+| `reload()` | Yes | Yes | Conditional | If args changed | Re-fetch and re-render — the standard update method. Queued (see "One lifecycle queue per component") |
+| `refresh()` | Yes | Conditional | Only if data changed | If args changed | Polling / background sync without flicker. Queued like reload(); never merges with a reload() |
 | `ready(cb?)` | No | No | No | No | Promise (or callback) resolving when component completes its lifecycle |
 | `stop()` | No | No | No | No | Stop lifecycle before removal: fires `detach` first if attached, always adds `_Component_Stopped`, de-registers from the parent and fires `stop`; calls `on_stop()` when overridden; does NOT remove DOM. Reached automatically by every jQuery removal (`.remove()`, `.empty()`, `.html(x)`, `.text(x)`, `.replaceWith()`) via the `jQuery.cleanData` hook and by parent re-renders; NOT by native DOM removal. A hook that throws during boot stops the component the same way, so ancestors are never left waiting |
 | `is_attached()` | No | No | No | No | Live: `true` when the root is in the document right now and the component is not stopped. Correct before the first `attach` and for untracked components; may run a moment ahead of the matching event |
 
 `redraw()` is an alias for `render()`.
 
-**Synchronous requirements:** `on_create()`, `on_render()`, `on_stop()`, `on_attach()`, `on_detach()`, `on_viewport_resize()`, `stop()` MUST be sync. `on_load()`, `on_loaded()`, `on_ready()` CAN be async.
+**Synchronous requirements:** `on_create()`, `on_render()`, `on_stop()`, `on_attach()`, `on_detach()`, `on_viewport_resize()`, `stop()` MUST be sync. `on_load()`, `on_load_error()`, `on_loaded()`, `on_ready()` CAN be async.
+
+**`on_load_error(error)`** - The framework always catches an `on_load()` throw and calls this. Not overridden: it prints the error naming the component, then a failed boot stops the component and a failed `reload()`/`refresh()`/`load()` rejects (the component keeps its previous render, and `ready()` still resolves). Overridden: no print, and the component continues - `on_loaded()`, a re-render with the `this.data` it set, then `ready`; the failed `reload()`/`refresh()`/`load()` resolves. Same access as `on_load()`. With deduplication each component sharing the failed request runs its own hook with the same error. Fallback data is never cached, and an instance whose `on_load()` has failed never reads or writes the cache again.
 
 **`on_viewport_resize(viewport_width)`** - Not a lifecycle stage; a notification. Fires after every `on_render()`, after every `on_ready()`, and on window resize (debounced 30ms) for every component in the document. The argument is `window.innerWidth` in CSS pixels - it agrees with CSS media queries; for the component's own width use `this.$.width()`. Detached and stopped components are skipped, and a handler that throws is logged without stopping the fan-out. Prefer CSS media/container queries; use this only when layout needs real measurement (canvas sizing, chart redraw, virtual scroll windowing, text truncation).
 
@@ -449,12 +482,15 @@ this.sid('name')  // Get child component instance by scoped ID
 // Setter mode - returns jQuery object for chaining
 $('#container').component('User_Card', {user_id: 123});
 $('<div>').component('Dashboard', {}).appendTo('body');
+$('.cards').component('Card', {theme: 'dark'});  // one Card per matched element
 
 // Getter mode - returns component instance (no arguments)
 const component = $('#my-component').component();
 component.reload();
 await component.ready();
 ```
+
+The setter creates one instance on every matched element (replacing any component already there), each with its own shallow copy of `args` (nested objects stay shared), and returns the same jQuery set. The getter returns the first matched element's component (or null) and logs a console warning when the set holds more than one element - use `.first().component()` or `.each()` to be explicit.
 
 **`on_attach()` / `on_detach()` and the `attach` / `detach` events** - the root entered / left the document, whatever the removal path. Every component starts detached; the first check runs after `on_ready()` and the `ready` handlers, and fires `attach` (sticky) if the root is in the document. Transitions strictly alternate and fire once each; `stop()` on an attached component fires `detach` first. Tracking is opt-in and lazy: it starts only for components that override a hook or receive `.on('attach'|'detach')`, via one document-level `MutationObserver` that re-checks `isConnected` per tracked component (held by `WeakRef`) per mutation batch. A synchronous move inside the document is not a transition. Use these, not `on_stop()`, for registrations that live outside the component (realtime subscriptions, external registries): unsubscribe in `on_detach()`, resubscribe plus one `refresh()` in `on_attach()`.
 
@@ -465,7 +501,7 @@ $('#my-component').component().on('ready', (component) => { ... });
 $('#my-component').component().once('loaded', (component) => { ... });
 ```
 
-**Supported events:** `render`, `rendered`, `create`, `load`, `loaded`, `ready`, `attach`, `detach`, `stop`. Events are sticky — if the event already occurred, the callback fires immediately. `.once()` fires exactly once. `component.rendered(cb?)` mirrors `ready()` but resolves when the synchronous render chain completes, before the ready phase.
+**Supported events:** `render`, `rendered`, `create`, `load`, `loaded`, `ready`, `attach`, `detach`, `stop`. Events are sticky — if the event already occurred, the callback fires immediately. `.once()` fires exactly once. `component.rendered(cb?)` mirrors `ready()` but resolves when the synchronous render chain completes, before the ready phase. Both `ready()` and `rendered()` also resolve (never reject) if the component is stopped, or stops while being waited on — including one whose hook threw during boot — so a waiter is released rather than left hanging. The promise resolves on stop; the callback does not run (it runs only on a real `ready` / `rendered`).
 
 ---
 
@@ -517,9 +553,28 @@ named after the slot, or as the names declared with `<Slot:row $params="record, 
 
 **All-or-nothing rule:** once an invocation uses any `<Slot:name>`, put ALL content in slots — mixing slotted and unslotted content is unsupported.
 
+**Optional slots - `content()` returns `''` when the caller supplied nothing:** the slot was
+left out, or its body emitted only HTML whitespace (`<Slot:note></Slot:note>`, or one holding
+only line breaks and indentation). Text, any element, any component, `&nbsp;` or a printed
+`0` is content; a slot that only passes another slot down counts by what that one emits.
+Unnamed `content()` follows the same rule. Call it once, test truthiness, emit:
+
+```jqhtml
+<Define:Property_Row>
+  <% const _note = content('note'); %>
+  <div class="value"><%= content('value') %></div>
+  <% if (_note) { %><div class="note"><%= _note %></div><% } %>
+</Define:Property_Row>
+```
+
+Never inspect the value beyond truthiness — its shape is internal. A caller cannot wrap a
+`<Slot:>` tag in `<% if %>`, so "nothing here" is written as an empty slot.
+
 ### Slot-Based Template Inheritance
 
-When a component template contains ONLY slots at the top level (no HTML), it automatically inherits the parent class template. The framework walks the JS prototype chain to find parent templates.
+When a component template contains ONLY slots at the top level (no HTML), it automatically inherits the parent class template. The framework walks the JS prototype chain to find parent templates. A `<Define:>` that mixes top-level slots with any other content (markup, text including
+non-breaking spaces, `<% %>` or `<%= %>`) is a compile error; only HTML whitespace may sit
+between the slots.
 
 **Three inheritance mechanisms that work together:**
 1. **JS class inheritance** (behavior): `class Child extends Parent {}`
@@ -527,6 +582,31 @@ When a component template contains ONLY slots at the top level (no HTML), it aut
 3. **Slot-based** (automatic): template with only slots inherits from the JS parent
 
 Note: `tag` is NOT inherited through `extends` — each `<Define:>` sets its own `tag` or defaults to `div`.
+
+**`extends=""` must agree with the JS class, or the component throws.** Take the
+component class's JS ancestors up to `Jqhtml_Component` and keep those that have a template
+of their own. If that list is empty (the class extends `Jqhtml_Component` directly, only
+template-less helper classes sit in between, or the component is template-only with no JS
+class), `extends=""` may name any template. Otherwise it must name one of them — any
+ancestor, not only the direct parent, so a template may deliberately skip an intermediate
+layer. Anything else throws onto the boot error path: the error names the
+component, the `extends=""` target and the templated ancestors, the component is stopped,
+and any ancestor waiting on it is released.
+
+```
+class Grid_Mid extends Grid_B {}       // Grid_A, Grid_B and Grid_Mid all have templates
+class Users_Grid extends Grid_Mid {}
+
+<Define:Users_Grid extends="Grid_Mid">   OK - direct templated parent
+<Define:Users_Grid extends="Grid_B">     OK - further templated ancestor (skips Grid_Mid)
+<Define:Users_Grid extends="Grid_A">     THROWS - Grid_A is not an ancestor of the class
+<Define:Users_Grid extends="Missing">    OK - no such template; the prototype chain decides
+```
+
+An `extends=""` naming a template that is not registered is not a conflict: resolution
+falls back to the prototype chain, as before. The check applies to full templates too,
+because `extends=""` also decides which parent `<Define>`'s attributes are inherited. It
+runs once per component and the verdict is cached until the next registration.
 
 **A missing or throwing parent template is an ERROR, not an empty render.** A slot-only
 template is nothing but an override of a parent, so if no parent template can be resolved,
@@ -604,7 +684,7 @@ args or an author-supplied id. A deduplicated follower skips `on_load()` entirel
 revalidation, so a wrong key there is permanently wrong data; redundant requests are the
 cheaper failure.
 
-Opt-in localStorage caching. Enable with `jqhtml.set_cache_key('myapp_v1.2.3_user_456')` — the key should include app build hash + user ID (cache auto-clears when it changes). Behavior: cache hit → instant render → `on_load()` revalidates in background → re-render if changed.
+Opt-in localStorage caching. Enable with `jqhtml.set_cache_key('myapp_v1.2.3_user_456')` — the key should include app build hash + user ID (cache auto-clears when it changes). Behavior: cache hit → instant render → `on_load()` revalidates in background → re-render if changed. The jqhtml version is part of every stored entry key (`jqhtml::<developer_key>::<jqhtml_version>::<cache_key>`), so entries written by another jqhtml version are never read, even under the same cache key; upgrading jqhtml is a one-time cache miss.
 
 A second parameter selects the mode: `set_cache_key(key, 'data' | 'html')`. Default `'data'` caches `this.data`; `'html'` caches the rendered HTML snapshot and can skip template execution entirely on cache hit.
 
@@ -616,7 +696,7 @@ Components can override the cache key via a `cache_id()` method when `this.args`
 
 Hydrate server-rendered placeholders into live components. The server outputs `<div class="_Component_Init" data-component-init-name="Component_Name" data-component-args='{"key":"value"}'>`, then the client calls `await jqhtml.boot()`.
 
-**SSR Preload APIs** on `window.jqhtml`: `start_data_capture()`, `get_captured_data()`, `stop_data_capture()`, `set_preload_data(entries)`, `clear_preload_data()`. See `packages/ssr/README.md`.
+**SSR Preload APIs** (part of `@jqhtml/ssr`, which is **not production ready** - see `packages/ssr/README.md`) on `window.jqhtml`: `start_data_capture()`, `get_captured_data()`, `stop_data_capture()`, `set_preload_data(entries)`, `clear_preload_data()`. See `packages/ssr/README.md`.
 
 **Full documentation:** `docs/reference/18_boot.md`
 
@@ -656,7 +736,8 @@ Hydrate server-rendered placeholders into live components. The server outputs `<
 packages/
 ├── core/             # Runtime (lifecycle, component system, jQuery integration)
 ├── parser/           # Compiler: .jqhtml → JS (lexer, parser, codegen, sourcemaps)
-├── ssr/              # Server-side rendering for SEO / hydration
+├── ssr/              # Server-side rendering (NOT production ready)
+├── webpack-loader/   # webpack/Rspack loader for .jqhtml imports
 └── vscode-extension/ # Syntax highlighting + language support for .jqhtml files
 ```
 
@@ -667,10 +748,21 @@ packages/
 
 ### Template Compilation
 
-`.jqhtml` templates compile to imperative JavaScript render functions returning an instruction array (`{tag: [...]}` objects and strings) that the runtime processes into DOM. **Not JSX** — no React-style transformation. Sourcemaps map errors back to original `.jqhtml` line numbers.
+`.jqhtml` templates compile to imperative JavaScript render functions returning a markup buffer (`jqhtml.Markup`: a list of `{tag: [...]}` objects and strings, plus the component that wrote it) that the runtime processes into DOM. **Not JSX** — no React-style transformation. Sourcemaps map errors back to original `.jqhtml` line numbers. **`@jqhtml/parser` and `@jqhtml/core` must be the same version**: the compiled format changed in 2.3.75, so rebuild every precompiled template when upgrading.
 
 ```bash
 npx jqhtml-compile my_component.jqhtml   # (from @jqhtml/parser)
+```
+
+### webpack and Rspack
+
+`@jqhtml/webpack-loader` compiles `.jqhtml` imports; each import's default export is the template object (the file's first `<Define:>`), which you pass to `jqhtml.register()`. It uses only the standard loader API, so the same rule works in Rspack. Source maps follow `devtool`; a compile error fails the build with the file, line and column.
+
+```javascript
+// webpack.config.js / rspack.config.js
+module.exports = {
+  module: { rules: [{ test: /\.jqhtml$/, loader: '@jqhtml/webpack-loader' }] }
+};
 ```
 
 ---
@@ -737,7 +829,7 @@ DATA:
 
 ## Versioning
 
-JQHTML v2 stays v2 forever. Version format: `2.MONTHS_SINCE_AUG_2025.BUILD_COUNT` (e.g., v2.3.17 = 3 months after Aug 2025, 17th build that month). Breaking changes may occur in any release.
+JQHTML v2 stays v2 forever. Version format: `2.MINOR.PATCH`. Each release increments PATCH by one (2.3.74 -> 2.3.75); MINOR changes only by deliberate decision. Breaking changes may occur in any release.
 
 ---
 
@@ -760,6 +852,7 @@ JQHTML v2 stays v2 forever. Version format: `2.MONTHS_SINCE_AUG_2025.BUILD_COUNT
 | on_create | read/write | read/write | no | no |
 | on_render | read | read | yes | yes |
 | on_load | read | read/write | **NO** | **NO** |
+| on_load_error | read | read/write | **NO** | **NO** |
 | on_loaded | read | read | yes | yes |
 | on_ready | read | read | yes | yes |
 

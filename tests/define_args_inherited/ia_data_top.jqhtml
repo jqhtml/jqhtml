@@ -1,0 +1,6 @@
+<%--
+Ia_Data_Top - farthest <Define> of the second mixed chain; sets data-size.
+--%>
+<Define:Ia_Data_Top data-size="top data">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Data_Top>

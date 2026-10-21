@@ -1,0 +1,26 @@
+<%--
+Extends_Js_Class_Conflict - a template's extends="" must agree with its JS class.
+
+Rule: take the class's JS ancestors up to Jqhtml_Component that have a template of their
+own. Empty list -> no conflict. Otherwise extends= must name one of them (any ancestor).
+Anything else throws through the boot error path.
+
+Every child is declared in this template, so a regression that wedges this component
+produces no SUMMARY line at all.
+--%>
+<Define:Extends_Js_Class_Conflict>
+  <div>
+    <h1>extends= vs the JS class parent</h1>
+    <Ejc_Conflict $sid="conflict" />
+    <Ejc_Full_Conflict $sid="full_conflict" />
+    <Ejc_Skip $sid="skip" />
+    <Ejc_Via_Helper $sid="via_helper" />
+    <Ejc_Helper_Between $sid="helper_between" />
+    <Ejc_Direct $sid="direct" />
+    <Ejc_Slot_Proto $sid="slot_proto" />
+    <Ejc_Full_Own $sid="full_own" />
+    <Ejc_Missing $sid="missing" />
+    <Ejc_Tpl_Only $sid="tpl_only" />
+    <div $sid="late_stage"></div>
+  </div>
+</Define:Extends_Js_Class_Conflict>

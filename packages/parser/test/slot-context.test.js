@@ -2,11 +2,11 @@
  * Slot functions and content() splices.
  *
  * A slot body or default content is compiled as a closure over the component
- * whose template contains it (the definer). Its instructions are spliced into
- * the receiving component's stream as ['_content', instructions, definer] so
- * the runtime can render them - handler attributes, id= scoping,
- * instantiator() - in the definer, the same `this` that <%= %> and $sid
- * already resolve against.
+ * whose template contains it (the definer). It returns a markup buffer created
+ * as `new jqhtml.Markup(this)`, which carries the definer, and the buffer is
+ * spliced into the receiving component's stream as itself so the runtime can
+ * render it - handler attributes, id= scoping, instantiator() - in the
+ * definer, the same `this` that <%= %> and $sid already resolve against.
  *
  * <Slot:name $params="a, b"> names the parameters the slot function receives
  * from content('name', a, b). Without it the single parameter is named after
@@ -25,29 +25,26 @@ function compile(template) {
 const wrap = (body) => `<Define:Test>\n${body}\n</Define:Test>`;
 
 describe('content() splices carry the definer context', () => {
-  it('default content is pushed as [_content, instructions, context]', () => {
+  it('default content is pushed as its markup buffer', () => {
     const code = compile(wrap(`<div><%= content() %></div>`));
-    assert.ok(code.includes(`const [contentInstructions, contentContext] = content.call(this);`), code);
-    assert.ok(code.includes(`_output.push(['_content', contentInstructions, contentContext]);`), code);
-    assert.ok(!code.includes(`_output.push(['_content', contentInstructions]);`), 'old two-element marker still emitted');
+    assert.ok(code.includes(`const result = content.call(this); if (result instanceof jqhtml.Markup) { _output.p(result); }`), code);
   });
 
-  it('named slot content is pushed as [_content, instructions, context]', () => {
+  it('named slot content is pushed as its markup buffer', () => {
     const code = compile(wrap(`<div><%= content('header') %></div>`));
-    assert.ok(code.includes(`_output.push(['_content', result[0], result[1]]);`), code);
-    assert.ok(!code.includes(`_output.push(...result[0])`), 'tuple is still spread flat');
+    assert.ok(code.includes(`if (result instanceof jqhtml.Markup) { _output.p(result); }`), code);
   });
 
   it('named slot content with arguments forwards them untouched', () => {
     const code = compile(wrap(`<div><%= content('row', record, i) %></div>`));
     assert.ok(code.includes(`const result = content('row', record, i);`), code);
-    assert.ok(code.includes(`_output.push(['_content', result[0], result[1]]);`), code);
+    assert.ok(code.includes(`if (result instanceof jqhtml.Markup) { _output.p(result); }`), code);
   });
 
-  it('any [instructions, context] tuple from an expression is wrapped the same way', () => {
+  it('any markup buffer from an expression is spliced the same way; any other array prints (Array)', () => {
     for (const open of ['<%=', '<%!=', '<%br=']) {
       const code = compile(wrap(`<div>${open} this.args.render_fn() %></div>`));
-      assert.ok(code.includes(`_output.push(['_content', result[0], result[1]]);`), `${open}: ${code}`);
+      assert.ok(code.includes(`if (result instanceof jqhtml.Markup) { _output.p(result); } else if (Array.isArray(result)) { _output.p("(Array)"); }`), `${open}: ${code}`);
     }
   });
 });
@@ -74,9 +71,10 @@ describe('slot function parameters', () => {
     assert.ok(code.includes(`row: function(record, index) {`), code);
   });
 
-  it('every slot function still returns [_output, this] bound to the definer', () => {
+  it('every slot function returns its own markup buffer, bound to the definer', () => {
     const code = compile(wrap(`<Grid><Slot:row $params="record"><td><%= record.id %></td></Slot:row></Grid>`));
-    assert.ok(code.includes(`return [_output, this]; }.bind(this)`), code);
+    assert.ok(code.includes(`row: function(record) { const _output = new jqhtml.Markup(this);`), code);
+    assert.ok(code.includes(`return _output; }.bind(this)`), code);
   });
 });
 

@@ -96,6 +96,7 @@ class Html_Cache_Test extends Jqhtml_Component {
     html += '</ul>';
 
     const all_passed = this.state.test_results.every(r => r.passed);
+    window.testPassed = all_passed;
     html += `<h3>${all_passed ? '✅ All tests passed!' : '❌ Some tests failed'}</h3>`;
 
     $results.html(html);

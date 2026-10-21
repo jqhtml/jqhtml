@@ -18,6 +18,24 @@ export enum NodeType {
   CONDITIONAL_ATTRIBUTE = 'ConditionalAttribute'  // Conditional attribute: <% if (cond) { %>attr="val"<% } %>
 }
 
+/**
+ * Where a piece of author JavaScript starts in the source, for sourcemaps: the 1-based
+ * line and column of its first character. For code joined onto one line
+ * (join_lines_mapped), line_starts gives where each later source line begins in the
+ * joined text (-1 inside a literal or comment).
+ */
+export interface CodeLocation {
+  line: number;
+  column: number;
+  line_starts?: number[];
+}
+
+/** 1-based position of a closing tag's `</`. */
+export interface ClosePosition {
+  line: number;
+  column: number;
+}
+
 // Base node interface - all nodes have these
 export interface BaseNode {
   type: NodeType;
@@ -59,6 +77,7 @@ export interface ExpressionNode extends BaseNode {
   code: string;
   escaped: boolean;  // true for <%= and <%br=, false for <%!=
   nl2br: boolean;    // true for <%br= (escaped + newlines to <br />)
+  code_loc?: CodeLocation;  // where `code` starts in the source
 }
 
 // If statement with optional else
@@ -81,6 +100,7 @@ export interface CodeBlockNode extends BaseNode {
   type: NodeType.CODE_BLOCK;
   tokens?: Array<{type: string, value: string}>;  // New token-based approach
   code?: string;  // Keep for backward compatibility
+  code_loc?: CodeLocation;  // where the code's first character is in the source
 }
 
 // Conditional attribute: <% if (condition) { %>attr="value"<% } %>
@@ -106,6 +126,7 @@ export interface SlotNode extends BaseNode {
   params?: string[];
   children: ASTNode[];
   selfClosing: boolean;
+  close_loc?: ClosePosition;  // the </Slot:name> tag
 }
 
 // Component invocation: <ComponentName prop="value">...</ComponentName>
@@ -114,10 +135,12 @@ export interface ComponentInvocationNode extends BaseNode {
   name: string;               // literal tag name, or the normalized expression text for a dynamic tag
   dynamic?: boolean;          // <{expression}>: the name is computed at render time
   expression?: string;        // the raw expression text of a dynamic tag
+  expression_loc?: CodeLocation;  // where `expression` starts in the source
   attributes: Record<string, any>;
   conditionalAttributes?: ConditionalAttributeNode[];  // Optional conditional attributes
   children: ASTNode[];
   selfClosing: boolean;
+  close_loc?: ClosePosition;  // the closing tag, when there is one
 }
 
 // HTML tag: <div class="foo">...</div>
@@ -129,6 +152,7 @@ export interface HtmlTagNode extends BaseNode {
   children: ASTNode[];
   selfClosing: boolean;
   preserveWhitespace?: boolean;  // True for <textarea>, <pre> - preserves exact whitespace
+  close_loc?: ClosePosition;  // the closing tag, when there is one
 }
 
 // Union type for all AST nodes

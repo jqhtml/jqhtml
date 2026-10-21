@@ -1,0 +1,6 @@
+<%-- Lq_Fetch - on_load() for args.key "old" takes 200ms, for any other key 20ms, so a
+reload() with new args made during the boot load would answer FIRST if it ran
+concurrently, and the old-args response would land last. --%>
+<Define:Lq_Fetch class="lq-fetch">
+  <span $sid="value"><%= this.data.value %></span>
+</Define:Lq_Fetch>

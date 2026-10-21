@@ -73,7 +73,7 @@ Initializes all `._Component_Init` elements within the given scope.
 **Parameters:**
 - `scope` (optional): jQuery object, HTMLElement, or CSS selector. Defaults to `document.body`.
 
-**Returns:** `Promise` that resolves when all components (including nested) are ready.
+**Returns:** `Promise` that resolves when all components (including nested) are ready. A component whose hook throws during boot is logged and stopped, and counts as settled, so the promise still resolves and `jqhtml:ready` still fires.
 
 ```javascript
 // Initialize entire document
@@ -272,6 +272,12 @@ module.exports = { jqhtml };
 ```
 
 ## Full Server-Side Rendering (@jqhtml/ssr)
+
+> **Not production ready.** `@jqhtml/ssr` in its current form is not safe to deploy: it
+> runs code supplied by requests, does not isolate concurrent renders from each other, and
+> does not restrict which servers a render may call. Do not use it in production or expose
+> it to any network. A redesigned, hardened SSR is planned for a future jqhtml release;
+> check the CHANGELOG for the version that announces it.
 
 `boot()` hydrates placeholders that a server emitted by hand. For rendering actual
 component HTML on the server, the `@jqhtml/ssr` package runs a persistent Node render

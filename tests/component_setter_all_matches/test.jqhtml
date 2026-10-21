@@ -1,0 +1,7 @@
+<Define:Component_Setter_All_Matches>
+  <div>
+    <h1>.component() setter applies to every match; getter warns on multiple</h1>
+    <div $sid="host_a"><div class="slot"></div><div class="slot"></div><div class="slot"></div></div>
+    <div $sid="host_c"><div class="slot"></div><div class="slot"></div><div class="slot"></div></div>
+  </div>
+</Define:Component_Setter_All_Matches>

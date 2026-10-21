@@ -1,0 +1,5 @@
+<Define:Shb_Leaf>
+  <% for (let item of ['x', 'y']) { %>
+    <div class="leaf-item"><%= content('item', item) %></div>
+  <% } %>
+</Define:Shb_Leaf>

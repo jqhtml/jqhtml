@@ -11,7 +11,9 @@ OUTPUT=$(node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/cfg_cached.jqhtml" "$SCRIPT_DIR/cfg_cached.js" \
   "$SCRIPT_DIR/cfg_with_id.jqhtml" "$SCRIPT_DIR/cfg_with_id.js" \
   --delay=4 2>&1)
+STATUS=$?
 echo "$OUTPUT"
+[ $STATUS -ne 0 ] && exit $STATUS
 echo "$OUTPUT" | grep -q "FAIL:" && exit 1
 echo "$OUTPUT" | grep -q "SUMMARY:" || exit 1
 exit 0

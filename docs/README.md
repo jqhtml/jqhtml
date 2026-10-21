@@ -21,7 +21,7 @@ work from; the tutorial-style version for end users is the online site above.
 
 - [Core Runtime](../packages/core/README.md) - Core JQHTML runtime library
 - [Parser](../packages/parser/README.md) - Template parser and compiler
-- [SSR](../packages/ssr/README.md) - Server-side rendering
+- [SSR](../packages/ssr/README.md) - Server-side rendering (not production ready)
 - [VS Code Extension](../packages/vscode-extension/README.md) - Syntax highlighting
 
 ## Development Notes

@@ -1,0 +1,6 @@
+<Define:Coordinator_Leader_Apply_Failure>
+  <div>
+    <h1>Load coordinator: leader fails after on_load() returns</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Coordinator_Leader_Apply_Failure>

@@ -1,7 +1,8 @@
 // JQHTML Lexer - Simple character scanner, no regex
 // Tracks positions for source map support
 
-import { JQHTMLParseError } from './errors.js';
+import { JQHTMLParseError, HiddenCloseLocation } from './errors.js';
+import { find_template_close, find_matching_bracket, blank_line_comments, code_line_starts, find_hidden_closes } from './js_scanner.js';
 
 export enum TokenType {
   // Literals
@@ -78,19 +79,35 @@ export interface Token {
   start: number;     // Deprecated: use loc.start.offset
   end: number;       // Deprecated: use loc.end.offset
   loc?: SourceLocation;  // New: detailed location information for source maps
+  /**
+   * Set on the literal text parts of an interpolated attribute value
+   * (title="a <%= x %> b"): they are text, never a value to classify as an
+   * identifier or expression.
+   */
+  interpolation_text?: boolean;
 }
 
 export class Lexer {
   private input: string;
+  private filename?: string;
   private position: number = 0;
   private line: number = 1;
   private column: number = 1;
   private tokens: Token[] = [];
+  // Offset at which each line of the input starts, for token positions
+  private line_starts: number[] = [0];
+
+  // Each %> that a // comment in template code hides and that looks like it was
+  // meant to close the tag; compile errors explain them (add_hidden_close_note)
+  public readonly hidden_closes: HiddenCloseLocation[] = [];
+  // True while an expression inside a quoted attribute value is scanned
+  private in_attribute_value = false;
 
   // Track saved positions for accurate token creation
   private savedPosition: { line: number; column: number; offset: number } | null = null;
 
-  constructor(input: string) {
+  constructor(input: string, filename?: string) {
+    this.filename = filename;
     // Preprocess: Normalize all line endings to \n (handles \r\n and \r)
     // This ensures the lexer only needs to handle \n throughout
     let processed = input.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -101,6 +118,20 @@ export class Lexer {
     // Preprocess: Insert // for empty lines in code blocks to preserve line mapping
     processed = this.preprocessCodeBlocks(processed);
     this.input = processed;
+    for (let i = 0; i < processed.length; i++) {
+      if (processed[i] === '\n') this.line_starts.push(i + 1);
+    }
+  }
+
+  /** 1-based line and column of an input offset. */
+  private position_at(offset: number): { line: number; column: number } {
+    let low = 0;
+    let high = this.line_starts.length - 1;
+    while (low < high) {
+      const mid = (low + high + 1) >> 1;
+      if (this.line_starts[mid] <= offset) low = mid; else high = mid - 1;
+    }
+    return { line: low + 1, column: offset - this.line_starts[low] + 1 };
   }
 
   /**
@@ -243,10 +274,13 @@ export class Lexer {
   }
 
   /**
-   * Preprocess code blocks and expressions
-   * - Insert comment markers for empty lines in code blocks
-   * - Collapse multi-line expressions to single line with trailing newlines
-   * This ensures 1:1 line mapping in generated code
+   * Preprocess code blocks: mark empty lines with a comment placeholder.
+   *
+   * Expressions (<%= %>, <%!= %>, <%br= %>) are left exactly as written - a
+   * multi-line expression is joined onto one generated line by the parser, so no
+   * newline is moved out of it into the template text. Lines that start inside a
+   * string, template literal or block comment are part of that literal or comment
+   * and are never touched (shared JS scanner).
    */
   private preprocessCodeBlocks(input: string): string {
     let result = input;
@@ -257,213 +291,89 @@ export class Lexer {
       let startIdx = result.indexOf('<%', searchPos);
       if (startIdx === -1) break;
 
-      // Check what type of block this is
-      const isExpression = result[startIdx + 2] === '=';
-      const isUnescapedExpression = result.substring(startIdx + 2, startIdx + 4) === '!=';
-
-      if (isExpression || isUnescapedExpression) {
-        // Handle expressions: collapse to single line
-        const exprStart = isUnescapedExpression ? startIdx + 4 : startIdx + 3;
-
-        // Find matching %> considering strings
-        const endIdx = this.findClosingTag(result, exprStart);
-        if (endIdx === -1) {
-          // Unclosed expression - leave it for parser to report error
-          searchPos = startIdx + 2;
-          continue;
-        }
-
-        // Extract the expression content
-        const exprContent = result.substring(exprStart, endIdx);
-
-        // Count newlines in the expression
-        const newlineCount = (exprContent.match(/\n/g) || []).length;
-
-        if (newlineCount > 0) {
-          // Strip line comments BEFORE collapsing to avoid breaking parser
-          let processedExpr = exprContent;
-
-          // Replace // comments with spaces (preserve length for sourcemaps)
-          let cleaned = '';
-          let inString = false;
-          let stringDelim = '';
-          let escaped = false;
-
-          for (let i = 0; i < processedExpr.length; i++) {
-            const ch = processedExpr[i];
-            const next = processedExpr[i + 1] || '';
-
-            // Handle escape sequences
-            if (escaped) {
-              cleaned += ch;
-              escaped = false;
-              continue;
-            }
-
-            if (ch === '\\' && inString) {
-              cleaned += ch;
-              escaped = true;
-              continue;
-            }
-
-            // Track strings
-            if (!inString && (ch === '"' || ch === "'" || ch === '`')) {
-              inString = true;
-              stringDelim = ch;
-              cleaned += ch;
-            } else if (inString && ch === stringDelim) {
-              inString = false;
-              cleaned += ch;
-            } else if (!inString && ch === '/' && next === '/') {
-              // Found line comment - replace with spaces until newline
-              cleaned += ' ';
-              i++; // skip second /
-              cleaned += ' ';
-              while (i + 1 < processedExpr.length && processedExpr[i + 1] !== '\n') {
-                i++;
-                cleaned += ' ';
-              }
-            } else {
-              cleaned += ch;
-            }
-          }
-
-          // Collapse multi-line expression to single line
-          // Replace all newlines with spaces to preserve token separation
-          const collapsedExpr = cleaned.replace(/\n/g, ' ');
-
-          // Add trailing newlines after the expression
-          const trailingNewlines = '\n'.repeat(newlineCount);
-
-          // Reconstruct with collapsed expression and trailing newlines
-          const prefix = result.substring(0, exprStart);
-          const suffix = result.substring(endIdx);
-          result = prefix + collapsedExpr + suffix.substring(0, 2) + trailingNewlines + suffix.substring(2);
-        }
-
-        searchPos = startIdx + 2;
-      } else {
-        // Handle code blocks: insert /* empty line */ for empty lines
-        const endIdx = this.findClosingTag(result, startIdx + 2);
-        if (endIdx === -1) {
-          // Unclosed code block - leave it for parser to report error
-          break;
-        }
-
-        // Extract the code block content between <% and %>
-        const blockContent = result.substring(startIdx + 2, endIdx);
-
-        // Process the content line by line
-        const lines = blockContent.split('\n');
-        const processedLines: string[] = [];
-
-        for (let i = 0; i < lines.length; i++) {
-          let line = lines[i];
-
-          // Strip whole-line // comments: if "//" is the first non-space
-          // sequence on the line, blank everything from "//" to end of line
-          // (preserving leading whitespace and line length for sourcemaps).
-          // This runs BEFORE JS scanning so apostrophes/quotes/%> inside the
-          // comment can't break string tracking or hide the closing %>.
-          const leadingWs = line.match(/^[ \t]*/)![0];
-          if (line.slice(leadingWs.length).startsWith('//')) {
-            line = leadingWs + ' '.repeat(line.length - leadingWs.length);
-          }
-
-          const trimmed = line.trim();
-
-          // Don't add placeholders on the last line if it's empty
-          // (this would be right before the %>)
-          if (trimmed === '' && i < lines.length - 1) {
-            // Empty line - use /* */ instead of // to avoid breaking code
-            // Extra trailing space helps with alignment
-            processedLines.push(' /* empty line */ ');
-          } else {
-            // Line has code or is the last line - keep as is
-            processedLines.push(line);
-          }
-        }
-
-        // Reconstruct the code block
-        const processedContent = processedLines.join('\n');
-        result = result.substring(0, startIdx + 2) + processedContent + result.substring(endIdx);
-
-        // Move search position past this block
-        searchPos = startIdx + 2 + processedContent.length + 2; // +2 for %>
+      // Expressions: skip the whole body, so a <% inside one is not a code block
+      const after = result.substring(startIdx + 2, startIdx + 5);
+      const exprStart = after.startsWith('=') ? startIdx + 3
+        : after.startsWith('!=') ? startIdx + 4
+        : after === 'br=' ? startIdx + 5
+        : -1;
+      if (exprStart !== -1) {
+        const endIdx = find_template_close(result, exprStart);
+        // Unclosed expression - leave it for the parser to report
+        searchPos = endIdx === -1 ? startIdx + 2 : endIdx + 2;
+        continue;
       }
+
+      // Code block: insert /* empty line */ for empty lines
+      const endIdx = find_template_close(result, startIdx + 2);
+      if (endIdx === -1) {
+        // Unclosed code block - leave it for parser to report error
+        break;
+      }
+
+      this.record_hidden_closes(result, startIdx + 2);
+
+      // Extract the code block content between <% and %>, with every // comment
+      // blanked (length and newlines preserved for sourcemaps). Codegen joins a
+      // source line's nodes onto one generated line, so a comment left in place
+      // would comment out whatever follows the block on that line.
+      const blockContent = blank_line_comments(result.substring(startIdx + 2, endIdx), true);
+
+      // Process the content line by line
+      const lines = blockContent.split('\n');
+      const in_code = code_line_starts(blockContent, true);
+      const processedLines: string[] = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        // Don't add placeholders on the last line if it's empty
+        // (this would be right before the %>), or inside a literal or comment
+        if (trimmed === '' && i < lines.length - 1 && in_code[i]) {
+          // Empty line - use /* */ instead of // to avoid breaking code
+          // Extra trailing space helps with alignment
+          processedLines.push(' /* empty line */ ');
+        } else {
+          // Line has code, is the last line, or belongs to a literal - keep as is
+          processedLines.push(line);
+        }
+      }
+
+      // Reconstruct the code block
+      const processedContent = processedLines.join('\n');
+      result = result.substring(0, startIdx + 2) + processedContent + result.substring(endIdx);
+
+      // Move search position past this block
+      searchPos = startIdx + 2 + processedContent.length + 2; // +2 for %>
     }
 
     return result;
   }
 
   /**
-   * Find the closing %> tag, properly handling strings and comments
+   * Record the suspicious %> hidden in // comments of the code region starting at
+   * `start` of `text`. Line comments are blanked once a code block is preprocessed,
+   * so code blocks are recorded there and expressions (and an unclosed code block)
+   * when scanned; no region is seen with its comments twice.
    */
-  private findClosingTag(input: string, startPos: number): number {
-    let pos = startPos;
-    let inString = false;
-    let stringDelimiter = '';
-    let inComment = false;
-    let commentType = '';
-
-    while (pos < input.length - 1) {
-      const char = input[pos];
-      const nextChar = input[pos + 1];
-
-      // Handle string literals
-      if (!inComment) {
-        if (!inString && (char === '"' || char === "'" || char === '`')) {
-          inString = true;
-          stringDelimiter = char;
-        } else if (inString && char === stringDelimiter) {
-          // Check if it's escaped
-          let escapeCount = 0;
-          let checkPos = pos - 1;
-          while (checkPos >= 0 && input[checkPos] === '\\') {
-            escapeCount++;
-            checkPos--;
-          }
-          if (escapeCount % 2 === 0) {
-            inString = false;
-            stringDelimiter = '';
-          }
-        }
-      }
-
-      // Handle comments
-      if (!inString && !inComment) {
-        if (char === '/' && nextChar === '/') {
-          inComment = true;
-          commentType = 'line';
-        } else if (char === '/' && nextChar === '*') {
-          inComment = true;
-          commentType = 'block';
-        }
-      } else if (inComment) {
-        if (commentType === 'line' && char === '\n') {
-          inComment = false;
-          commentType = '';
-        } else if (commentType === 'block' && char === '*' && nextChar === '/') {
-          inComment = false;
-          commentType = '';
-          pos++; // Skip the /
-        }
-      }
-
-      // Check for closing tag only if not in string or comment
-      if (!inString && !inComment) {
-        if (char === '%' && nextChar === '>') {
-          return pos;
-        }
-      }
-
-      pos++;
+  private record_hidden_closes(text: string, start: number) {
+    for (const h of find_hidden_closes(text, start)) {
+      if (!h.suspicious) continue;
+      const line_start = text.lastIndexOf('\n', h.comment - 1) + 1;
+      let line = 1;
+      for (let i = text.indexOf('\n'); i !== -1 && i < line_start; i = text.indexOf('\n', i + 1)) line++;
+      this.hidden_closes.push({
+        line,
+        column: h.comment - line_start + 1,
+        close_column: h.close - line_start + 1,
+        ...(this.in_attribute_value ? { in_attribute: true } : {})
+      });
     }
-
-    return -1; // Not found
   }
 
   tokenize(): Token[] {
+    this.reject_script_text();
     while (this.position < this.input.length) {
       this.scan_next();
     }
@@ -472,6 +382,30 @@ export class Lexer {
     return this.tokens;
   }
   
+  /**
+   * A template is compiled into JavaScript, and that JavaScript may be inlined in an
+   * HTML <script> block, where any `<script` or `</script` in it would end or nest the
+   * block. So the text is a compile error wherever it is written - a <script> element,
+   * text, an attribute value, a <% %> block or an HTML comment. <%-- --%> comments are
+   * never emitted and are blanked out of this.input already.
+   */
+  private reject_script_text(): void {
+    const match = /<\/?script/i.exec(this.input);
+    if (!match) return;
+    const { line, column } = this.position_at(match.index);
+    const error = new JQHTMLParseError(
+      `${match[0]} is not allowed in a JQHTML template. The template compiles to JavaScript ` +
+      `that may be inlined in an HTML <script> block, and this text would end it.`,
+      line,
+      column,
+      this.input,
+      this.filename
+    );
+    error.suggestion = `\n\nBehavior belongs in the component's .js file or a <% %> block. ` +
+      `If a string must contain the text, split it: '<' + '/script>'.`;
+    throw error;
+  }
+
   private scan_next() {
     const start = this.position;
     const start_line = this.line;
@@ -486,7 +420,8 @@ export class Lexer {
         'Invalid expression syntax: <%== is not valid JQHTML syntax',
         this.line,
         this.column - 4,  // Point to the start of <%==
-        this.input
+        this.input,
+        this.filename
       );
       error.suggestion = '\n\nValid expression syntax:\n' +
         '  <%= expr %>   - Escaped output (safe, default)\n' +
@@ -616,8 +551,6 @@ export class Lexer {
   
   private scan_text() {
     const start = this.position;
-    const start_line = this.line;
-    const start_column = this.column;
     let text = '';
 
     while (this.position < this.input.length) {
@@ -661,50 +594,15 @@ export class Lexer {
     }
     
     if (text.length > 0) {
-      this.add_token(TokenType.TEXT, text, start, this.position, start_line, start_column);
+      this.add_token(TokenType.TEXT, text, start, this.position);
     }
   }
   
   private scan_code_block() {
-    // After <%, save the original position INCLUDING whitespace
-    const position_with_whitespace = this.position;
-
-    // Now skip whitespace to check for keywords
-    this.skip_whitespace();
-    const saved_position = this.position;
-
-    // It's regular JavaScript code - rewind to include whitespace
-    this.position = position_with_whitespace;
+    // The code, including any whitespace after <%, is JavaScript.
     this.scan_javascript();
   }
   
-  private scan_comment() {
-    // Scan comment from <%-- to --%>
-    const start = this.position - 4; // Already consumed <%--
-    let comment = '';
-
-    while (this.position < this.input.length) {
-      if (this.match_sequence('--%>')) {
-        // Found end of comment
-        // Don't trim - we need to preserve whitespace for line mapping
-        this.add_token(TokenType.COMMENT, comment, start, this.position);
-        return;
-      }
-
-      const char = this.current_char();
-      comment += char;
-      this.advance();
-    }
-
-    // Error: unterminated comment
-    throw new JQHTMLParseError(
-      'Unterminated comment',
-      this.line,
-      this.column,
-      this.input
-    );
-  }
-
   private scan_html_comment() {
     // Scan HTML comment from <!-- to -->
     // Everything inside should be treated as raw text, no parsing
@@ -735,135 +633,51 @@ export class Lexer {
         return;
       }
 
-      const char = this.current_char();
-      comment += char;
-
-      // Track line numbers for error reporting
-      if (char === '\n') {
-        this.line++;
-        this.column = 1;
-      } else {
-        this.column++;
-      }
-
-      this.advance();
+      comment += this.current_char();
+      this.advance(); // tracks line and column
     }
 
-    // Error: unterminated HTML comment
+    // Error: unterminated HTML comment, reported where it opens
+    const opened = this.position_at(start);
     throw new JQHTMLParseError(
-      'Unterminated HTML comment',
-      this.line,
-      this.column,
-      this.input
+      'Unterminated HTML comment - expected -->',
+      opened.line,
+      opened.column,
+      this.input,
+      this.filename
     );
   }
 
   private scan_expression() {
-    // After <%=, scan JavaScript until %>
-    // Strip line comments from interpolation blocks to avoid breaking parser
+    // After <%=, scan JavaScript until %>, keeping its whitespace
     this.scan_javascript(true);
   }
 
-  private scan_javascript(strip_line_comments: boolean = false) {
+  private scan_javascript(keep_whitespace: boolean = false) {
     const start = this.position;
-    let code = '';
-    let in_string = false;
-    let string_delimiter = '';
-    let escape_next = false;
+    // Up to the closing %> (left unconsumed), or the end of input if there is none
+    let end = find_template_close(this.input, start);
+    if (end === -1) end = this.input.length;
+    this.record_hidden_closes(this.input, start);
 
-    while (this.position < this.input.length) {
-      const char = this.current_char();
+    // Blank // comments (length preserved for sourcemaps): codegen puts this code
+    // on a line with other generated code, which a comment would swallow
+    let code = blank_line_comments(this.input.substring(start, end), true);
+    while (this.position < end) this.advance();
 
-      // Handle escape sequences in strings
-      if (escape_next) {
-        code += char;
-        this.advance();
-        escape_next = false;
-        continue;
-      }
-
-      // Handle backslash (escape character)
-      if (char === '\\' && in_string) {
-        escape_next = true;
-        code += char;
-        this.advance();
-        continue;
-      }
-
-      // Handle string delimiters
-      if ((char === '"' || char === "'" || char === '`') && !in_string) {
-        in_string = true;
-        string_delimiter = char;
-      } else if (char === string_delimiter && in_string) {
-        in_string = false;
-        string_delimiter = '';
-      }
-
-      // Strip line comments in interpolation blocks (outside strings)
-      if (strip_line_comments && !in_string && char === '/' && this.peek_ahead(1) === '/') {
-        // Replace EVERY character from // up to (but not including) newline with = for debugging
-        // This maintains exact position alignment for sourcemaps
-
-        // Replace first /
-        code += ' ';
-        this.advance();
-
-        // Replace second /
-        code += ' ';
-        this.advance();
-
-        // Replace all comment text with spaces until we hit newline or %>
-        while (this.position < this.input.length) {
-          const next = this.current_char();
-
-          // Found newline - preserve it and stop
-          if (next === '\n') {
-            code += next;
-            this.advance();
-            break;
-          }
-
-          // Handle \r\n or \r
-          if (next === '\r') {
-            code += next;
-            this.advance();
-            // Check for \n following \r
-            if (this.current_char() === '\n') {
-              code += '\n';
-              this.advance();
-            }
-            break;
-          }
-
-          // Found closing %> - stop (don't consume it)
-          if (next === '%' && this.peek_ahead(1) === '>') {
-            break;
-          }
-
-          // Replace this comment character with space
-          code += ' ';
-          this.advance();
-        }
-        continue;
-      }
-
-      // Only look for %> when not inside a string
-      if (!in_string && char === '%' && this.peek_ahead(1) === '>') {
-        break;
-      }
-
-      code += char;
-      this.advance();
+    // Interpolations keep their whitespace; code blocks are trimmed, and the token
+    // then starts at the code's first character (its position is a sourcemap target)
+    let code_start = start;
+    if (!keep_whitespace) {
+      code_start += code.length - code.trimStart().length;
+      code = code.trim();
     }
 
-    // Don't trim when stripping comments - preserve whitespace for proper parsing
-    const finalCode = strip_line_comments ? code : code.trim();
-
-    if (finalCode.trim().length > 0) {
-      this.add_token(TokenType.JAVASCRIPT, finalCode, start, this.position);
+    if (code.trim().length > 0) {
+      this.add_token(TokenType.JAVASCRIPT, code, code_start, this.position);
     }
   }
-  
+
   private scan_component_name() {
     const start = this.position;
     let name = '';
@@ -977,37 +791,6 @@ export class Lexer {
     return true;
   }
   
-  private match_keyword(keyword: string): boolean {
-    const start = this.position;
-    
-    // Match the keyword
-    for (let i = 0; i < keyword.length; i++) {
-      if (this.position + i >= this.input.length ||
-          this.input[this.position + i] !== keyword[i]) {
-        return false;
-      }
-    }
-    
-    // Ensure it's not part of a larger word
-    const next_pos = this.position + keyword.length;
-    if (next_pos < this.input.length) {
-      const next_char = this.input[next_pos];
-      if ((next_char >= 'a' && next_char <= 'z') ||
-          (next_char >= 'A' && next_char <= 'Z') ||
-          (next_char >= '0' && next_char <= '9') ||
-          next_char === '_') {
-        return false;
-      }
-    }
-    
-    // Consume the keyword
-    for (let i = 0; i < keyword.length; i++) {
-      this.advance();
-    }
-    
-    return true;
-  }
-  
   private peek_sequence(sequence: string): boolean {
     if (this.position + sequence.length > this.input.length) {
       return false;
@@ -1066,50 +849,35 @@ export class Lexer {
     this.position++;
   }
   
-  private add_token(type: TokenType, value: string, start: number, end: number, line?: number, column?: number) {
-    // Calculate start position details
-    const startLine = line ?? this.line;
-    const startColumn = column ?? this.column;
-
-    // Calculate end position by scanning the value
-    let endLine = startLine;
-    let endColumn = startColumn;
-    let endOffset = end;
-
-    // Count lines and columns in the value to get accurate end position
-    for (let i = 0; i < value.length; i++) {
-      if (value[i] === '\n') {
-        endLine++;
-        endColumn = 1;
-      } else {
-        endColumn++;
-      }
-    }
-
-    // For single character tokens, end column is start + 1
-    if (value.length === 1 && value !== '\n') {
-      endColumn = startColumn + 1;
-    }
+  /**
+   * Record a token spanning input offsets [start, end). Its line/column (and
+   * loc.start) are those of `start` - the token's first character - and loc.end is
+   * the position of `end`, whatever the scanner has consumed by the time it calls.
+   */
+  private add_token(type: TokenType, value: string, start: number, end: number, extra?: Partial<Token>) {
+    const from = this.position_at(start);
+    const to = this.position_at(end);
 
     this.tokens.push({
       type,
       value,
-      line: startLine,  // Keep for backward compatibility
-      column: startColumn,  // Keep for backward compatibility
+      line: from.line,  // Keep for backward compatibility
+      column: from.column,  // Keep for backward compatibility
       start,  // Keep for backward compatibility
       end,  // Keep for backward compatibility
       loc: {
         start: {
-          line: startLine,
-          column: startColumn,
+          line: from.line,
+          column: from.column,
           offset: start
         },
         end: {
-          line: endLine,
-          column: endColumn,
-          offset: endOffset
+          line: to.line,
+          column: to.column,
+          offset: end
         }
-      }
+      },
+      ...extra
     });
   }
   
@@ -1183,31 +951,19 @@ export class Lexer {
     this.add_token(closing ? TokenType.TAG_CLOSE : TokenType.TAG_OPEN, closing ? '</' : '<', start, this.position);
 
     const brace_start = this.position;
-    this.advance(); // {
-    const expr_start = this.position;
-    let depth = 1;
-    let quote: string | null = null;
-    while (this.position < this.input.length) {
-      const ch = this.current_char();
-      if (quote !== null) {
-        if (ch === '\\') { this.advance(); if (this.position < this.input.length) this.advance(); continue; }
-        if (ch === quote) quote = null;
-        this.advance();
-        continue;
-      }
-      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; this.advance(); continue; }
-      if (ch === '{') depth++;
-      else if (ch === '}') { depth--; if (depth === 0) break; }
-      this.advance();
-    }
-    if (depth !== 0) {
+    const brace_end = find_matching_bracket(this.input, brace_start);
+    if (brace_end === -1) {
       throw new JQHTMLParseError(
         `Unterminated dynamic component tag: <${closing ? '/' : ''}{ has no matching }`,
         start_line,
         start_column,
-        this.input
+        this.input,
+        this.filename
       );
     }
+    this.advance(); // {
+    const expr_start = this.position;
+    while (this.position < brace_end) this.advance();
     const expression = this.input.substring(expr_start, this.position);
     this.advance(); // }
     this.add_token(TokenType.DYNAMIC_TAG_NAME, expression, brace_start, this.position);
@@ -1424,6 +1180,39 @@ export class Lexer {
   }
   
   
+  /**
+   * Characters HTML does not allow in an attribute name: whitespace, quotes, `<`,
+   * `/`, and control characters (`=` and `>` end the name before this is asked).
+   * An attribute name is emitted into the compiled module as an object key, so a
+   * quote in one is not just invalid HTML - it is the end of a JS string literal.
+   * Everything templates legitimately use stays allowed: `:` `.` `-` `_` `@` `$`
+   * and digits (x-on:click, :class, @click.prevent, aria-label, data-foo.bar).
+   */
+  private static is_forbidden_attribute_name_char(char: string): boolean {
+    const code = char.charCodeAt(0);
+    return char === '"' || char === "'" || char === '<' || char === '/' ||
+           code <= 0x20 || (code >= 0x7f && code <= 0x9f);
+  }
+
+  private throw_invalid_attribute_name(name_so_far: string, char: string): never {
+    const code = char.charCodeAt(0);
+    const shown = (code < 0x20 || (code >= 0x7f && code <= 0x9f))
+      ? `U+${code.toString(16).toUpperCase().padStart(4, '0')}`
+      : `'${char}'`;
+    const error = new JQHTMLParseError(
+      `Invalid character ${shown} in attribute name, after "${name_so_far}"`,
+      this.line,
+      this.column,
+      this.input,
+      this.filename
+    );
+    error.suggestion = `\n\nAttribute names cannot contain whitespace, quotes ("), apostrophes ('),\n` +
+      `"<", "/", "=", ">" or control characters.\n\n` +
+      `Names such as x-on:click, :class, @click.prevent, aria-label and data-foo.bar are fine.\n` +
+      `A quote here usually means a missing "=" or a stray quote earlier in the tag.`;
+    throw error;
+  }
+
   private scan_attribute() {
     const start = this.position;
     let name = '';
@@ -1436,6 +1225,9 @@ export class Lexer {
           (char === '/' && this.peek_ahead(1) === '>') ||
           (char === '<' && this.peek_ahead(1) === '%')) {
         break;
+      }
+      if (Lexer.is_forbidden_attribute_name_char(char)) {
+        this.throw_invalid_attribute_name(name, char);
       }
       name += char;
       this.advance();
@@ -1473,20 +1265,18 @@ export class Lexer {
         `  Attribute: ${attr_context}<%`,
         this.line,
         this.column,
-        this.input
+        this.input,
+        this.filename
       );
 
       if (is_dollar_attr) {
-        error.suggestion = `\n\n$ attributes can use either:\n\n` +
-          `1. Quoted interpolation (for string values):\n` +
+        error.suggestion = `\n\n$ attributes take JavaScript directly - no <%= %> needed:\n\n` +
           `   ✗ Wrong:   ${attr_context}<%= JSON.stringify(data) %>\n` +
-          `   ✓ Correct: ${attr_context}"<%= JSON.stringify(data) %>"\n\n` +
-          `2. Unquoted literal JavaScript (preferred):\n` +
-          `   ✓ Correct: ${attr_context}JSON.stringify(data)\n` +
-          `   ✓ Correct: ${attr_context}this.data.options\n` +
-          `   ✓ Correct: ${attr_context}myVariable\n\n` +
-          `The preferred approach is to use unquoted literal JavaScript\n` +
-          `without <%= %> tags for $ attributes.`;
+          `   ✓ Correct: ${attr_context}(JSON.stringify(data))\n` +
+          `   ✓ Correct: ${attr_context}this.data.options\n\n` +
+          `A bracketed value, ${attr_context}( ... ), may contain spaces and span lines.\n` +
+          `Quoted interpolation, ${attr_context}"<%= value %>", also works, but always gives a\n` +
+          `string and must stay on one line.`;
       } else {
         error.suggestion = `\n\nRegular attributes must use quoted values:\n\n` +
           `   ✗ Wrong:   ${attr_context}<%= value %>\n` +
@@ -1507,7 +1297,8 @@ export class Lexer {
           `  Attribute: ${attr_context}=`,
           this.line,
           this.column,
-          this.input
+          this.input,
+          this.filename
         );
         error.suggestion = `\n\nEvent attributes must be unquoted:\n` +
           `  ✗ Wrong:   @click="handleClick"     (passes string, not function)\n` +
@@ -1520,14 +1311,10 @@ export class Lexer {
 
       // Quoted value - check for interpolation
       const quote = char;
-      const quote_start = this.position;
       this.advance(); // consume opening quote
 
-      // Check if value contains <%= or <%!=
+      // Check if value contains <% (lookahead only - the position is not moved)
       if (this.value_contains_interpolation(quote)) {
-        // Rewind and scan with interpolation
-        this.position = quote_start;
-        this.advance(); // skip quote again
         this.scan_interpolated_attribute_value(quote);
       } else {
         // Simple value without interpolation
@@ -1550,69 +1337,17 @@ export class Lexer {
       }
     } else if (char === '(') {
       // Parenthesized expression: $attr=(condition ? 'online' : 'offline')
-      const value_start = this.position;
-      let value = '';
-      let paren_depth = 0;
-      let in_string = false;
-      let string_delimiter = '';
-      let escape_next = false;
-      
-      while (this.position < this.input.length) {
-        const ch = this.current_char();
-        
-        // Handle escape sequences in strings
-        if (escape_next) {
-          value += ch;
-          this.advance();
-          escape_next = false;
-          continue;
-        }
-        
-        // Handle backslash (escape character) inside strings
-        if (ch === '\\' && in_string) {
-          escape_next = true;
-          value += ch;
-          this.advance();
-          continue;
-        }
-        
-        // Handle string delimiters
-        if ((ch === '"' || ch === "'" || ch === '`') && !in_string) {
-          in_string = true;
-          string_delimiter = ch;
-        } else if (ch === string_delimiter && in_string) {
-          in_string = false;
-          string_delimiter = '';
-        }
-        
-        // Count parentheses only outside strings
-        if (!in_string) {
-          if (ch === '(') {
-            paren_depth++;
-          } else if (ch === ')') {
-            paren_depth--;
-            value += ch;
-            this.advance();
-            
-            // Stop when we close the last parenthesis
-            if (paren_depth === 0) {
-              break;
-            }
-            continue;
-          }
-          
-          // Stop at whitespace or tag end if not inside parentheses
-          if (paren_depth === 0 && (ch === ' ' || ch === '\t' || ch === '\n' || 
-              ch === '\r' || ch === '>' || 
-              (ch === '/' && this.peek_ahead(1) === '>'))) {
-            break;
-          }
-        }
-        
-        value += ch;
-        this.advance();
+      // Runs to the matching ) (shared JS scanner), or to the end of input if none
+      const attr_context = this.get_current_attribute_context();
+      if (!attr_context.startsWith('@') && !attr_context.startsWith('$')) {
+        this.throw_unquoted_regular_attribute(attr_context, '(expression)');
       }
-      
+      const value_start = this.position;
+      const close = find_matching_bracket(this.input, value_start);
+      const value_end = close === -1 ? this.input.length : close + 1;
+      const value = this.input.substring(value_start, value_end);
+      while (this.position < value_end) this.advance();
+
       if (value.length > 0) {
         this.add_token(TokenType.ATTR_VALUE, value, value_start, this.position);
       }
@@ -1634,22 +1369,7 @@ export class Lexer {
 
       // Regular attributes (not @ or $) must be quoted
       if (!is_event_attr && !is_dollar_attr) {
-        const error = new JQHTMLParseError(
-          `Regular HTML attributes must have quoted values.\n` +
-          `  Attribute: ${attr_context}`,
-          this.line,
-          this.column,
-          this.input
-        );
-        error.suggestion = `\n\nRegular attributes must be quoted:\n` +
-          `  ✗ Wrong:   ${attr_context}myValue\n` +
-          `  ✓ Correct: ${attr_context}"myValue"\n` +
-          `  ✓ Correct: ${attr_context}"prefix <%= this.data.value %> suffix"\n\n` +
-          `Only @ event attributes (unquoted) and $ attributes (either) allow unquoted values:\n` +
-          `  ✓ Correct: @click=this.handleClick  (passes function reference)\n` +
-          `  ✓ Correct: $data=this.complexObject (passes object)\n` +
-          `  ✓ Correct: $sid="my-id"              (passes string)`;
-        throw error;
+        this.throw_unquoted_regular_attribute(attr_context, 'myValue');
       }
 
       const value_start = this.position;
@@ -1729,7 +1449,8 @@ export class Lexer {
         `  Found: ${attr_context}${value}`,
         this.line,
         this.column,
-        this.input
+        this.input,
+        this.filename
       );
       error.suggestion = `\n\nUnquoted $ attribute values must be simple references or function calls:\n\n` +
         `✓ Allowed patterns:\n` +
@@ -1753,7 +1474,8 @@ export class Lexer {
         `  Found: ${attr_context}${value}`,
         this.line,
         this.column,
-        this.input
+        this.input,
+        this.filename
       );
       error.suggestion = `\n\nUnquoted $ attribute values cannot contain object literals.\n\n` +
         `If you need to pass an object, create it in the component:\n` +
@@ -1770,7 +1492,8 @@ export class Lexer {
         `  Found: ${attr_context}${value}`,
         this.line,
         this.column,
-        this.input
+        this.input,
+        this.filename
       );
       error.suggestion = `\n\nUnquoted $ attribute values cannot contain array literals.\n\n` +
         `If you need to pass an array, create it in the component:\n` +
@@ -1808,7 +1531,8 @@ export class Lexer {
             `  Found: ${attr_context}${value}`,
             this.line,
             this.column,
-            this.input
+            this.input,
+            this.filename
           );
           error.suggestion = `\n\nCheck for mismatched parentheses in the attribute value.`;
           throw error;
@@ -1822,7 +1546,8 @@ export class Lexer {
         `  Found: ${attr_context}${value}`,
         this.line,
         this.column,
-        this.input
+        this.input,
+        this.filename
       );
       error.suggestion = `\n\nCheck for mismatched parentheses in the attribute value.`;
       throw error;
@@ -1840,7 +1565,8 @@ export class Lexer {
         `  Found: ${attr_context}${value}`,
         this.line,
         this.column,
-        this.input
+        this.input,
+        this.filename
       );
       error.suggestion = `\n\nUnquoted $ attribute values must follow these patterns:\n\n` +
         `✓ Allowed:\n` +
@@ -1860,6 +1586,28 @@ export class Lexer {
     }
   }
   
+  /** The rule for plain attributes: a value must be quoted, on every tag, <Define:> included.
+   *  Only @ attributes (unquoted) and $ attributes (either) take a JavaScript value. */
+  private throw_unquoted_regular_attribute(attr_context: string, example: string): never {
+    const error = new JQHTMLParseError(
+      `Regular HTML attributes must have quoted values.\n` +
+      `  Attribute: ${attr_context}`,
+      this.line,
+      this.column,
+      this.input,
+      this.filename
+    );
+    error.suggestion = `\n\nRegular attributes must be quoted:\n` +
+      `  ✗ Wrong:   ${attr_context}${example}\n` +
+      `  ✓ Correct: ${attr_context}"myValue"\n` +
+      `  ✓ Correct: ${attr_context}"prefix <%= this.data.value %> suffix"\n\n` +
+      `Only @ event attributes (unquoted) and $ attributes (either) allow unquoted values:\n` +
+      `  ✓ Correct: @click=this.handleClick  (passes function reference)\n` +
+      `  ✓ Correct: $data=this.complexObject (passes object)\n` +
+      `  ✓ Correct: $sid="my-id"              (passes string)`;
+    throw error;
+  }
+
   private get_current_attribute_context(): string {
     // Look back in tokens to find the current attribute name for error reporting
     let i = this.tokens.length - 1;
@@ -1895,16 +1643,24 @@ export class Lexer {
   private scan_interpolated_attribute_value(quote: string) {
     let text_start = this.position;
     let text = '';
-    
+
+    // Literal text between interpolations: always text, never re-classified
+    const flush_text = () => {
+      if (text.length > 0) {
+        this.add_token(TokenType.ATTR_VALUE, text, text_start, this.position, { interpolation_text: true });
+        text = '';
+      }
+    };
+
     while (this.position < this.input.length && this.current_char() !== quote) {
       // Check for interpolation start
       if (this.current_char() === '<' && this.peek_ahead(1) === '%') {
         // Save any text before the interpolation
-        if (text.length > 0) {
-          this.add_token(TokenType.ATTR_VALUE, text, text_start, this.position);
-          text = '';
-        }
-        
+        flush_text();
+        const tag_start = this.position;
+        const tag_line = this.line;
+        const tag_column = this.column;
+
         // Check what kind of expression
         if (this.peek_ahead(2) === '!' && this.peek_ahead(3) === '=') {
           // <%!= expression %>
@@ -1912,13 +1668,15 @@ export class Lexer {
           this.advance(); // %
           this.advance(); // !
           this.advance(); // =
-          this.add_token(TokenType.EXPRESSION_UNESCAPED, '<%!=', this.position - 4, this.position);
+          this.add_token(TokenType.EXPRESSION_UNESCAPED, '<%!=', tag_start, this.position);
         } else if (this.peek_ahead(2) === '=') {
           // <%= expression %>
           this.advance(); // <
           this.advance(); // %
           this.advance(); // =
-          this.add_token(TokenType.EXPRESSION_START, '<%=', this.position - 3, this.position);
+          this.add_token(TokenType.EXPRESSION_START, '<%=', tag_start, this.position);
+        } else if (this.peek_sequence('<%br=')) {
+          throw this.attribute_nl2br_error();
         } else if (
           this.peek_ahead(2) === ' ' || this.peek_ahead(2) === '\t' ||
           this.peek_ahead(2) === '\n' || this.peek_ahead(2) === '\r'
@@ -1928,17 +1686,28 @@ export class Lexer {
           // be silently treated as literal text - so reject with guidance.
           throw this.attribute_code_block_error();
         } else {
-          // Just add as text
-          text += this.current_char();
-          this.advance();
-          continue;
+          // Any other <% form (<%-, <%x, a bare <%) is not a template tag JQHTML
+          // knows; emitting it as literal text would hide the mistake.
+          throw this.attribute_unknown_tag_error();
         }
 
         // Scan the JavaScript expression
-        this.scan_javascript();
+        const expression_start = this.position;
+        this.in_attribute_value = true;
+        try {
+          this.scan_javascript();
+        } finally {
+          this.in_attribute_value = false;
+        }
         
         // Consume %>
         if (this.current_char() === '%' && this.peek_ahead(1) === '>') {
+          // An expression in an attribute value stays on one line. (Without a %>
+          // the parser reports the unterminated expression instead.)
+          if (this.input.substring(expression_start, this.position).includes('\n')) {
+            throw this.attribute_multiline_expression_error(
+              this.input.substring(tag_start, expression_start), tag_line, tag_column);
+          }
           const tag_end_start = this.position;
           this.advance(); // %
           this.advance(); // >
@@ -1954,14 +1723,82 @@ export class Lexer {
     }
     
     // Add any remaining text
-    if (text.length > 0) {
-      this.add_token(TokenType.ATTR_VALUE, text, text_start, this.position);
-    }
+    flush_text();
     
     // Consume closing quote
     if (this.current_char() === quote) {
       this.advance();
     }
+  }
+
+  private attribute_nl2br_error(): JQHTMLParseError {
+    const attr_context = this.get_current_attribute_context(); // e.g. "title="
+    const error = new JQHTMLParseError(
+      `<%br= is not allowed in attribute values; use <%= %>\n` +
+      `  Attribute: ${attr_context}"<%br= ...`,
+      this.line,
+      this.column,
+      this.input,
+      this.filename
+    );
+    error.suggestion = `\n\n<%br= converts newlines to <br /> elements, which cannot exist inside an\n` +
+      `attribute value. Use an escaped expression instead:\n` +
+      `  ✗ Wrong:   title="<%br= this.data.text %>"\n` +
+      `  ✓ Correct: title="<%= this.data.text %>"`;
+    return error;
+  }
+
+  private attribute_multiline_expression_error(open: string, line: number, column: number): JQHTMLParseError {
+    const attr_context = this.get_current_attribute_context(); // e.g. "title="
+    const error = new JQHTMLParseError(
+      `A ${open} %> expression in an attribute value must be on one line\n` +
+      `  Attribute: ${attr_context}"...${open} ...`,
+      line,
+      column,
+      this.input,
+      this.filename
+    );
+    if (attr_context.startsWith('$')) {
+      // A $ arg takes JavaScript directly: the bracketed form may span lines and
+      // gives the same value.
+      const name = attr_context.replace(/=$/, '');
+      error.suggestion = `\n\nA $ attribute takes JavaScript directly. Use the bracketed form, which may\n` +
+        `span lines:\n` +
+        `  ✗ Wrong:   ${name}="<%= JSON.stringify([\n` +
+        `               {value: 1, label: 'One'},\n` +
+        `             ]) %>"\n` +
+        `  ✓ Correct: ${name}=(JSON.stringify([\n` +
+        `               {value: 1, label: 'One'},\n` +
+        `             ]))`;
+    } else {
+      error.suggestion = `\n\nPut the whole expression, including its %>, on the line where it opens. For a\n` +
+        `longer value, compute it first in a <% %> block:\n` +
+        `  ✗ Wrong:   title="<%= this.data.first +\n` +
+        `                      this.data.last %>"\n` +
+        `  ✓ Correct: <% const full_name = this.data.first + this.data.last; %>\n` +
+        `             <b title="<%= full_name %>">`;
+    }
+    error.suggestion += `\n\nA // comment runs to the end of its line, so it hides a %> written after it on\n` +
+      `the same line; inside an attribute value use /* */ instead.`;
+    return error;
+  }
+
+  private attribute_unknown_tag_error(): JQHTMLParseError {
+    const attr_context = this.get_current_attribute_context(); // e.g. "title="
+    const next = this.peek_ahead(2);
+    const form = next && next !== '"' && next !== "'" ? `<%${next}` : '<%';
+    const error = new JQHTMLParseError(
+      `Unknown template tag ${form} in attribute value; only <%= %> and <%!= %> are allowed in attribute values\n` +
+      `  Attribute: ${attr_context}"...${form}`,
+      this.line,
+      this.column,
+      this.input,
+      this.filename
+    );
+    error.suggestion = `\n\nInside an attribute value, <% starts a template tag. The forms allowed there are\n` +
+      `<%= expr %> (escaped) and <%!= expr %> (unescaped). To put the literal text "<%" in\n` +
+      `an attribute, output it from an expression: title="<%= '<' + '%' %>"`;
+    return error;
   }
 
   private attribute_code_block_error(): JQHTMLParseError {
@@ -1971,7 +1808,8 @@ export class Lexer {
       `  Attribute: ${attr_context}"<% ...`,
       this.line,
       this.column,
-      this.input
+      this.input,
+      this.filename
     );
     error.suggestion = `\n\nA <% %> code block (statement) is never evaluated inside an attribute value.\n` +
       `Use a <%= %> expression instead - expressions DO work inside attributes.\n\n` +

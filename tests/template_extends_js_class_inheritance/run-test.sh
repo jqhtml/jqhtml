@@ -18,6 +18,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/contacts_datagrid.jqhtml" \
   "$SCRIPT_DIR/tester.jqhtml" \
   --delay=1
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -53,3 +54,6 @@ echo "  ✅ on_ready() executed (component ready)"
 echo "  ✅ Template renders with parent structure + child slots"
 echo "  ✅ Parent class methods available on child instance"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

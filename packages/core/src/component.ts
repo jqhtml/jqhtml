@@ -11,34 +11,68 @@
 // Use global jQuery
 declare const $: any;
 import { LifecycleManager } from './lifecycle-manager.js';
-import { get_template_by_class, get_template, get_component_class } from './component-registry.js';
+import { get_template_by_class, get_template, get_component_class, extends_conflict } from './component-registry.js';
 import { process_instructions, uid } from './instruction-processor.js';
 import { logLifecycle, applyDebugDelay, handleComponentError } from './debug.js';
 import { Load_Coordinator } from './load-coordinator.js';
-import { Jqhtml_Local_Storage } from './local-storage.js';
+import { Jqhtml_Local_Storage, is_registered_cache_class_instance } from './local-storage.js';
 import { event_on, event_once, event_trigger, event_on_registered, event_invalidate } from './component-events.js';
-import { setup_data_property, execute_on_load_detached } from './data-proxy.js';
+import { setup_data_property, execute_on_load_detached, execute_on_load_error_detached, LOAD_HOOK_OWNER, RAW_DATA } from './data-proxy.js';
 import { track_attachment, untrack_attachment } from './dom-attachment.js';
-import { read_cache_in_create, check_cache_on_reload, write_html_cache_snapshot, write_cache_on_loaded, generate_cache_key, warn_uncacheable_component } from './component-cache.js';
-import { debug_attributes_enabled } from './config.js';
+import { read_cache_in_create, check_cache_on_reload, write_html_cache_snapshot, write_cache_on_loaded, generate_cache_key, mark_cacheability } from './component-cache.js';
+import { debug_attributes_enabled, get_config } from './config.js';
 import { COMPONENT_NAME_PATTERN, is_component_name, dynamic_component_name } from './component-name.js';
 import { print_object } from './value-printers.js';
 import { escape_html, escape_html_nl2br } from './escape.js';
+import { Jqhtml_Markup, markup_has_content } from './markup.js';
 
 /**
- * The `jqhtml` argument every compiled render function receives: the same
- * escaping the runtime exports, the object-printer entry point, and the
- * dynamic tag name check. One shared object, not one per render.
+ * The `jqhtml` argument every compiled render function receives: the markup
+ * buffer class each render/content/slot function returns, the same escaping
+ * the runtime exports, the object-printer entry point, and the dynamic tag
+ * name check. One shared object, not one per render.
  */
 export const render_utilities = {
+  Markup: Jqhtml_Markup,
   escape_html,
   escape_html_nl2br,
   print_object,
   dynamic_component_name,
 };
-import { Component_Queue } from './component-queue.js';
+import { Component_Queue, Lifecycle_Call_Promise } from './component-queue.js';
 import { capture_component_data, is_capture_enabled, consume_preload_data, has_preload_data } from './preload-data.js';
 import { get_viewport_width } from './viewport.js';
+import { merge_style } from './style-merge.js';
+
+// The base get_class_hierarchy() result per class, for _apply_css_classes(). A class's
+// name and prototype chain do not change after definition, and re-registering a class
+// registers a new class object, so no entry goes stale. A class that overrides the
+// static method (or has it patched) is asked every time, as before. Read-only: the
+// caller copies before adding to it.
+const class_hierarchies = new WeakMap<object, string[]>();
+function class_hierarchy_of(ctor: typeof Jqhtml_Component): string[] {
+  if (ctor.get_class_hierarchy !== base_get_class_hierarchy) return ctor.get_class_hierarchy();
+  let hierarchy = class_hierarchies.get(ctor);
+  if (hierarchy === undefined) {
+    hierarchy = ctor.get_class_hierarchy();
+    class_hierarchies.set(ctor, hierarchy);
+  }
+  return hierarchy;
+}
+
+// Lifecycle methods guarded against manual calls, with the hint each error gives.
+// The wrapper itself stays per instance: it closes over its own component, so a call
+// with any other `this` (or none) still names that component in the error.
+const PROTECTED_LIFECYCLE_METHODS: ReadonlyArray<readonly [string, string]> = [
+  ['on_create', 'Called automatically during creation.'],
+  ['on_render', 'Use render() to trigger a re-render.'],
+  ['on_load', 'Use reload() to refresh data.'],
+  ['on_load_error', 'Called automatically when on_load() fails.'],
+  ['on_ready', 'Called automatically when ready.'],
+  ['on_stop', 'Use stop() to stop the component.'],
+  ['on_attach', 'Called automatically when the component enters the document.'],
+  ['on_detach', 'Called automatically when the component leaves the document.'],
+];
 
 // WeakMap storage for protected lifecycle method implementations (Option 2)
 // See docs/internal/lifecycle-method-protection.md for design details
@@ -53,6 +87,9 @@ const lifecycle_impls = new WeakMap<Jqhtml_Component, Record<string, Function>>(
  * parent template with the child's slots) and default-attribute collection walk
  * it, so a `<Define>`'s class/attrs can never resolve through a different chain
  * than its markup does.
+ *
+ * It does not judge whether extends="" agrees with the JS class: _render() throws on
+ * a conflict first (extends_conflict() in component-registry.ts).
  *
  * @param template_def The template whose parent is wanted
  * @param ctor The component class to walk the prototype chain of (null skips it)
@@ -99,6 +136,67 @@ function resolve_parent_template(
   return null;
 }
 
+/**
+ * The template chain a component's defaults come from, FARTHEST ancestor first and
+ * the component's own template last. Walks resolve_parent_template(), so extends=
+ * and the JS prototype chain (slot-only JS subclasses included) are followed exactly
+ * as the render path follows them.
+ *
+ * The one walk both kinds of <Define> default use: `$foo` arg defaults (defineArgs,
+ * see merge_define_args()) and attribute defaults (_apply_default_attributes()).
+ *
+ * @param template The component's own template
+ * @param ctor The component class (its prototype chain is walked)
+ */
+function resolve_template_chain(template: any, ctor: any): any[] {
+  const chain: any[] = [];
+  let current_template = template;
+  let current_class: any = ctor;
+  const seen = new Set<any>();
+
+  while (current_template && !seen.has(current_template)) {
+    seen.add(current_template);
+    chain.unshift(current_template); // Add to front so the farthest ancestor comes first
+
+    const parent = resolve_parent_template(current_template, current_class);
+    if (!parent) break;
+
+    current_template = parent.template;
+    // Advance the prototype walk too: the next parent must be resolved relative to
+    // the class we just landed on, not the original one. A template-only parent has
+    // no class, which is correct - its own chain can only be an explicit extends=.
+    current_class = get_component_class(parent.name) || null;
+  }
+
+  return chain;
+}
+
+/**
+ * Merge the `$foo` arg defaults (defineArgs) of a template chain, nearest template
+ * winning: farthest ancestor < nearer ancestors < the component's own template.
+ *
+ * A `$foo` arg default and a `data-foo` attribute default are one arg, so a NEARER
+ * template's data-foo (or hand-written `$foo` defaultAttributes key) removes a
+ * farther template's `$foo` from this merge; _apply_default_attributes() then
+ * applies that nearer data-foo. Within one template the `$foo` arg default wins over
+ * its own data-foo, as it always has.
+ *
+ * @param chain Templates, farthest first (resolve_template_chain())
+ */
+function merge_define_args(chain: any[]): Record<string, any> {
+  const merged: Record<string, any> = {};
+  for (const tmpl of chain) {
+    if (tmpl.defaultAttributes) {
+      for (const key of Object.keys(tmpl.defaultAttributes)) {
+        if (key.startsWith('$')) delete merged[key.substring(1)];
+        else if (key.startsWith('data-')) delete merged[key.substring(5)];
+      }
+    }
+    if (tmpl.defineArgs) Object.assign(merged, tmpl.defineArgs);
+  }
+  return merged;
+}
+
 // Extend window for debug capabilities
 declare global {
   interface Window {
@@ -106,6 +204,48 @@ declare global {
       log: (componentName: string, phase: string, message: string, data?: any) => void;
       updateTree: () => void;
     };
+  }
+}
+
+/** One run of on_load()/on_loaded()/on_ready(), while it is in progress (see _call_lifecycle()). */
+interface Hook_Run {
+  name: string;
+  settled: boolean;
+  previous: Hook_Run | null;  // The run in progress when this one started (a promoted call nests in an on_ready())
+}
+
+/**
+ * Development warning, after on_create(), for each top-level property of this.data that
+ * is not simple data: a primitive, a plain object, an array, or a value the cache restores
+ * as itself (Date, Map, Set, a registered cache class). One level only - nested values are
+ * not walked. this.data is copied through the cache serializer right after, so a function,
+ * DOM node, jQuery object, component or unregistered class instance does not survive.
+ */
+function warn_non_simple_create_data(raw: any, component_name: string): void {
+  if (get_config().mode !== 'development') return;
+  for (const key of Object.keys(raw)) {
+    const value = raw[key];
+    const type = typeof value;
+    let what: string | null = null;
+    if (type === 'function') what = 'a function';
+    else if (type === 'symbol' || type === 'bigint') what = 'a ' + type;
+    else if (value !== null && type === 'object' && !Array.isArray(value)) {
+      const proto = Object.getPrototypeOf(value);
+      if (proto !== Object.prototype && proto !== null && !is_registered_cache_class_instance(value)) {
+        what = value instanceof Jqhtml_Component ? 'a component'
+          : (typeof Node !== 'undefined' && value instanceof Node) ? 'a DOM node'
+          : value.jquery ? 'a jQuery object'
+          : 'an instance of ' + ((value.constructor && value.constructor.name) || 'a class');
+      }
+    }
+    if (what) {
+      console.warn(
+        `[JQHTML] <${component_name}> on_create() set this.data.${key} to ${what}. this.data ` +
+        `holds simple data only (strings, numbers, booleans, null, plain objects, arrays, and ` +
+        `Date, Map, Set or registered cache classes); it is copied through the cache serializer ` +
+        `after on_create(), so this value does not survive as it is. Keep it in this.state or on the component.`
+      );
+    }
   }
 }
 
@@ -135,21 +275,29 @@ export class Jqhtml_Component {
   private _use_dom_fallback: boolean = false;  // If true, use find() fallback instead of _dom_children optimization
   private _stopped: boolean = false;
   private _booted: boolean = false;  // Guard to prevent double boot() calls
-  private _data_before_render: string | null = null;  // Store data state before initial render
+  private _data_before_render: string | null = null;  // Serialized this.data before the initial render (_should_rerender), custom on_load() only
   private _lifecycle_callbacks: Map<string, Array<(component: Jqhtml_Component) => void>> = new Map();
   private _lifecycle_states: Map<string, any> = new Map();  // Track which lifecycle events have occurred and their data
   private _did_first_render: boolean = false;  // Track if component has rendered at least once
   private _render_count: number = 0;  // Incremented each time _render() is called, used to detect stale renders
-  private _args_on_last_render: Record<string, any> | null = null;  // Args snapshot from last render (for reload() comparison)
-  private _data_on_last_render: string | null = null;  // Data snapshot from last render (for refresh() comparison)
-  private __initial_data_snapshot: Record<string, any> | null = null;  // Snapshot of this.data after on_create() for restoration before on_load()
+  private _args_on_last_render: string | null = null;  // JSON of this.args at the last render (reload() args-changed check), custom on_load() only
+  private _data_on_last_render: string | null = null;  // Serialized this.data at the last render (refresh() comparison), custom on_load() only
+  private __initial_data_text: string | null = null;  // this.data as on_create() left it (Jqhtml_Local_Storage.snapshot()), restored before every on_load()
   private __data_frozen: boolean = false;  // Track if this.data is currently frozen
-  private _queue: Component_Queue = new Component_Queue();  // Lifecycle operation queue (render/reload/refresh)
-  private next_reload_force_refresh: boolean | null = null;  // State machine for reload()/refresh() debounce precedence
-  private __lifecycle_authorized: boolean = false;  // Flag for lifecycle method protection
+
+  // Serialized text of the current this.data - ONE per data generation. See _data_text().
+  // Cleared by the data setter and the unfrozen set/delete traps (data-proxy.ts).
+  private __data_text: string | null = null;
+  private __data_text_of: object | null = null;  // The raw data object __data_text describes
+  private _queue: Component_Queue = new Component_Queue(() => this._on_queue_idle());  // Lifecycle lock + queue: boot, render/load/reload/refresh
+  private _load_seq: number = 0;  // Sequence number of the newest load; a load whose number is older is superseded and dropped
+  private _ready_owed: boolean = false;  // Boot ended with calls queued: 'ready' fires when the queue goes idle
+  private _locked_sync_hook: string | null = null;  // 'on_create' / 'on_render' while this component's own sync hook runs
+  private _async_hook: Hook_Run | null = null;  // The innermost on_load/on_loaded/on_ready run in progress (see _queue_call())
 
   // Cache mode properties
   private _cache_key: string | null = null;  // Cache key for caching
+  private _data_cache_key: string | null = null;  // Key the current this.data is cached under (written or hydrated), null if not cached
 
   // 'html' mode caching
   // The snapshot carries the cid it was taken under, not just markup: every scoped id
@@ -158,10 +306,10 @@ export class Jqhtml_Component {
   private _cached_html: { cid: string; html: string } | null = null;  // Cached HTML snapshot to inject on first render
   private _used_cached_html: boolean = false;  // Flag if cached HTML was used (forces re-render after on_load)
   private _should_cache_html_after_ready: boolean = false;  // Flag to cache HTML after on_ready lifecycle
-  private _is_dynamic: boolean = false;  // True if this.data changed during on_load() (used for HTML cache sync)
+  private _is_dynamic: boolean = false;  // True if the last load is to be cached: data changed, or unchanged under a moved cache key (read by the html snapshot)
 
   // on_render synchronization (HTML cache mode)
-  private _on_render_complete: boolean = false;  // True after on_render() has been called post-on_load
+  private _on_render_complete: boolean = false;  // True once the DOM is final post-load (post-load render, or end of the boot render chain)
 
   // use_cached_data feature - skip on_load() when cache hit occurs
   private _use_cached_data_hit: boolean = false;  // True if use_cached_data=true AND cache was used
@@ -194,6 +342,15 @@ export class Jqhtml_Component {
   // Used to skip expensive cache/load operations for static components
   private __has_custom_on_load: boolean = false;
 
+  // on_load_error(): whether it is overridden (an override is what lets a failed load
+  // continue), and the latch set by the first on_load() failure - from then on this
+  // instance neither reads nor writes the cache (see _run_load_error_hook()).
+  private __has_custom_on_load_error: boolean = false;
+  private _load_failed: boolean = false;
+  // The failure the base on_load_error() printed, so the boot failure path does not
+  // print the same error a second time. Boxed: a thrown value may be undefined.
+  private _load_error_printed: { error: any } | null = null;
+
   // gate_load() — "load gates" registered during on_create() that must settle
   // before the component's FIRST on_load() runs. See gate_load() / _await_load_gates().
   private __load_gates: Promise<any>[] = [];        // Pending gates (cleared once the first load begins)
@@ -212,6 +369,7 @@ export class Jqhtml_Component {
     // Prototype chain is set up before constructor runs, so this.on_load
     // correctly resolves to child class override if one exists
     this.__has_custom_on_load = this.on_load !== Jqhtml_Component.prototype.on_load;
+    this.__has_custom_on_load_error = this.on_load_error !== Jqhtml_Component.prototype.on_load_error;
 
     this._cid = this._generate_cid();
     this._lifecycle_manager = LifecycleManager.get_instance();
@@ -242,16 +400,18 @@ export class Jqhtml_Component {
       }
     }
     
-    // Get template to check for defineArgs
-    let template_for_args;
+    // The component's template and the chain it inherits defaults from (farthest first)
+    let own_template;
     if (args._component_name) {
-      template_for_args = get_template(args._component_name);
+      own_template = get_template(args._component_name);
     } else {
-      template_for_args = get_template_by_class(this.constructor as any);
+      own_template = get_template_by_class(this.constructor as any);
     }
+    const template_chain = own_template ? resolve_template_chain(own_template, this.constructor) : [];
 
-    // Merge in order: defineArgs (defaults from Define tag) < dataAttrs < args (invocation overrides)
-    const defineArgs = template_for_args?.defineArgs || {};
+    // Merge in order: inherited $ arg defaults (nearest <Define> wins) < dataAttrs <
+    // args (invocation overrides)
+    const defineArgs = merge_define_args(template_chain);
     this.args = { ...defineArgs, ...dataAttrs, ...args };
 
     // The name this instance was invoked as. Every invocation path passes it
@@ -279,7 +439,7 @@ export class Jqhtml_Component {
 
     // Apply CSS classes and attributes
     this._apply_css_classes();
-    this._apply_default_attributes();  // Apply defaultAttributes from template
+    this._apply_default_attributes(template_chain);  // Apply defaultAttributes from the template chain
     this._set_attributes();
 
     // Find DOM parent component (for lifecycle coordination)
@@ -309,35 +469,23 @@ export class Jqhtml_Component {
    * @private
    */
   private _protect_lifecycle_methods(): void {
-    const methods: Record<string, string> = {
-      on_create: 'Called automatically during creation.',
-      on_render: 'Use render() to trigger a re-render.',
-      on_load: 'Use reload() to refresh data.',
-      on_ready: 'Called automatically when ready.',
-      on_stop: 'Use stop() to stop the component.',
-      on_attach: 'Called automatically when the component enters the document.',
-      on_detach: 'Called automatically when the component leaves the document.'
-    };
-
     const impls: Record<string, Function> = {};
     const self = this;
 
-    for (const [name, help] of Object.entries(methods)) {
+    for (const [name, help] of PROTECTED_LIFECYCLE_METHODS) {
       const original = (this as any)[name];
       // Skip if using base class default (empty method)
       if (original === Jqhtml_Component.prototype[name as keyof Jqhtml_Component]) continue;
 
       impls[name] = original;
-      // Create wrapper with same function name (for stack traces)
+      // Create wrapper with same function name (for stack traces). The framework calls
+      // the stored original through _call_lifecycle(), so any call to the wrapper is manual.
       (this as any)[name] = {
-        [name](...args: any[]) {
-          if (!self.__lifecycle_authorized) {
-            throw new Error(
-              `[JQHTML] ${name}() cannot be called manually. ${help}\n` +
-              `Component: ${self.component_name()} (_cid: ${self._cid})`
-            );
-          }
-          return lifecycle_impls.get(self)![name].apply(self, args);
+        [name](..._args: any[]) {
+          throw new Error(
+            `[JQHTML] ${name}() cannot be called manually. ${help}\n` +
+            `Component: ${self.component_name()} (_cid: ${self._cid})`
+          );
         }
       }[name];
     }
@@ -346,28 +494,60 @@ export class Jqhtml_Component {
   }
 
   /**
-   * Call a lifecycle method with authorization (async)
+   * Call a lifecycle method (async)
    * Framework calls this to invoke lifecycle methods, bypassing the protection wrapper.
-   * The flag is set momentarily for the wrapper check, then reset BEFORE user code runs.
-   * This ensures any nested lifecycle calls from user code will fail the flag check.
    * @private
    */
-  private async _call_lifecycle<T>(name: string, context?: any): Promise<T | void> {
+  private async _call_lifecycle<T>(name: string, context?: any, args: any[] = []): Promise<T | void> {
     // Get the original implementation (bypasses wrapper entirely)
     const impl = lifecycle_impls.get(this)?.[name] || (this as any)[name];
-    // Call original directly - no flag needed since we bypass the wrapper
-    return await impl.call(context || this);
+
+    // The async hooks that run inside the lifecycle lock are recorded while they run: a
+    // render()/load()/reload()/refresh() called meanwhile is handled per hook when
+    // awaited (see _queue_call()).
+    if (name === 'on_load' || name === 'on_loaded' || name === 'on_ready') {
+      const previous = this._async_hook;
+      const run: Hook_Run = { name, settled: false, previous };
+      this._async_hook = run;
+      try {
+        return await impl.apply(context || this, args);
+      } finally {
+        run.settled = true;
+        if (this._async_hook === run) {
+          this._async_hook = previous && !previous.settled ? previous : null;
+        }
+      }
+    }
+
+    // Call original directly, bypassing the wrapper
+    return await impl.apply(context || this, args);
   }
 
   /**
-   * Call a lifecycle method with authorization (sync version for sync methods like on_stop)
+   * Call a lifecycle method (sync version for sync methods like on_stop)
    * @private
    */
   private _call_lifecycle_sync<T>(name: string): T | void {
     // Get the original implementation (bypasses wrapper entirely)
     const impl = lifecycle_impls.get(this)?.[name] || (this as any)[name];
-    // Call original directly - no flag needed since we bypass the wrapper
+    // Call original directly, bypassing the wrapper
     return impl.call(this);
+  }
+
+  /**
+   * Call on_create() or on_render() and record that it is running, so a render(),
+   * load(), reload() or refresh() made from inside it can be warned about (see
+   * _queue_call()). Both run inside the lifecycle lock.
+   * @private
+   */
+  private _call_locked_sync_hook<T>(name: string): T | void {
+    const previous = this._locked_sync_hook;
+    this._locked_sync_hook = name;
+    try {
+      return this._call_lifecycle_sync<T>(name);
+    } finally {
+      this._locked_sync_hook = previous;
+    }
   }
 
   /**
@@ -375,11 +555,17 @@ export class Jqhtml_Component {
    * Called after every on_render() and on_ready(); the debounced window
    * listener in viewport.ts drives it from then on. Errors are isolated so a
    * bad handler cannot break the lifecycle.
+   *
+   * Skipped while the hook resolves to the base no-op (nothing could observe the
+   * call). Read live on each fire, so a hook assigned to the instance (class field,
+   * on_create(), later) or patched onto a prototype is called like a class override.
    * @private
    */
   private _fire_viewport_resize(): void {
+    const hook = this.on_viewport_resize;
+    if (hook === base_on_viewport_resize) return;
     try {
-      this.on_viewport_resize(get_viewport_width());
+      hook.call(this, get_viewport_width());
     } catch (error) {
       console.error(
         `[JQHTML] Error in on_viewport_resize() for ${this.component_name()}:`,
@@ -396,6 +582,39 @@ export class Jqhtml_Component {
    */
   private _has_on_load(): boolean {
     return this.__has_custom_on_load;
+  }
+
+  /**
+   * The loaded step for a component with NO custom on_load(): on_loaded(), then the
+   * 'loaded' event, at the point where on_load() would have completed (boot,
+   * load(), reload(), refresh()). Every component gets them, whether or not it fetches
+   * data; a component with on_load() gets them from _apply_load_result() / load().
+   *
+   * Suppressed by _load_only and _load_render_only (preloading mode), exactly as for a
+   * component with on_load(). Never runs on a stopped component, and 'loaded' does not
+   * fire if on_loaded() awaited across a stop().
+   *
+   * Returns null when nothing was awaited: on_loaded() is the base no-op, so 'loaded'
+   * fired synchronously and the caller's chain does not yield - a template-only
+   * component's boot stays synchronous. Otherwise a promise for on_loaded() + 'loaded'.
+   * @private
+   */
+  private _loaded_without_on_load(): Promise<void> | null {
+    if (this._stopped || this._load_only || this._load_render_only) return null;
+
+    if (this.on_loaded === Jqhtml_Component.prototype.on_loaded) {
+      this.trigger('loaded');
+      return null;
+    }
+
+    return (async () => {
+      await this._call_lifecycle('on_loaded');
+
+      // on_loaded() may have awaited across a stop(); don't fire 'loaded' after it.
+      if (this._stopped) return;
+
+      this.trigger('loaded');
+    })();
   }
 
   /**
@@ -423,6 +642,33 @@ export class Jqhtml_Component {
   // -------------------------------------------------------------------------
   
   /**
+   * The component render(sid) and _render(sid) delegate to: the one on this
+   * component's $sid element. Throws when there is no such element, or when it is
+   * not a component (no $redrawable).
+   * @private
+   */
+  private _redraw_target(id: string): any {
+    const $element = this.$sid(id);
+    if ($element.length === 0) {
+      throw new Error(
+        `[JQHTML] render("${id}") - no such id.\n` +
+        `Component "${this.component_name()}" has no child element with $sid="${id}".`
+      );
+    }
+
+    const child = $element.data('_component');
+    if (!child) {
+      throw new Error(
+        `[JQHTML] render("${id}") - element is not a component or does not have $redrawable attribute set.\n` +
+        `Element with $sid="${id}" exists but is not initialized as a component.\n` +
+        `Add $redrawable attribute or make it a proper component.`
+      );
+    }
+
+    return child;
+  }
+
+  /**
    * Internal render phase - Create DOM structure
    * Called top-down (parent before children) when part of lifecycle
    * This is an internal method - users should call render() instead
@@ -440,26 +686,7 @@ export class Jqhtml_Component {
 
     // If id provided, delegate to child component
     if (id) {
-      // First check if element with scoped ID exists
-      const $element = this.$sid(id);
-      if ($element.length === 0) {
-        throw new Error(
-          `[JQHTML] render("${id}") - no such id.\n` +
-          `Component "${this.component_name()}" has no child element with $sid="${id}".`
-        );
-      }
-
-      // Element exists, check if it's a component
-      const child = $element.data('_component');
-      if (!child) {
-        throw new Error(
-          `[JQHTML] render("${id}") - element is not a component or does not have $redrawable attribute set.\n` +
-          `Element with $sid="${id}" exists but is not initialized as a component.\n` +
-          `Add $redrawable attribute or make it a proper component.`
-        );
-      }
-
-      return child._render(null, options);
+      return this._redraw_target(id)._render(null, options);
     }
 
     this._log_lifecycle('render', 'start');
@@ -531,7 +758,7 @@ export class Jqhtml_Component {
 
       // Call on_render() after cache inject (unless suppressed by _load_render_only)
       if (!options.skip_on_render) {
-        const cacheRenderResult = this._call_lifecycle_sync('on_render');
+        const cacheRenderResult = this._call_locked_sync_hook('on_render');
         if (cacheRenderResult && typeof (cacheRenderResult as any).then === 'function') {
           console.warn(
             `[JQHTML] Component "${this.component_name()}" returned a Promise from on_render(). ` +
@@ -545,19 +772,15 @@ export class Jqhtml_Component {
       this.trigger('render');
 
       // Store args/data snapshots for later comparison
-      try {
-        this._args_on_last_render = JSON.parse(JSON.stringify(this.args));
-      } catch (error) {
-        this._args_on_last_render = null;
-      }
-      this._data_on_last_render = JSON.stringify(this.data);
+      this._record_render_snapshots();
 
       return current_render_id;
     }
 
-    // Capture data state before first render for comparison later
-    if (this._data_before_render === null) {
-      this._data_before_render = JSON.stringify(this.data);
+    // Capture data state before first render for comparison later. Read only by
+    // _should_rerender(), which answers false without it when there is no custom on_load().
+    if (this._data_before_render === null && this.__has_custom_on_load) {
+      this._data_before_render = this._data_text();
     }
 
     // Get template and render it
@@ -571,6 +794,14 @@ export class Jqhtml_Component {
       template_def = get_template_by_class(this.constructor as any);
     }
 
+    // extends="" naming a template the JS class does not descend from would render one
+    // parent's markup over another's methods. Thrown here, so it takes the boot error
+    // path: logged, this component stopped, waiting ancestors released.
+    const extends_error = template_def?.extends ? extends_conflict(template_def, this.constructor) : null;
+    if (extends_error) {
+      throw new Error(extends_error);
+    }
+
     if (template_def && template_def.render) {
       // Utilities the compiled render function calls (see render_utilities)
       const jqhtml = render_utilities;
@@ -582,6 +813,11 @@ export class Jqhtml_Component {
       // console.log('[Component] this.data:', this.data);
       // console.log('[Component] this.args:', this.args);
 
+      // What content() returns: the slot's buffer, or '' when it emits nothing (see
+      // markup_has_content), so a slot written empty tests falsy like an absent one
+      const content_or_empty = (markup: any) =>
+        markup instanceof Jqhtml_Markup && !markup_has_content(markup) ? '' : markup;
+
       // Create content function that handles both default content and named slots
       const createContentFunction = () => {
         const defaultContentFn = this.args._innerhtml_function;
@@ -591,8 +827,8 @@ export class Jqhtml_Component {
         return (slotName?: string, ...slotArgs: any[]) => {
           // If slot name provided and slots object exists, try to use named slot
           if (slotName && slotsObj && slotsObj[slotName]) {
-            // Call the slot function - it returns [instructions, context]
-            return slotsObj[slotName](...slotArgs);
+            // Call the slot function - it returns its markup buffer
+            return content_or_empty(slotsObj[slotName](...slotArgs));
           }
           // If slot name provided but not found, return empty
           else if (slotName) {
@@ -600,7 +836,7 @@ export class Jqhtml_Component {
           }
           // No slot name = default content
           else if (defaultContentFn) {
-            return defaultContentFn(this);
+            return content_or_empty(defaultContentFn(this));
           }
           // No content at all
           else {
@@ -611,7 +847,8 @@ export class Jqhtml_Component {
 
       const contentFunction = createContentFunction();
 
-      let [instructions, context] = template_def.render.bind(this)(
+      // A markup buffer, or {_slots: {...}} from a slot-only template
+      let rendered: any = template_def.render.bind(this)(
         this.data,
         this.args,
         contentFunction, // Content function with slot support
@@ -619,8 +856,8 @@ export class Jqhtml_Component {
       );
 
       // Check for template inheritance (slot-only OR explicit extends)
-      // If instructions is {_slots: {...}}, find parent template and invoke it
-      if (instructions && typeof instructions === 'object' && instructions._slots && !Array.isArray(instructions)) {
+      // If the result is {_slots: {...}}, find parent template and invoke it
+      if (!(rendered instanceof Jqhtml_Markup) && rendered && rendered._slots) {
         const component_name = template_def.name || this.args._component_name || this.constructor.name;
         const parent = resolve_parent_template(template_def, this.constructor);
 
@@ -637,14 +874,12 @@ export class Jqhtml_Component {
 
         // Create a content function that invokes child slots
         // When parent calls content('slotName'), it invokes the child's slot function
-        const childSlots = instructions._slots;
+        const childSlots = rendered._slots;
         const contentFunction = (slotName: string, ...slotArgs: any[]) => {
           if (childSlots[slotName] && typeof childSlots[slotName] === 'function') {
-            // Invoke the slot function with everything content() was given
-            const [slotInstructions, slotContext] = childSlots[slotName](...slotArgs);
-            // Return in render function format: [instructions, context]
-            // The template expression handler expects this format
-            return [slotInstructions, slotContext];
+            // Invoke the slot function with everything content() was given; its
+            // markup buffer is what the template expression handler splices
+            return content_or_empty(childSlots[slotName](...slotArgs));
           }
           // Slot not found, return empty
           return '';
@@ -656,14 +891,12 @@ export class Jqhtml_Component {
         // re-thrown, which routes it through the boot error path: logged, this component
         // stopped, its waiting ancestors released.
         try {
-          const [parentInstructions, parentContext] = parent.template.render.bind(this)(
+          rendered = parent.template.render.bind(this)(
             this.data,
             this.args,
             contentFunction, // Pass content function that invokes child slots
             jqhtml
           );
-          instructions = parentInstructions;
-          context = parentContext;
         } catch (error) {
           // Rethrown, not swallowed - only re-labelled so the report names both ends
           // of the inheritance, which the raw template error does not.
@@ -676,11 +909,11 @@ export class Jqhtml_Component {
         }
       }
 
-      // Process instructions to generate DOM. ['_content', ...] markers from
+      // Process instructions to generate DOM. Markup buffers spliced in by
       // content() are handled by the processor, which renders them in the
       // component that wrote them.
       // This kicks off child component boots but doesn't wait for them
-      process_instructions(instructions, this.$, this);
+      process_instructions(rendered.instructions, this.$, this);
     }
 
     // Don't update ready state here - let phases complete in order
@@ -690,7 +923,7 @@ export class Jqhtml_Component {
 
     // Call on_render() after render completes (unless suppressed by _load_render_only)
     if (!options.skip_on_render) {
-      const renderResult = this._call_lifecycle_sync('on_render');
+      const renderResult = this._call_locked_sync_hook('on_render');
       if (renderResult && typeof (renderResult as any).then === 'function') {
         console.warn(
           `[JQHTML] Component "${this.component_name()}" returned a Promise from on_render(). ` +
@@ -718,7 +951,7 @@ export class Jqhtml_Component {
       this._ready_state = 3;
       this._update_debug_attrs();
     } else if (!this.__has_custom_on_load) {
-      // A component with no custom on_load() skips the load phase entirely, so it never
+      // A component with no custom on_load() fetches nothing (only on_loaded()/'loaded' run), so it never
       // reaches _ready_state 2 and would never set the flag above - and its data cannot
       // change, so this first render IS its final, fresh render. Without this, an
       // html-cache parent waited forever in _wait_for_children_on_render() for a
@@ -732,19 +965,93 @@ export class Jqhtml_Component {
     // Apply debug delay after render
     applyDebugDelay(isRerender ? 'rerender' : 'render');
 
-    // Store args snapshot for reload() comparison (skip if non-serializable)
-    try {
-      this._args_on_last_render = JSON.parse(JSON.stringify(this.args));
-    } catch (error) {
-      // Args contain circular references - skip snapshot (reload comparison will be disabled)
-      this._args_on_last_render = null;
-    }
-
-    // Store data snapshot for refresh() comparison
-    this._data_on_last_render = JSON.stringify(this.data);
+    // Store args/data snapshots for reload()/refresh() comparison
+    this._record_render_snapshots();
 
     // Return the render ID so callers can check if this render is still current
     return current_render_id;
+  }
+
+  /**
+   * Record what this render was made from, for _reload(): the args (did they change
+   * since, so try the cache?) and the data (did refresh() bring anything new?).
+   *
+   * Skipped for a component with no custom on_load(). _reload() is the only reader of
+   * both fields and returns before reading them for such a component - it just
+   * re-renders - so serializing args and data on every one of its renders bought
+   * nothing. For a list of row components that was most of the cost of a re-render.
+   * @private
+   */
+  private _record_render_snapshots(): void {
+    if (!this.__has_custom_on_load) return;
+
+    // JSON text of args, compared against JSON.stringify(this.args) in _reload().
+    // null (args hold a cycle) disables the comparison.
+    try {
+      this._args_on_last_render = JSON.stringify(this.args);
+    } catch (error) {
+      this._args_on_last_render = null;
+    }
+
+    this._data_on_last_render = this._data_text();
+  }
+
+  /**
+   * The serialized text of this.data - Jqhtml_Local_Storage.serialize() output - used
+   * for every "did this.data change?" decision (_should_rerender(), load(), _reload(),
+   * refresh()) and as the text written to the cache and handed to load followers.
+   *
+   * One text per data generation. The text a load result was normalized through is
+   * installed directly (_assign_load_result()), and any other text is computed once
+   * and kept while this.data is frozen - frozen data cannot change, and every way of
+   * replacing it (the data setter, an unfrozen set/delete) clears the text. It is
+   * computed from the raw data object, not through the deep-freeze proxies, which
+   * would allocate a read-only wrapper for every nested object they hand out.
+   *
+   * The cache serializer, not JSON.stringify: JSON renders every Map and Set as {},
+   * so data loaded into one never registered as changed.
+   * @private
+   */
+  _data_text(): string {
+    const raw = (this.data as any)[RAW_DATA];
+    if (this.__data_text !== null && this.__data_text_of === raw && this.__data_frozen) {
+      return this.__data_text;
+    }
+
+    // null: the data as a whole cannot be serialized (a getter threw). Never equal to
+    // anything, so it reads as "changed" - the safe answer, a re-render.
+    const text = Jqhtml_Local_Storage.serialize(raw) ?? `\u0000unserializable:${uid()}`;
+    if (this.__data_frozen) {
+      this.__data_text = text;
+      this.__data_text_of = raw;
+    }
+    return text;
+  }
+
+  /**
+   * Make a load result this.data: normalize it through the cache serializer, assign it
+   * (unfreeze, assign, refreeze), and keep the text it was normalized through as the new
+   * generation's _data_text(). Returns that text.
+   *
+   * Every on_load() result goes through here - in EVERY cache mode, not just 'data'.
+   * Two consequences the rest of the framework depends on:
+   *   - this.data is jqhtml's own copy. The author's object graph is never aliased,
+   *     so mutating what on_load() returned cannot reach a frozen this.data.
+   *   - this.data is BY CONSTRUCTION what the cache stores and what a cache hit
+   *     returns. Hot and cold are the same object shape in every mode, so turning
+   *     caching on can never change what a component sees.
+   * Dates, Maps, Sets and register_cache_class() classes are reconstructed; anything
+   * the serializer cannot express is dropped and warned about once (local-storage.ts).
+   * @private
+   */
+  private _assign_load_result(result_data: Record<string, any>): string {
+    const { value, text } = Jqhtml_Local_Storage.normalize(result_data, this.component_name());
+    this.__data_frozen = false;
+    this.data = value;
+    this.__data_frozen = true;
+    this.__data_text = text;
+    this.__data_text_of = (this.data as any)[RAW_DATA];
+    return text;
   }
 
   /**
@@ -770,34 +1077,17 @@ export class Jqhtml_Component {
     // this component's sticky ready marker with nothing left to re-trigger it, so
     // every later `await comp.ready()` would hang.
     if (id) {
-      const $element = this.$sid(id);
-      if ($element.length === 0) {
-        throw new Error(
-          `[JQHTML] render("${id}") - no such id.\n` +
-          `Component "${this.component_name()}" has no child element with $sid="${id}".`
-        );
-      }
-
-      const child = $element.data('_component');
-      if (!child) {
-        throw new Error(
-          `[JQHTML] render("${id}") - element is not a component or does not have $redrawable attribute set.\n` +
-          `Element with $sid="${id}" exists but is not initialized as a component.\n` +
-          `Add $redrawable attribute or make it a proper component.`
-        );
-      }
-
-      return child.render();
+      return this._redraw_target(id).render();
     }
 
     // Invalidate ready event so new handlers wait for this render cycle to complete
     // This prevents .on('ready') handlers from firing immediately based on previous lifecycle
     this.invalidate('ready');
 
-    // Enqueue the full render lifecycle through the component queue
+    // Enqueue the full render lifecycle through the component's lifecycle lock.
     // Return the queue promise so `await this.render()` resolves when the
     // full render lifecycle (DOM update, children ready, on_ready) completes
-    return this._queue.enqueue('render', async () => {
+    return this._queue_call('render', 'render', async () => {
       // The queued executor can start long after render() was called - re-check.
       if (this._stopped) return;
 
@@ -824,14 +1114,9 @@ export class Jqhtml_Component {
 
       this._fire_viewport_resize();
 
-      // Back to the ready state: _render() dropped it to 3. Set BEFORE the trigger
-      // so a handler that calls ready() during dispatch takes the already-ready
-      // fast path instead of waiting for another trigger that will never come.
-      this._ready_state = 4;
-      this._update_debug_attrs();
-
-      // Trigger ready event
-      this.trigger('ready');
+      // Back to the ready state (_render() dropped it to 3) and 'ready' - unless boot's
+      // 'ready' is still owed, which the queue going idle fires (_entry_ready_point()).
+      this._entry_ready_point();
     });
   }
 
@@ -858,20 +1143,28 @@ export class Jqhtml_Component {
    *
    * @returns true if this.data changed, false if unchanged
    */
-  async load(): Promise<boolean> {
-    if (this._stopped) return false;
+  load(): Promise<boolean> {
+    if (this._stopped) return Promise.resolve(false);
 
-    // No custom on_load() means there is nothing to run and nothing can have changed.
-    // Running the detached execution anyway seeded this.data with the empty detached
-    // clone (create() takes no snapshot for these components), silently wiping whatever
-    // on_create() had set.
-    if (!this.__has_custom_on_load) return false;
+    // No custom on_load() means there is nothing to fetch and nothing can have changed:
+    // this.data is left exactly as on_create() set it (running the detached execution
+    // anyway would seed it with the empty detached clone - create() takes no snapshot
+    // for these components). What does run is the loaded step every component gets:
+    // on_loaded() and 'loaded', queued like any other load(). Always false.
+    if (!this.__has_custom_on_load) {
+      return this._queue_call('load', 'load', async () => {
+        if (this._stopped) return false;
+        const loaded = this._loaded_without_on_load();
+        if (loaded) await loaded;
+        return false;
+      }, true);
+    }
 
     // The queue settles this caller with the value of the executor that actually
     // ran - including one that collapsed two rapid load() calls into one run - so
     // the result is returned from the executor, not read back out of a closure
     // variable that a discarded executor would have left at its initial value.
-    return this._queue.enqueue('load', async () => {
+    return this._queue_call('load', 'load', async () => {
       // The queued executor can start long after load() was called - re-check.
       if (this._stopped) return false;
 
@@ -879,48 +1172,49 @@ export class Jqhtml_Component {
       this._debug_no_data = false;
 
       // Snapshot current data for change detection
-      const data_before = JSON.stringify(this.data);
+      const data_before = this._data_text();
 
-      // Execute on_load() on detached proxy (restores data to on_create snapshot)
-      const { data: result_data } = await this._execute_on_load_detached(null);
+      // Execute on_load() on detached proxy (restores data to on_create snapshot). A
+      // failure goes through on_load_error(): recovered, its fallback is applied below
+      // like loaded data (never cached); not recovered, load() rejects.
+      const load_seq = ++this._load_seq;
+      const attempt = await this._execute_on_load_or_recover(null);
 
       // Stopped during on_load(): don't write data or cache for a dead component.
-      if (this._stopped) return false;
+      if (!attempt || this._stopped) return false;
+      const result_data = attempt.data;
+
+      // A newer load started meanwhile: its result is the one that counts.
+      if (this._load_superseded(load_seq)) return false;
 
       // Atomically update this.data: unfreeze → normalize → assign → refreeze.
-      // The round trip runs in EVERY cache mode - see _apply_load_result().
-      this.__data_frozen = false;
-      this.data = Jqhtml_Local_Storage.normalize_for_cache(result_data, this.component_name());
-      this.__data_frozen = true;
+      // The round trip runs in EVERY cache mode - see _assign_load_result().
+      const data_after = this._assign_load_result(result_data);
 
       const cache_mode = Jqhtml_Local_Storage.get_cache_mode();
 
       // Detect if data changed
-      const data_after = JSON.stringify(this.data);
       const data_changed = data_before !== data_after;
 
-      // Update cache with fresh data if changed
-      if (data_changed) {
-        // ONE derivation, shared with the cache read in create() and with _load().
-        // The copy that used to live here omitted content serialization, so an
-        // object-arg component computed a null key and silently never wrote the
-        // cache that create() would later read with the content-serialized key.
-        // Recomputed rather than reused: args may have changed since boot.
-        const { cache_key, uncacheable_property, uncacheable_reason } = generate_cache_key(this);
+      // ONE derivation, shared with the cache read in create() and with _load().
+      // The copy that used to live here omitted content serialization, so an
+      // object-arg component computed a null key and silently never wrote the
+      // cache that create() would later read with the content-serialized key.
+      // Recomputed rather than reused: args may have changed since boot.
+      const key_result = generate_cache_key(this);
+      const cache_key = key_result.cache_key;
 
-        if (cache_key === null) {
-          // Leave the same record _load() leaves: the offending arg on the element,
-          // and one dev warning. A silent catch here made a throwing cache_id()
-          // undiagnosable - the component simply stopped being cached.
-          if (uncacheable_property) {
-            this.$.attr(
-              'data-nocache',
-              uncacheable_reason ? `${uncacheable_property}:${uncacheable_reason}` : uncacheable_property
-            );
-          }
-          warn_uncacheable_component(this, uncacheable_property, uncacheable_reason);
-        } else if (cache_mode !== 'html') {
-          Jqhtml_Local_Storage.set(cache_key, this.data);
+      // The same record boot and reload() leave: the offending arg on the element and
+      // one dev warning, or no data-nocache once the args are keyable again. A silent
+      // catch here made a throwing cache_id() undiagnosable.
+      mark_cacheability(this, key_result);
+
+      // Update cache with fresh data if changed - never once a load has failed.
+      if (data_changed) {
+        this._data_cache_key = null;
+        if (!this._load_failed && cache_key !== null && cache_mode !== 'html') {
+          Jqhtml_Local_Storage.set_serialized(cache_key, data_after);
+          this._data_cache_key = cache_key;
         }
       }
 
@@ -936,7 +1230,7 @@ export class Jqhtml_Component {
       }
 
       return data_changed;
-    });
+    }, true);
   }
 
   /**
@@ -949,7 +1243,7 @@ export class Jqhtml_Component {
     this._log_lifecycle('create', 'start');
 
     // Call on_create() synchronously - it MUST be synchronous
-    const result = this._call_lifecycle_sync('on_create');
+    const result = this._call_locked_sync_hook('on_create');
     if (result && typeof (result as any).then === 'function') {
       console.warn(
         `[JQHTML] Component "${this.component_name()}" returned a Promise from on_create(). ` +
@@ -962,6 +1256,22 @@ export class Jqhtml_Component {
     // _force_initial_render overrides this optimization
     this._is_detached = !this.$[0].isConnected && !this._force_initial_render;
 
+    // Make this.data jqhtml's own copy of what on_create() left, for EVERY component -
+    // the same serializer round trip every on_load() result goes through. on_create()
+    // may have put objects into this.data that it also keeps elsewhere
+    // (`this.state.list = this.data.list = []`); without the copy, mutating them later
+    // through that other reference would change frozen data behind the freeze. The text
+    // is the cache serializer's snapshot (keys holding undefined keep their key), and it
+    // is also what on_load() restarts from. Untouched data ({} with no keys) is skipped:
+    // its copy would be itself. The copy is installed after the cache read below, and
+    // only if that read did not already replace this.data with a cached copy.
+    const created_raw = (this.data as any)[RAW_DATA];
+    const created_touched = Object.getPrototypeOf(created_raw) !== Object.prototype || Object.keys(created_raw).length > 0;
+    if (created_touched) warn_non_simple_create_data(created_raw, this.component_name());
+    const created_text = created_touched
+      ? (Jqhtml_Local_Storage.snapshot(created_raw) ?? '{}')
+      : '{}';
+
     // OPTIMIZATION: Skip cache operations and snapshot if no custom on_load()
     // Components without on_load() don't fetch data, so nothing to cache or restore
     if (this.__has_custom_on_load) {
@@ -970,7 +1280,10 @@ export class Jqhtml_Component {
       // is the on_create() state. read_cache_in_create() REPLACES this.data on a warm
       // 'data' cache, so snapshotting after it made a warm boot restart on_load() from
       // cached data - `this.data.items.push(x)` doubled its rows on every reload.
-      this.__initial_data_snapshot = JSON.parse(JSON.stringify(this.data));
+      // The cache serializer (snapshot() also keeps keys holding undefined), so a Date,
+      // Map, Set or registered class set here is what on_load() finds - a JSON copy
+      // handed on_load() a string, {} and a missing key instead.
+      this.__initial_data_text = created_text;
 
       // CACHE CHECK - Read from cache based on cache mode ('data' or 'html')
       // Skip cache for detached elements — no point hydrating from cache when not in DOM
@@ -980,7 +1293,13 @@ export class Jqhtml_Component {
       }
     }
 
-    // Freeze this.data after on_create() - only on_load() can modify it now
+    if (created_touched && (this.data as any)[RAW_DATA] === created_raw) {
+      this.data = Jqhtml_Local_Storage.restore_snapshot(created_text) ?? {};
+    }
+
+    // Freeze this.data after on_create() - only on_load() can modify it now.
+    // on_create() may have mutated nested values no trap sees: start a new generation.
+    this.__data_text = null;
     this.__data_frozen = true;
 
     this._ready_state = 1;
@@ -1128,9 +1447,14 @@ export class Jqhtml_Component {
     //              follower never runs on_load() and adopts the leader's data with NO
     //              revalidation, so a wrong key here is permanently wrong data. Redundant
     //              concurrent requests are the cheaper failure.
-    const { cache_key, uncacheable_property, uncacheable_reason } = generate_cache_key(this);
+    const key_result = generate_cache_key(this);
+    const { cache_key, uncacheable_property, uncacheable_reason } = key_result;
 
     const dedup_key = Load_Coordinator.generate_invocation_key(this.component_name(), this.args).key;
+
+    // Caching disabled - mark the element with the offending arg AND why; keyable args
+    // clear any stale mark. No warning here: create() already gave it for these args.
+    mark_cacheability(this, key_result, false);
 
     // SSR preload check: if preloaded data exists for this component+args, use it
     if (cache_key !== null && has_preload_data()) {
@@ -1145,7 +1469,7 @@ export class Jqhtml_Component {
           );
         }
 
-        const data_before_load = JSON.stringify(this.data);
+        const data_before_load = this._data_text();
         await this._apply_load_result(preloaded_data, data_before_load);
         return;
       }
@@ -1154,13 +1478,7 @@ export class Jqhtml_Component {
     // Store cache key for later use
     this._cache_key = cache_key;
 
-    // Caching disabled - mark the element with the offending arg AND why
     if (cache_key === null && uncacheable_property) {
-      this.$.attr(
-        'data-nocache',
-        uncacheable_reason ? `${uncacheable_property}:${uncacheable_reason}` : uncacheable_property
-      );
-
       if ((window as any).jqhtml?.debug?.verbose) {
         console.log(
           `[Cache] Component ${this._cid} (${this.component_name()}) has non-keyable args - caching disabled`,
@@ -1170,7 +1488,11 @@ export class Jqhtml_Component {
     }
 
     // Store "before" snapshot for comparison after on_load()
-    const data_before_load = JSON.stringify(this.data);
+    const data_before_load = this._data_text();
+
+    // This load's sequence number - a result whose number is no longer the newest is
+    // dropped (_load_superseded()).
+    const load_seq = ++this._load_seq;
 
     // No dedup identity - run on_load() alone rather than risk sharing a load
     if (dedup_key === null) {
@@ -1179,8 +1501,10 @@ export class Jqhtml_Component {
           `[Load Deduplication] Component ${this._cid} (${this.component_name()}) has no dedup key - loading independently`
         );
       }
-      const { data: result_data } = await this._execute_on_load_detached(null);
-      await this._apply_load_result(result_data, data_before_load);
+      const attempt = await this._execute_on_load_or_recover(null);
+      // Removed while on_load() ran: nothing to apply to, and on_loaded() must not run
+      if (!attempt || this._stopped || this._load_superseded(load_seq)) return;
+      await this._apply_load_result(attempt.data, data_before_load);
       return;
     }
 
@@ -1200,43 +1524,55 @@ export class Jqhtml_Component {
       // Recomputing it here would miss the entry whenever args changed meanwhile.
       const coordination_promise = Load_Coordinator.get_coordination_promise(dedup_key);
       if (coordination_promise) {
+        // Wait for leader to complete (rejects if the leader's load failed)
+        let leader_failed = false;
+        let leader_error: any;
         try {
-          // Wait for leader to complete (rejects if the leader's on_load() threw)
           await coordination_promise;
-
-          // Retrieve leader's data from coordinator
-          const leader_data = Load_Coordinator.get_leader_data(this, dedup_key);
-
-          if (leader_data !== null) {
-            // Apply leader's data using the same method as leader
-            // This properly handles freeze/unfreeze and normalization
-            await this._apply_load_result(leader_data, data_before_load);
-
-            if ((window as any).jqhtml?.debug?.verbose) {
-              console.log(
-                `[Load Deduplication] Component ${this._cid} applied data from leader`,
-                { data: this.data }
-              );
-            }
-
-            // _apply_load_result already sets ready_state and triggers 'load'
-            return;
-          }
         } catch (error) {
-          // Leader failed - error will propagate naturally
-          console.error(
-            `[Load Deduplication] Component ${this._cid} failed due to leader error:`,
-            error
-          );
-          throw error;
+          leader_failed = true;
+          leader_error = error;
+        }
+
+        // The shared request failed: this component's load failed with it. It runs
+        // its OWN on_load_error() with the leader's error - never the leader's fallback.
+        if (leader_failed) {
+          const fallback = await this._run_load_error_hook(leader_error);
+          if (fallback === null || this._stopped) return;
+          await this._apply_load_result(fallback, data_before_load);
+          return;
+        }
+
+        // Retrieve leader's data from coordinator. Collected even when this follower
+        // was stopped meanwhile: the call is what removes it from the entry's waiting
+        // list, and the entry is freed when the last follower collects.
+        const leader_data = Load_Coordinator.get_leader_data(this, dedup_key);
+
+        if (this._stopped || this._load_superseded(load_seq)) return;
+
+        if (leader_data !== null) {
+          // Apply leader's data using the same method as leader
+          // This properly handles freeze/unfreeze and normalization
+          await this._apply_load_result(leader_data, data_before_load);
+
+          if ((window as any).jqhtml?.debug?.verbose) {
+            console.log(
+              `[Load Deduplication] Component ${this._cid} applied data from leader`,
+              { data: this.data }
+            );
+          }
+
+          // _apply_load_result already sets ready_state and triggers 'load'
+          return;
         }
       }
 
       // No leader data to adopt (the entry was already collected, or its data could
       // not be serialized). Load independently rather than firing load/loaded with the
       // untouched on_create() data.
-      const { data: result_data } = await this._execute_on_load_detached(null);
-      await this._apply_load_result(result_data, data_before_load);
+      const attempt = await this._execute_on_load_or_recover(null);
+      if (!attempt || this._stopped || this._load_superseded(load_seq)) return;
+      await this._apply_load_result(attempt.data, data_before_load);
       return;
     }
 
@@ -1248,16 +1584,54 @@ export class Jqhtml_Component {
       );
     }
 
-    // Execute on_load on detached proxy with Load_Coordinator registration
-    const { data: result_data, complete_coordination } = await this._execute_on_load_detached(dedup_key);
+    // Execute on_load on detached proxy with Load_Coordinator registration. If on_load()
+    // throws, the entry is already rejected (every follower runs its own on_load_error())
+    // and what comes back is this component's own fallback, with no coordination.
+    const attempt = await this._execute_on_load_or_recover(dedup_key);
+    if (!attempt) return;
+    const { data: result_data, complete_coordination } = attempt;
 
-    // Apply result via sequential queue
-    await this._apply_load_result(result_data, data_before_load);
+    // Removed while on_load() ran, or superseded by a newer load. Nothing is applied to
+    // this component (no this.data assignment, no cache write, no on_loaded()), but the
+    // followers still get the data it fetched: they are live components with the same
+    // args, and failing or re-fetching for them would only repeat a request that
+    // already succeeded.
+    if (this._stopped || this._load_superseded(load_seq)) {
+      if (complete_coordination) {
+        let stopped_text: string;
+        try {
+          this._check_load_result(result_data);
+          stopped_text = Jqhtml_Local_Storage.normalize(result_data, this.component_name()).text;
+        } catch (error) {
+          Load_Coordinator.handle_leader_error(dedup_key, error as Error);
+          return;
+        }
+        complete_coordination(stopped_text);
+      }
+      return;
+    }
 
-    // Complete coordination AFTER this.data is updated
-    // This ensures followers receive the correct final data
+    // Apply result via sequential queue. A failure here (on_load() left this.data
+    // non-object, or on_loaded() threw) is a failed leader load exactly like on_load()
+    // throwing: release the entry through the same path, or every follower and every
+    // later same-args component waits on it forever.
+    let final_text: string;
+    try {
+      final_text = await this._apply_load_result(result_data, data_before_load);
+    } catch (error) {
+      // Only while this leader still owns the entry. After a recovered on_load()
+      // failure the entry is gone, and the key may already belong to a new leader.
+      if (complete_coordination) {
+        Load_Coordinator.handle_leader_error(dedup_key, error as Error);
+      }
+      throw error;
+    }
+
+    // Complete coordination AFTER this.data is updated. Followers receive the
+    // serialized text of the data this load produced - the text this.data was
+    // normalized through, so nothing is serialized again here.
     if (complete_coordination) {
-      complete_coordination(this.data);
+      complete_coordination(final_text);
     }
   }
 
@@ -1268,9 +1642,80 @@ export class Jqhtml_Component {
    */
   private async _execute_on_load_detached(dedup_key: string | null = null): Promise<{
     data: Record<string, any>;
-    complete_coordination: ((data: Record<string, any>) => void) | null;
+    complete_coordination: ((final_text: string | null) => void) | null;
   }> {
     return execute_on_load_detached(this, dedup_key);
+  }
+
+  /**
+   * Run on_load() for a load, routing a failure through on_load_error().
+   *
+   * @returns What _execute_on_load_detached() returns on success. After a failure an
+   *          on_load_error() override recovered from: the fallback data, with no
+   *          coordination (fallback data is never handed to deduplication followers).
+   *          null when the component was stopped and the load is abandoned.
+   *          Throws when the failure is not recovered (see _run_load_error_hook()).
+   * @private
+   */
+  private async _execute_on_load_or_recover(dedup_key: string | null = null): Promise<{
+    data: Record<string, any>;
+    complete_coordination: ((final_text: string | null) => void) | null;
+  } | null> {
+    try {
+      return await this._execute_on_load_detached(dedup_key);
+    } catch (error) {
+      const fallback = await this._run_load_error_hook(error);
+      return fallback === null ? null : { data: fallback, complete_coordination: null };
+    }
+  }
+
+  /**
+   * A load failed: this component's on_load() threw, or the deduplicated load it shared
+   * did. Every caller (boot, reload(), refresh(), load()) comes through here.
+   *
+   * - Latches _load_failed: from now on this instance neither reads nor writes the
+   *   cache, in any cache mode, even after a later successful load.
+   * - on_load_error() not overridden: the base prints the error and it is rethrown. The
+   *   boot path stops the component; reload()/refresh()/load() reject. Unchanged.
+   * - Overridden: the override runs in on_load()'s detached context (read this.args,
+   *   write this.data from the on_create() snapshot) and the data it leaves is
+   *   returned as the fallback; the lifecycle continues with it. If the override
+   *   throws, that is rethrown - the no-override path, without the base's print.
+   *
+   * @returns The fallback data, or null if the component is (or became) stopped
+   * @private
+   */
+  private async _run_load_error_hook(error: any): Promise<Record<string, any> | null> {
+    this._load_failed = true;
+
+    if (!this.__has_custom_on_load_error) {
+      Jqhtml_Component.prototype.on_load_error.call(this, error);
+      throw error;
+    }
+
+    // A stopped component runs no more hooks; there is nothing left to recover.
+    if (this._stopped) return null;
+
+    const fallback = await execute_on_load_error_detached(this, error);
+    return this._stopped ? null : fallback;
+  }
+
+  /**
+   * Throw unless on_load() left this.data as an object (arrays included).
+   * @private
+   */
+  private _check_load_result(result_data: any): void {
+    if (result_data === null || typeof result_data !== 'object') {
+      const value_type = typeof result_data;
+      const shown = value_type === 'string' ? JSON.stringify(result_data)
+        : value_type === 'function' ? 'a function'
+        : String(result_data);
+      throw new Error(
+        `[JQHTML] Component "${this.component_name()}" on_load() left this.data as ${shown}. ` +
+        `this.data must be an object - assign properties to it (this.data.items = ...) ` +
+        `or assign an object (this.data = {...}).`
+      );
+    }
   }
 
   /**
@@ -1280,10 +1725,11 @@ export class Jqhtml_Component {
    * ensures that setting this.data happens in FIFO order.
    *
    * @param result_data - The data returned from _execute_on_load_detached
-   * @param data_before_load - JSON string of this.data before on_load (for change detection), or null
+   * @param data_before_load - _data_text() of this.data before on_load (for change detection), or null
+   * @returns The serialized text of the data applied (see _assign_load_result())
    * @private
    */
-  private async _apply_load_result(result_data: Record<string, any>, data_before_load: string | null): Promise<void> {
+  private async _apply_load_result(result_data: Record<string, any>, data_before_load: string | null): Promise<string> {
     // Queue this operation - wait for any earlier _load calls to finish setting data
     const my_turn = this._load_queue;
 
@@ -1296,21 +1742,14 @@ export class Jqhtml_Component {
     await my_turn;
 
     try {
-      // Now it's our turn to set this.data
+      // this.data must be an object. Rejected here, before anything is unfrozen or
+      // assigned: a null or primitive result would otherwise fail inside the data
+      // setter and leave this.data unfrozen.
+      this._check_load_result(result_data);
 
-      // Every on_load() result is round-tripped through the cache serializer before it
-      // becomes this.data - in EVERY cache mode, not just 'data'. Two consequences the
-      // rest of the framework depends on:
-      //   - this.data is jqhtml's own copy. The author's object graph is never aliased,
-      //     so mutating what on_load() returned cannot reach a frozen this.data.
-      //   - this.data is BY CONSTRUCTION what the cache stores and what a cache hit
-      //     returns. Hot and cold are the same object shape in every mode, so turning
-      //     caching on can never change what a component sees.
-      // Dates, Maps, Sets and register_cache_class() classes are reconstructed; anything
-      // the serializer cannot express is dropped and warned about once (local-storage.ts).
-      this.__data_frozen = false;
-      this.data = Jqhtml_Local_Storage.normalize_for_cache(result_data, this.component_name());
-      this.__data_frozen = true;
+      // Now it's our turn to set this.data - round-tripped through the cache
+      // serializer in every cache mode (see _assign_load_result()).
+      const data_after_load = this._assign_load_result(result_data);
 
       if ((window as any).jqhtml?.debug?.verbose) {
         console.log(
@@ -1320,7 +1759,7 @@ export class Jqhtml_Component {
       }
 
       // SSR data capture: record this component's data for preloading
-      if (is_capture_enabled() && this._has_on_load()) {
+      if (is_capture_enabled() && this._has_on_load() && !this._load_failed) {
         capture_component_data(
           this.component_name(),
           this.args,
@@ -1330,15 +1769,11 @@ export class Jqhtml_Component {
       }
 
       // Calculate if data changed
-      const data_after_load = JSON.stringify(this.data);
       const data_changed = data_before_load !== null && data_after_load !== data_before_load;
 
-      // Track if component is "dynamic" (this.data changed during on_load)
-      // Used by HTML cache mode for synchronization - static parents don't block children
-      this._is_dynamic = data_changed && data_after_load !== '{}';
-
-      // CACHE WRITE - @see component-cache.ts
-      write_cache_on_loaded(this, this._is_dynamic);
+      // CACHE WRITE - also sets _is_dynamic (this load is worth caching), which the
+      // html snapshot reads. @see component-cache.ts
+      write_cache_on_loaded(this, data_changed, data_after_load);
 
       this._ready_state = 2;
       this._update_debug_attrs();
@@ -1355,6 +1790,8 @@ export class Jqhtml_Component {
         await this._call_lifecycle('on_loaded');
         this.trigger('loaded');
       }
+
+      return data_after_load;
     } finally {
       // Signal next in queue
       resolve_my_turn!();
@@ -1373,24 +1810,165 @@ export class Jqhtml_Component {
 
     // HTML CACHE MODE - Wait for children on_render, then snapshot
     // @see component-cache.ts for write_html_cache_snapshot implementation
+    // A component stopped during any await below (a parent re-render removing it,
+    // an explicit stop()) abandons the phase: no snapshot of a dead DOM, no on_ready()
+    // after on_stop(), no ready state, no 'ready' event.
     if (this._should_cache_html_after_ready && this._cache_key) {
       await this._wait_for_children_on_render();
+      if (this._stopped) return;
       write_html_cache_snapshot(this);
     }
 
     // Wait for all children to reach ready state (bottom-up execution)
     await this._wait_for_children_ready();
+    if (this._stopped) return;
 
+    // on_ready() runs inside the lifecycle lock, like every other cycle's: a
+    // render()/load()/reload()/refresh() made from it waits and starts after boot ends -
+    // unless on_ready() awaits it, which runs it at once (see _queue_call()).
     await this._call_lifecycle('on_ready');
+    if (this._stopped) return;
     this._fire_viewport_resize();
-
-    this._ready_state = 4;
-    this._update_debug_attrs();
 
     this._log_lifecycle('ready', 'complete');
 
-    // Emit lifecycle event
+    // Calls queued during boot (from on_ready() or anywhere else) replace the state boot
+    // reached, and so does a promoted call still running. 'ready' fires once they have
+    // all run, when the queue goes idle (_on_queue_idle()), so a waiter sees the
+    // post-reload state.
+    if (this._queue.has_pending || this._queue.promoted_running) {
+      this._ready_owed = true;
+      return;
+    }
+    this._fire_ready();
+  }
+
+  /**
+   * Set the ready state and fire 'ready'. The state is set BEFORE the trigger so a
+   * handler that calls ready() during dispatch takes the already-ready fast path.
+   * @private
+   */
+  private _fire_ready(): void {
+    this._ready_owed = false;
+    this._ready_state = 4;
+    this._update_debug_attrs();
     this.trigger('ready');
+  }
+
+  /**
+   * A render/reload/refresh entry reached its 'ready' point. Deferred to the queue going
+   * idle (_on_queue_idle()) while 'ready' is already owed (boot ended with calls queued)
+   * or a promoted call is still running (see _queue_call()) - a promoted entry counts
+   * itself, so it never fires 'ready' in the middle of the cycle it is nested in.
+   * @private
+   */
+  private _entry_ready_point(): void {
+    if (this._ready_owed || this._queue.promoted_running) {
+      this._ready_owed = true;
+      return;
+    }
+    this._fire_ready();
+  }
+
+  /**
+   * The lifecycle queue went idle. Fires the 'ready' boot deferred because calls were
+   * queued when it ended (see _ready()).
+   * @private
+   */
+  private _on_queue_idle(): void {
+    if (this._ready_owed && !this._stopped) {
+      this._fire_ready();
+    }
+  }
+
+  /**
+   * True (and logged in verbose mode) when a newer load has started since the load
+   * numbered `load_seq` began. The older result is dropped: applying it would put
+   * data fetched for older args over newer data. The lifecycle lock already prevents
+   * overlapping loads; this guards any path that ever does overlap.
+   * @private
+   */
+  private _load_superseded(load_seq: number): boolean {
+    if (load_seq === this._load_seq) return false;
+    if ((window as any).jqhtml?.debug?.verbose) {
+      console.log(
+        `[JQHTML] Component ${this._cid} (${this.component_name()}) dropped the result of a superseded load`,
+        { load_seq, newest: this._load_seq }
+      );
+    }
+    return true;
+  }
+
+  /**
+   * Put a render/load/reload/refresh call on this component's lifecycle queue.
+   *
+   * Where the call was made decides what its promise does when awaited:
+   *   - from this component's own on_create()/on_render(): warned at once (development).
+   *     It is queued behind the running lifecycle step, so it does not run there.
+   *   - while this component's on_ready() runs: awaiting (or chaining) the promise before
+   *     on_ready() has settled pulls the queued call forward and runs it at once, nested
+   *     (Component_Queue.promote()). Unawaited, it runs after on_ready() returns.
+   *   - while on_loaded() runs: awaiting it before on_loaded() has settled warns
+   *     (development). It cannot start until on_loaded() returns - a deadlock.
+   *   - while on_load() runs, or anywhere else: a plain promise; the call waits its turn.
+   * @param method - Public method name, for the warnings
+   * @param key - Queue key: method plus arguments. Only identical keys merge.
+   * @param async_hops - Settle the caller a few microtasks after the queue does, as an
+   *        async method would. load()/reload()/refresh() were async methods; the extra hops
+   *        put a caller's `await` after the queue has released the lock, so
+   *        `await c.reload(); c.render();` starts the render at once instead of queueing it.
+   * @private
+   */
+  private _queue_call<T>(method: string, key: string, executor: () => Promise<T>, async_hops: boolean = false): Promise<T> {
+    const development = get_config().mode === 'development';
+    if (this._locked_sync_hook !== null && development) {
+      const hook = this._locked_sync_hook;
+      const purpose = hook === 'on_render'
+        ? 'on_render() is for styling freshly rendered DOM'
+        : 'on_create() is for setting initial this.args and this.data';
+      console.warn(
+        `[JQHTML] ${this.component_name()}: ${method}() called from ${hook}() does not belong there. ` +
+        `${purpose}; ${method}() waits until the current lifecycle step finishes, so it does not run here. ` +
+        `Call it from on_ready() or an event handler.`
+      );
+    }
+
+    // Read before enqueueing: an idle component starts the call synchronously, and its
+    // own on_load() is then the running hook - not one this call was made from.
+    const run = this._async_hook;
+    const { promise, entry } = this._queue.enqueue(key, executor);
+    const result = async_hops ? (async () => promise)() : promise;
+
+    // Started at once, or not made during on_ready()/on_loaded(): nothing to add.
+    if (entry === null || run === null || run.settled) return result;
+
+    // An on_ready() still running - the innermost hook, or one a promoted call is nested
+    // in (after a promotion, the outer on_ready() keeps running alongside the nested
+    // call's hooks) - may be the one awaiting this call.
+    let ready_run: Hook_Run | null = run;
+    while (ready_run !== null && (ready_run.settled || ready_run.name !== 'on_ready')) {
+      ready_run = ready_run.previous;
+    }
+    if (ready_run !== null) {
+      const owner = ready_run;
+      return Lifecycle_Call_Promise.wrap(result, () => {
+        if (!owner.settled) this._queue.promote(entry);
+      });
+    }
+
+    if (run.name === 'on_loaded' && development) {
+      const name = this.component_name();
+      return Lifecycle_Call_Promise.wrap(result, () => {
+        if (run.settled) return;
+        console.warn(
+          `[JQHTML] ${method}() was awaited while ${name}'s on_loaded() is still running. ` +
+          `If on_loaded() awaits this call it will deadlock: call it without await. ` +
+          `Code outside the component should await comp.ready() before awaiting reload() or refresh().`
+        );
+      });
+    }
+
+    return result;
   }
 
   /**
@@ -1423,14 +2001,64 @@ export class Jqhtml_Component {
       return Promise.resolve();
     }
 
-    // Return promise that resolves when ready event fires.
-    // once(), not on(): a promise can only settle once, so a permanent listener
-    // just accumulates on the component - one per ready() call, forever.
+    // Resolves on 'ready', or on 'stop': a stopped component never fires 'ready'
+    // again, so a waiter must be released rather than left hanging (a component
+    // whose hook throws during boot is stopped, and `await jqhtml.boot()` waits here).
+    return this._settle_on('ready', callback);
+  }
+
+  /**
+   * Promise that resolves when `event_name` fires OR the component stops, whichever
+   * comes first - resolves immediately if the component is already stopped. Used by
+   * ready(), rendered() and _wait_for_children_ready(): a stopped component never
+   * fires either event again, so waiting on the event alone hangs every waiter
+   * forever.
+   *
+   * Resolves rather than rejects: the documented contract is that waiters on a
+   * failed or stopped component are RELEASED, and existing `await comp.ready()` code
+   * does not catch. Callers that need to know can check `_stopped` afterwards.
+   *
+   * The optional callback runs ONLY when the event itself fires, never on stop: it
+   * is developer code written for a ready/rendered DOM, and calling it on a stopped
+   * component would be a new call into user code the contract never made.
+   *
+   * Both listeners are one-shot and the first to fire removes the other, so repeated
+   * waits on a long-lived component do not accumulate handlers in either queue.
+   * @private
+   */
+  private _settle_on(event_name: string, callback?: () => void): Promise<void> {
     return new Promise<void>((resolve) => {
-      this.once('ready', () => {
-        if (callback) callback();
+      let settled = false;
+      const settle = (run_callback: boolean) => {
+        if (settled) return;
+        settled = true;
+        // There is no off() in the event API; splice this handler out of both
+        // queues the way once() does.
+        for (const name of [event_name, 'stop']) {
+          const callbacks = this._lifecycle_callbacks.get(name);
+          if (callbacks) {
+            for (const handler of [on_stop, on_event]) {
+              const idx = callbacks.indexOf(handler);
+              if (idx !== -1) callbacks.splice(idx, 1);
+            }
+          }
+        }
+        // Resolve before the callback: a callback that throws must not leave the
+        // promise pending (the throw is still reported by the event dispatcher).
         resolve();
-      });
+        if (run_callback && callback) callback();
+      };
+      const on_stop = () => settle(false);
+      const on_event = () => settle(true);
+
+      if (this._stopped) {
+        settle(false);
+        return;
+      }
+      // 'stop' first: registering event_name can fire on_event synchronously (sticky),
+      // and settle must be able to deregister both queues when it does.
+      this.on('stop', on_stop);
+      if (!settled) this.on(event_name, on_event);
     });
   }
 
@@ -1452,12 +2080,9 @@ export class Jqhtml_Component {
    * @param callback Optional callback to execute when rendered
    */
   rendered(callback?: () => void): Promise<void> {
-    return new Promise<void>((resolve) => {
-      this.on('rendered', () => {
-        if (callback) callback();
-        resolve();
-      });
-    });
+    // Like ready(): also released when the component stops, since a stopped
+    // component never fires 'rendered'.
+    return this._settle_on('rendered', callback);
   }
 
   /**
@@ -1496,16 +2121,11 @@ export class Jqhtml_Component {
         continue;
       }
 
-      // Create promise that resolves when child reaches ready.
-      // once(), not on(): a permanent listener would be appended to the child on
-      // every render/reload cycle of a polling parent and never removed.
-      // Raced against 'stop' so a child stopped mid-wait releases the parent.
-      const ready_promise = new Promise<void>((resolve) => {
-        child.once('ready', () => resolve());
-        child.once('stop', () => resolve());
-      });
-
-      ready_promises.push(ready_promise);
+      // Resolves on the child's 'ready', or on its 'stop' so a child stopped mid-wait
+      // releases the parent. _settle_on() registers one handler per event and removes
+      // both when either fires, so repeated waits (every render/reload cycle of a
+      // polling parent) leave nothing behind in either queue.
+      ready_promises.push(child._settle_on('ready'));
     }
 
     // Wait for all children to be ready
@@ -1540,7 +2160,9 @@ export class Jqhtml_Component {
       }
 
       // Event-driven, not polled: the child sets _on_render_complete just before it
-      // fires 'render', and 'stop' ends the wait for a child that dies first.
+      // fires 'render' (a post-load re-render) or 'rendered' (the end of its boot render
+      // chain, which is the only signal when its load left the data unchanged and it did
+      // not re-render), and 'stop' ends the wait for a child that dies first.
       //
       // A plain once('render') would be wrong: events are sticky, and this child has
       // already rendered at least once (the pre-on_load render), so once() would fire
@@ -1552,10 +2174,10 @@ export class Jqhtml_Component {
           if (settled) return;
           if (!child._on_render_complete && !child._stopped) return;  // pre-load render
           settled = true;
-          // There is no off() in the event API; splice this handler out of both queues
+          // There is no off() in the event API; splice this handler out of every queue
           // the way once() does, so a long-lived child does not accumulate handlers
           // across repeated waits.
-          for (const event_name of ['render', 'stop']) {
+          for (const event_name of ['render', 'rendered', 'stop']) {
             const callbacks = child._lifecycle_callbacks.get(event_name);
             if (callbacks) {
               const idx = callbacks.indexOf(on_child_event);
@@ -1564,10 +2186,12 @@ export class Jqhtml_Component {
           }
           resolve();
         };
-        // 'stop' first: registering 'render' can fire the handler synchronously (sticky),
-        // and the handler must be able to deregister both queues when it does.
+        // 'stop' first: registering 'render'/'rendered' can fire the handler
+        // synchronously (sticky), and the handler must be able to deregister every queue
+        // when it does - and a queue registered after a settle would leak the handler.
         child.on('stop', on_child_event);
-        child.on('render', on_child_event);
+        if (!settled) child.on('rendered', on_child_event);
+        if (!settled) child.on('render', on_child_event);
       });
 
       render_promises.push(render_promise);
@@ -1579,20 +2203,36 @@ export class Jqhtml_Component {
 
 
   /**
-   * Reload component - re-fetch data and re-render (debounced)
+   * Reload component - re-fetch data and re-render.
    *
-   * This is the public API that automatically debounces calls to _reload()
-   * Multiple rapid calls to reload() will be coalesced into a single execution
+   * Goes through the component's lifecycle queue: while the component is busy (boot,
+   * or another entry running) the call waits as an entry and runs in order. It merges
+   * only into an identical call waiting right before it (see Component_Queue).
    *
    * @param always_render - If true (default), always re-render after on_load().
-   *                        If false, only re-render if data actually changed.
+   *                        If false, only re-render if data actually changed (refresh()).
    */
-  async reload(always_render?: boolean): Promise<void> {
+  reload(always_render?: boolean): Promise<void> {
+    return this._queue_reload(always_render !== false, 'reload');
+  }
+
+  /**
+   * Refresh component - re-fetch data and re-render only if data changed.
+   *
+   * Same as reload(false). Queued like reload(); a refresh() and a reload() are
+   * separate entries and each runs with its own render rule.
+   */
+  refresh(): Promise<void> {
+    return this._queue_reload(false, 'refresh');
+  }
+
+  /** @private - shared by reload() and refresh() */
+  private _queue_reload(force_render: boolean, method: string): Promise<void> {
     // Load-gate short-circuit: if a gate is currently holding the first on_load,
     // reload()/refresh() resumes the paused boot lifecycle instead of running its
-    // normal debounced re-fetch. The boot lifecycle then proceeds to run on_load
-    // (the fresh fetch) exactly as reload() would want. Any later gate settlement
-    // becomes a no-op. Return a promise that resolves when the component is ready.
+    // normal re-fetch. The boot lifecycle then proceeds to run on_load (the fresh
+    // fetch) exactly as reload() would want. Any later gate settlement becomes a
+    // no-op. Return a promise that resolves when the component is ready.
     if (this.__gate_resume) {
       const resume = this.__gate_resume;
       this.__gate_resume = null;
@@ -1600,35 +2240,7 @@ export class Jqhtml_Component {
       return this.ready();
     }
 
-    // Default to true if undefined
-    const force_refresh = always_render !== undefined ? always_render : true;
-
-    // State machine: reload(true) takes precedence over reload(false)
-    if (force_refresh) {
-      this.next_reload_force_refresh = true;
-    } else {
-      // Only set to false if not already true
-      if (this.next_reload_force_refresh !== true) {
-        this.next_reload_force_refresh = false;
-      }
-    }
-
-    // Enqueue through component queue (replaces _create_debounced_function)
-    // Same-type pending operations collapse (multiple reload() calls share one execution)
-    return this._queue.enqueue('reload', () => this._reload());
-  }
-
-  /**
-   * Refresh component - re-fetch data and re-render only if data changed (debounced)
-   *
-   * Similar to reload() but only re-renders if the data actually changed after on_load().
-   * Useful for checking server for updates without forcing unnecessary re-renders.
-   *
-   * Uses the same debouncing as reload() and plays nice with it - if reload() is called
-   * while refresh() is queued, reload() takes precedence and will always render.
-   */
-  async refresh(): Promise<void> {
-    return this.reload(false);
+    return this._queue_call(method, force_render ? 'reload' : 'refresh', () => this._reload(force_render), true);
   }
 
   /**
@@ -1649,7 +2261,7 @@ export class Jqhtml_Component {
     this.invalidate('ready');
 
     // Serialised with reload()/refresh() so it can never interleave with a real load.
-    return this._queue.enqueue('reload', async () => {
+    return this._queue.enqueue('reload_without_data', async () => {
       if (this._stopped) return;
 
       // Drop this component's own cache entries (data and html snapshot), so a later
@@ -1659,12 +2271,13 @@ export class Jqhtml_Component {
         Jqhtml_Local_Storage.remove(cache_key);
         Jqhtml_Local_Storage.remove(`${cache_key}::html`);
       }
+      this._data_cache_key = null;
 
       // Back to the on_create() state. Components with no custom on_load() take no
       // snapshot (nothing can have changed this.data), so they simply re-render.
-      if (this.__initial_data_snapshot !== null) {
+      if (this.__initial_data_text !== null) {
         this.__data_frozen = false;
-        this.data = JSON.parse(JSON.stringify(this.__initial_data_snapshot));
+        this.data = Jqhtml_Local_Storage.restore_snapshot(this.__initial_data_text) ?? {};
         this.__data_frozen = true;
       }
 
@@ -1676,10 +2289,8 @@ export class Jqhtml_Component {
 
       if (this._stopped) return;
 
-      this._ready_state = 4;
-      this._update_debug_attrs();
-      this.trigger('ready');
-    });
+      this._entry_ready_point();
+    }).promise;
   }
 
   /**
@@ -1687,8 +2298,10 @@ export class Jqhtml_Component {
    *
    * COMPLETE RELOAD PROCESS (Source of Truth):
    *
-   * STEP 1: Cache check (if args changed since last render)
-   *   - Generate cache key from component name + current args
+   * STEP 1: Cache key refresh, cache check (if args changed since last render)
+   *   - Generate cache key from component name + current args, and ALWAYS store it
+   *     (null included) so this reload's writes go to the current args' entry
+   *   - Set or clear data-nocache (and the dev warning) as boot and load() do
    *   - If cached data exists and is non-empty:
    *     - Unfreeze this.data (temporarily)
    *     - Hydrate this.data with cached data
@@ -1701,7 +2314,8 @@ export class Jqhtml_Component {
    *   - Restore this.data to on_create() snapshot
    *   - Call on_load() directly (no _load() wrapper)
    *   - Freeze this.data after completion
-   *   - If data changed and non-empty: write to cache
+   *   - If data changed and non-empty, or is unchanged but the cache key moved
+   *     (new args): write to cache
    *
    * STEP 3: Conditionally re-render
    *   - If didn't render from cache yet, OR data changed after on_load():
@@ -1710,29 +2324,64 @@ export class Jqhtml_Component {
    * STEP 3.5: Wait for all children to be ready
    *   - Bottom-up ordering (children ready before parent)
    *   - Same as main lifecycle
+   *   - html cache mode: snapshot the post-reload markup if this load changed data
    *
    * STEP 4: Call on_ready()
    *   - Always call on_ready() after reload completes
    *
-   * @private - Use reload() instead (debounced wrapper)
+   * A failed cycle (on_load() failure not recovered by on_load_error(), or any other
+   * throw) restores the ready state it found before rejecting - see below.
+   *
+   * @param force_render - true for reload() (always render), false for refresh()
+   *                       (render only if the data changed)
+   * @private - Use reload() / refresh() instead (queued wrappers)
    */
-  async _reload(): Promise<void> {
+  async _reload(force_render: boolean = true): Promise<void> {
     if (this._stopped) return;
 
     // Any real load returns the component to normal, whatever the debug tool did.
     this._debug_no_data = false;
 
+    // Was the component ready (state AND sticky marker) when this cycle began?
+    const was_ready = this._ready_state >= 4 && this._lifecycle_states.has('ready');
+
     // Invalidate ready event so new handlers wait for this reload to complete
     // This prevents .on('ready') handlers from firing immediately based on previous lifecycle
     this.invalidate('ready');
 
+    try {
+      await this._reload_cycle(force_render);
+    } catch (error) {
+      // The cycle deleted the sticky 'ready' marker above and may have dropped
+      // _ready_state (load phase 2, render 3). Rejecting without restoring both left
+      // every later `await comp.ready()` - and a parent re-entering
+      // _wait_for_children_ready() - hanging forever. The component is still alive and
+      // showing its previous render, which was ready: restore that, then reject.
+      // on_ready() is NOT called again (nothing new was rendered).
+      if (was_ready && !this._stopped) {
+        this._ready_state = 4;
+        this._update_debug_attrs();
+        this.trigger('ready');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * The body of _reload(), after the ready marker has been invalidated.
+   * @private
+   */
+  private async _reload_cycle(force_render: boolean): Promise<void> {
     this._log_lifecycle('reload', 'start');
 
     // OPTIMIZATION: If no custom on_load(), skip data fetching entirely
     // Just re-render with current data and call on_ready
     if (!this.__has_custom_on_load) {
-      // Reset state machine
-      this.next_reload_force_refresh = null;
+      // The loaded step (on_loaded(), 'loaded') where on_load() would have completed -
+      // before the render, as for a component with on_load().
+      const loaded = this._loaded_without_on_load();
+      if (loaded) await loaded;
+      if (this._stopped) return;
 
       this._render();
       await this._wait_for_children_ready();
@@ -1746,10 +2395,8 @@ export class Jqhtml_Component {
       if (this._stopped) return;
 
       this._fire_viewport_resize();
-      // Restore the ready state (_render() dropped it to 3) before the trigger
-      this._ready_state = 4;
-      this._update_debug_attrs();
-      this.trigger('ready');
+      // Restore the ready state (_render() dropped it to 3) and fire 'ready'
+      this._entry_ready_point();
 
       this._log_lifecycle('reload', 'complete (no on_load)');
       return;
@@ -1763,28 +2410,35 @@ export class Jqhtml_Component {
     let args_changed = false;
     if (this._args_on_last_render) {
       try {
-        args_changed = JSON.stringify(this.args) !== JSON.stringify(this._args_on_last_render);
+        args_changed = JSON.stringify(this.args) !== this._args_on_last_render;
       } catch (error) {
         // Args contain circular references - cannot detect change, assume changed
         args_changed = true;
       }
     }
 
-    if (args_changed) {
-      // @see component-cache.ts for full implementation
-      rendered_from_cache = check_cache_on_reload(this);
-    }
+    // Refreshes _cache_key from the current args (null included) and, if they changed,
+    // renders from the cache. @see component-cache.ts for full implementation
+    rendered_from_cache = check_cache_on_reload(this, args_changed);
 
     // Capture data state before on_load for comparison
-    data_before_load = JSON.stringify(this.data);
+    data_before_load = this._data_text();
 
     // STEP 2: Call on_load() on detached proxy
     // This uses the same detached execution as _load() - on_load runs isolated
-    // and result is applied via sequential queue
-    const { data: result_data } = await this._execute_on_load_detached(null);  // null = no coordination
+    // and result is applied via sequential queue. A failure goes through
+    // on_load_error(): recovered, the fallback is applied and rendered like loaded
+    // data (never cached); not recovered, it throws out to _reload().
+    const load_seq = ++this._load_seq;
+    const attempt = await this._execute_on_load_or_recover(null);  // null = no coordination
 
     // Stopped during on_load(): don't write data or re-render a dead component.
-    if (this._stopped) return;
+    if (!attempt || this._stopped) return;
+    const result_data = attempt.data;
+
+    // A newer load started meanwhile: its result is the one that counts, and the cycle
+    // that started it finishes the render and 'ready'.
+    if (this._load_superseded(load_seq)) return;
 
     // Apply result via sequential queue
     // This handles normalization, caching, and setting _is_dynamic
@@ -1794,13 +2448,10 @@ export class Jqhtml_Component {
     if (this._stopped) return;
 
     // Re-read data state after apply (for render decision below)
-    const data_after_load = JSON.stringify(this.data);
+    const data_after_load = this._data_text();
     const data_changed = data_after_load !== data_before_load;
 
     // STEP 3: Conditionally re-render (with refresh() support)
-
-    // Read force_refresh from state machine (default true)
-    const force_refresh = this.next_reload_force_refresh !== null ? this.next_reload_force_refresh : true;
 
     // Track if we need to render
     let should_render = false;
@@ -1815,7 +2466,7 @@ export class Jqhtml_Component {
       this._used_cached_html = false;
     }
 
-    if (force_refresh) {
+    if (force_render) {
       // reload(true) or reload() - always render if we haven't yet, OR data changed
       should_render = !rendered_from_cache || data_changed;
     } else {
@@ -1844,20 +2495,19 @@ export class Jqhtml_Component {
       this._render();
     }
 
-    // Reset state machine based on what we just executed
-    if (force_refresh === false && this.next_reload_force_refresh === false) {
-      this.next_reload_force_refresh = null;
-    } else if (force_refresh === true && this.next_reload_force_refresh === true) {
-      this.next_reload_force_refresh = null;
-    }
-    // If they don't match, another call was queued - leave it
-
     // STEP 3.5 & 4: Wait for children and call on_ready (only if we rendered)
     if (rendered_from_cache || should_render) {
       await this._wait_for_children_ready();
 
       // Stopped while waiting for children: no hook, no event on a dead component.
       if (this._stopped) return;
+
+      // HTML CACHE MODE: snapshot the post-reload markup, at the point boot's _ready()
+      // does (children rendered, before on_ready()). Without this the html entry kept
+      // the boot-time markup for as long as the instance lived.
+      if (this._should_cache_html_after_ready && this._cache_key) {
+        write_html_cache_snapshot(this);
+      }
 
       await this._call_lifecycle('on_ready');
 
@@ -1866,11 +2516,8 @@ export class Jqhtml_Component {
 
       this._fire_viewport_resize();
       // Restore the ready state (the load phase dropped it to 2, _render() to 3)
-      // before the trigger, so handlers see a ready component.
-      this._ready_state = 4;
-      this._update_debug_attrs();
-      // Trigger ready event so parent callbacks fire on subsequent reloads
-      this.trigger('ready');
+      // and fire 'ready' so parent callbacks fire on subsequent reloads
+      this._entry_ready_point();
     } else {
       // refresh()/reload(false) found unchanged data: no re-render, and on_ready()
       // is deliberately NOT called (documented behaviour). But the component IS
@@ -1879,9 +2526,12 @@ export class Jqhtml_Component {
       // restoring both, ready() never resolves again and a parent re-entering
       // _wait_for_children_ready() hangs on this child forever (the documented
       // polling pattern breaks after its first quiet refresh).
-      this._ready_state = 4;
-      this._update_debug_attrs();
-      this.trigger('ready');
+      // The markup on screen is the last render of exactly this data, so a pending
+      // html snapshot (data changed since the load before) is still taken.
+      if (this._should_cache_html_after_ready && this._cache_key) {
+        write_html_cache_snapshot(this);
+      }
+      this._entry_ready_point();
     }
 
     this._log_lifecycle('reload', 'complete');
@@ -1982,6 +2632,23 @@ export class Jqhtml_Component {
   on_create(): void {}
   on_load(): void | Promise<void> {}  // Override to fetch data asynchronously
   on_loaded(): void | Promise<void> {}  // Override to process loaded data (e.g., clone this.data to this.state)
+
+  /**
+   * Called when on_load() throws (or the deduplicated load this component shared
+   * fails), with the error. Same access as on_load(): read this.args, write this.data.
+   *
+   * This base implementation prints the error. Not overriding it, the failure then
+   * takes its usual course: a failed boot stops the component, a failed
+   * reload()/refresh()/load() rejects. Overriding it, the component continues - it
+   * renders the this.data the override leaves, then fires 'ready'. An override may call
+   * super.on_load_error(error) to keep the print; one that throws stops the component.
+   */
+  on_load_error(error: any): void | Promise<void> {
+    // Called through super from an override, `this` is the restricted on_load() context.
+    const owner = (this as any)[LOAD_HOOK_OWNER] || this;
+    owner._load_error_printed = { error };
+    console.error(`[JQHTML] on_load() failed in ${owner.component_name()} (_cid: ${owner._cid}):`, error);
+  }
   async on_ready(): Promise<void> {}
   on_stop(): void {}
   on_attach(): void {}   // Sync. Root entered the document (first checked after 'ready')
@@ -2130,7 +2797,7 @@ export class Jqhtml_Component {
     }
 
     // Compare current data state with data state before initial render
-    const currentDataState = JSON.stringify(this.data);
+    const currentDataState = this._data_text();
     const dataChanged = this._data_before_render !== currentDataState;
 
     // Update stored state for next comparison
@@ -2163,7 +2830,7 @@ export class Jqhtml_Component {
    * Register event callback - delegates to component-events.ts
    * @see component-events.ts for full documentation
    */
-  on(event_name: string, callback: (component: Jqhtml_Component, data?: any) => void): this {
+  on(event_name: string, callback: (this: Jqhtml_Component, component: Jqhtml_Component, data?: any) => void): this {
     if (event_name === 'attach' || event_name === 'detach') this._watch_attachment();
     return event_on(this, event_name, callback);
   }
@@ -2173,7 +2840,7 @@ export class Jqhtml_Component {
    * If the event already occurred, fires immediately and does not register.
    * @see component-events.ts for full documentation
    */
-  once(event_name: string, callback: (component: Jqhtml_Component, data?: any) => void): this {
+  once(event_name: string, callback: (this: Jqhtml_Component, component: Jqhtml_Component, data?: any) => void): this {
     if (event_name === 'attach' || event_name === 'detach') this._watch_attachment();
     return event_once(this, event_name, callback);
   }
@@ -2428,7 +3095,7 @@ export class Jqhtml_Component {
   }
 
   private _apply_css_classes(): void {
-    const hierarchy = (this.constructor as typeof Jqhtml_Component).get_class_hierarchy();
+    const hierarchy = class_hierarchy_of(this.constructor as typeof Jqhtml_Component);
 
     // If component name differs from class name, add component name to hierarchy
     // This happens when:
@@ -2457,48 +3124,30 @@ export class Jqhtml_Component {
     }
   }
 
-  private _apply_default_attributes(): void {
-    // Get template using same logic as render() method
-    let template;
-
-    // If we have a component name, try looking up by name first (for unregistered components)
-    if (this.args._component_name) {
-      template = get_template(this.args._component_name);
-    } else {
-      // Otherwise look up by class
-      template = get_template_by_class(this.constructor as any);
-    }
-
-    if (!template) return;
-
-    // Walk the inheritance chain to collect defaultAttributes from parent templates,
-    // applying parent first so the child's own attributes take precedence.
-    //
-    // This uses resolve_parent_template(), the same helper the slot-only render path
+  private _apply_default_attributes(templateChain: any[]): void {
+    // templateChain is resolve_template_chain() for this component, farthest ancestor
+    // first: the SAME chain the constructor merged the $ arg defaults (defineArgs)
+    // from. It follows resolve_parent_template(), the helper the slot-only render path
     // uses, so a <Define>'s class/attrs resolve through EXACTLY the chain its markup
-    // does. It previously followed only `extends=`, so a slot-only JS subclass
-    // (class Users_Grid extends Grid_Abstract) inherited the parent's template but
-    // none of the parent <Define>'s class="" or attributes.
-    const templateChain: any[] = [];
-    let currentTemplate = template;
-    let currentClass: any = this.constructor;
-    const seen = new Set<any>();
+    // does - extends= and the JS prototype chain, slot-only JS subclasses included.
+    if (templateChain.length === 0) return;
 
-    while (currentTemplate && !seen.has(currentTemplate)) {
-      seen.add(currentTemplate);
-      templateChain.unshift(currentTemplate); // Add to front so parent comes first
+    const debug_enabled = (window as any).jqhtml?.debug?.enabled;
 
-      const parent = resolve_parent_template(currentTemplate, currentClass);
-      if (!parent) break;
+    // Merge the chain into ONE set of defaults, farthest ancestor first, each nearer
+    // template overriding: child <Define> > parent <Define> > grandparent, and so on.
+    // The merged set is then applied once, behind the invocation attributes, so the
+    // full precedence is invocation > child Define > parent Define.
+    //
+    // (Applying each template in turn with "only if not already set" made the PARENT's
+    // value win whenever two <Define>s set the same key.)
+    //
+    // Keyed by slot: 'class', 'style', '$<arg>' for $foo / data-foo (both spellings are
+    // the same arg, so a child data-foo overrides a parent $foo and vice versa), and the
+    // attribute name for everything else. A Map keeps the slot where the farthest
+    // template first set it, so attribute order on the element is unchanged.
+    const merged = new Map<string, { key: string; value: any }>();
 
-      currentTemplate = parent.template;
-      // Advance the prototype walk too: the next parent must be resolved relative to
-      // the class we just landed on, not the original one. A template-only parent has
-      // no class, which is correct - its own chain can only be an explicit extends=.
-      currentClass = get_component_class(parent.name) || null;
-    }
-
-    // Apply defaultAttributes from each template in the chain (parent first, child last)
     for (const tmpl of templateChain) {
       if (!tmpl.defaultAttributes) continue;
 
@@ -2506,78 +3155,104 @@ export class Jqhtml_Component {
       const defineAttrs = { ...tmpl.defaultAttributes };
       delete defineAttrs.tag;
 
-      // Debug logging
-      if ((window as any).jqhtml?.debug?.enabled) {
+      if (debug_enabled) {
         const componentName = tmpl.name || this.args._component_name || this.constructor.name;
-        console.log(`[Component] Applying defaultAttributes for ${componentName}:`, defineAttrs);
+        console.log(`[Component] Collecting defaultAttributes from ${componentName}:`, defineAttrs);
       }
 
-      // Apply each default attribute
+      // Within ONE <Define>, the first spelling of an arg wins ($foo then data-foo), as
+      // it always has; only a nearer template overrides.
+      const claimed = new Set<string>();
+
       for (const [key, value] of Object.entries(defineAttrs)) {
+        let slot: string;
+        let slot_value: any = value;
+
         if (key === 'class') {
-          // Special handling for class - merge with existing
-          const existingClasses = this.$.attr('class');
-          if (existingClasses) {
-            const existing = existingClasses.split(/\s+/).filter(c => c);
-            const newClasses = String(value).split(/\s+/).filter(c => c);
-            for (const newClass of newClasses) {
-              if (!existing.includes(newClass)) {
-                existing.push(newClass);
-              }
+          // Class MERGES: farther templates' classes first, nearer ones appended,
+          // de-duplicated - exactly the order the per-template application produced.
+          slot = 'class';
+          const prev = merged.get(slot);
+          if (prev && prev.value) {
+            const classes = String(prev.value).split(/\s+/).filter(c => c);
+            for (const newClass of String(value).split(/\s+/).filter(c => c)) {
+              if (!classes.includes(newClass)) classes.push(newClass);
             }
-            this.$.attr('class', existing.join(' '));
-          } else {
-            this.$.attr('class', value);
+            slot_value = classes.join(' ');
           }
         } else if (key === 'style') {
-          // Special handling for style - merge with existing
-          // Define attributes are applied AFTER invocation attributes
-          // So we only add Define style properties that don't already exist
-          // This ensures invocation wins conflicts (invocation overrides Define)
-          const existingStyle = this.$.attr('style');
-          if (existingStyle) {
-            // Parse existing styles (from invocation)
-            const existingRules = new Map<string, string>();
-            existingStyle.split(';').forEach(rule => {
-              const [prop, val] = rule.split(':').map(s => s.trim());
-              if (prop && val) existingRules.set(prop, val);
-            });
-
-            // Parse Define styles and only add if not already present
-            String(value).split(';').forEach(rule => {
-              const [prop, val] = rule.split(':').map(s => s.trim());
-              if (prop && val && !existingRules.has(prop)) {
-                // Only add if property doesn't exist (invocation wins)
-                existingRules.set(prop, val);
-              }
-            });
-
-            // Build merged style string
-            const merged = Array.from(existingRules.entries())
-              .map(([prop, val]) => `${prop}: ${val}`)
-              .join('; ');
-            this.$.attr('style', merged);
-          } else {
-            this.$.attr('style', value);
+          // Style merges per property; the nearer template's value wins.
+          slot = 'style';
+          const prev = merged.get(slot);
+          if (prev && prev.value) {
+            slot_value = merge_style(String(prev.value), String(value), true);
           }
         } else if (key.startsWith('$') || key.startsWith('data-')) {
-          // Data attributes - also update args
-          const dataKey = key.startsWith('$') ? key.substring(1) :
-                         key.startsWith('data-') ? key.substring(5) : key;
-
-          // Only apply if not already set in args
-          if (!(dataKey in this.args)) {
-            this.args[dataKey] = value;
-            this.$.data(dataKey, value);
-            this.$.attr(key.startsWith('$') ? `data-${dataKey}` : key, String(value));
-          }
+          slot = '$' + (key.startsWith('$') ? key.substring(1) : key.substring(5));
         } else {
-          // Regular attributes - apply directly if not already set.
-          // === undefined, not falsy: tabindex="0" and an empty-string attribute
-          // written at the invocation are SET, and a Define default must not win.
-          if (this.$.attr(key) === undefined) {
-            this.$.attr(key, value);
+          slot = key;
+        }
+
+        if (claimed.has(slot)) continue;
+        claimed.add(slot);
+        merged.set(slot, { key, value: slot_value });
+      }
+    }
+
+    if (merged.size === 0) return;
+
+    if (debug_enabled) {
+      const componentName = this.args._component_name || this.constructor.name;
+      const summary: Record<string, any> = {};
+      for (const { key, value } of merged.values()) summary[key] = value;
+      console.log(`[Component] Applying merged defaultAttributes for ${componentName}:`, summary);
+    }
+
+    // Apply the merged defaults behind the invocation attributes
+    for (const { key, value } of merged.values()) {
+      if (key === 'class') {
+        // Special handling for class - merge with existing
+        const existingClasses = this.$.attr('class');
+        if (existingClasses) {
+          const existing = existingClasses.split(/\s+/).filter(c => c);
+          const newClasses = String(value).split(/\s+/).filter(c => c);
+          for (const newClass of newClasses) {
+            if (!existing.includes(newClass)) {
+              existing.push(newClass);
+            }
           }
+          this.$.attr('class', existing.join(' '));
+        } else {
+          this.$.attr('class', value);
+        }
+      } else if (key === 'style') {
+        // Special handling for style - merge with existing
+        // Define attributes are applied AFTER invocation attributes
+        // So we only add Define style properties that don't already exist
+        // This ensures invocation wins conflicts (invocation overrides Define)
+        const existingStyle = this.$.attr('style');
+        if (existingStyle) {
+          // Only add Define properties the invocation does not set (invocation wins)
+          this.$.attr('style', merge_style(existingStyle, String(value), false));
+        } else {
+          this.$.attr('style', value);
+        }
+      } else if (key.startsWith('$') || key.startsWith('data-')) {
+        // Data attributes - also update args
+        const dataKey = key.startsWith('$') ? key.substring(1) : key.substring(5);
+
+        // Only apply if not already set in args (the invocation set it)
+        if (!(dataKey in this.args)) {
+          this.args[dataKey] = value;
+          this.$.data(dataKey, value);
+          this.$.attr(key.startsWith('$') ? `data-${dataKey}` : key, String(value));
+        }
+      } else {
+        // Regular attributes - apply directly if not already set.
+        // === undefined, not falsy: tabindex="0" and an empty-string attribute
+        // written at the invocation are SET, and a Define default must not win.
+        if (this.$.attr(key) === undefined) {
+          this.$.attr(key, value);
         }
       }
     }
@@ -2656,11 +3331,19 @@ export class Jqhtml_Component {
   }
 
   private _log_lifecycle(phase: string, status: string): void {
+    // Nothing to log: no lifecycle logging flag and no legacy JQHTML_DEBUG hook. Runs
+    // several times per component per render, so this is checked before any call.
+    // Without window.jqhtml it falls through, so logLifecycle() still reports that.
+    const has_window = typeof window !== 'undefined';
+    const debug = has_window ? (window as any).jqhtml?.debug : undefined;
+    const legacy = has_window ? window.JQHTML_DEBUG : undefined;
+    if (debug && !debug.logFullLifecycle && !debug.logCreationReady && !legacy) return;
+
     // Use new debug module
     logLifecycle(this, phase, status as 'start' | 'complete');
     
     // Keep legacy support for window.JQHTML_DEBUG
-    if (typeof window !== 'undefined' && window.JQHTML_DEBUG) {
+    if (legacy) {
       window.JQHTML_DEBUG.log(this.component_name(), phase, status, {
         cid: this._cid,
         ready_state: this._ready_state,
@@ -2668,15 +3351,12 @@ export class Jqhtml_Component {
       });
     }
   }
-  
-  private _log_debug(action: string, ...args: any[]): void {
-    if (typeof window !== 'undefined' && window.JQHTML_DEBUG) {
-      window.JQHTML_DEBUG.log(
-        this.component_name(),
-        'debug',
-        `${action}: ${args.map(a => JSON.stringify(a)).join(', ')}`
-      );
-    }
-  }
 
 }
+
+// The base on_viewport_resize() no-op, for the identity check that lets the lifecycle
+// and the resize dispatcher skip components that do not override it.
+export const base_on_viewport_resize = Jqhtml_Component.prototype.on_viewport_resize;
+
+// The base get_class_hierarchy(), for the identity check in class_hierarchy_of().
+const base_get_class_hierarchy = Jqhtml_Component.get_class_hierarchy;

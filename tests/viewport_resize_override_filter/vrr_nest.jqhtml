@@ -1,0 +1,6 @@
+<%-- Template-only parent (base Jqhtml_Component, no hook) with two hooked children around a plain one --%>
+<Define:Vrr_Nest>
+  <Vrr_Hooked $sid="inner_a" $key="<%= this.args.key %>.a" />
+  <Vrr_Plain $sid="inner_plain" $key="<%= this.args.key %>.p" />
+  <Vrr_Hooked $sid="inner_b" $key="<%= this.args.key %>.b" />
+</Define:Vrr_Nest>

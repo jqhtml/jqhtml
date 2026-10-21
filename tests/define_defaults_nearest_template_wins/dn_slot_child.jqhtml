@@ -1,0 +1,9 @@
+<%--
+Dn_Slot_Child - slot-only template with NO extends=, but with its own default attributes.
+The template and Dn_Slot_Base's defaults arrive through the JS prototype chain.
+--%>
+<Define:Dn_Slot_Child title="slot child" data-mode="slot child" style="color: blue">
+  <Slot:body>
+    <span>slot child body</span>
+  </Slot:body>
+</Define:Dn_Slot_Child>

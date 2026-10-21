@@ -1,0 +1,6 @@
+<Define:Reload_Cache_Write_And_Nocache>
+  <div>
+    <h1>reload() writes under a new key and keeps data-nocache current</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Reload_Cache_Write_And_Nocache>

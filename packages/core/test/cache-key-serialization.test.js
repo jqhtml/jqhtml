@@ -144,6 +144,36 @@ describe('declines rather than risking a false hit', () => {
   });
 });
 
+describe('a decline ends the walk at the first offending value', () => {
+  // The serializer returns its decline instead of throwing it; these pin that the
+  // reason still comes from the innermost value and that nothing after it is read.
+  const reason = (value) => result({ p: value }).uncacheable_reason;
+
+  it('reports the reason from deep inside arrays and objects', () => {
+    expect(reason({ a: [1, { b: [() => {}] }] })).toBe('function');
+    expect(reason([[[Symbol('s')]]])).toBe('symbol');
+    expect(reason({ a: { b: new Map() } })).toBe('non-plain-object');
+  });
+
+  it('reports too-large when the cap is crossed mid-structure', () => {
+    expect(reason({ a: ['x'.repeat(300), 'y'.repeat(300)] })).toBe('too-large');
+    expect(reason(Array.from({ length: 200 }, (_, i) => i))).toBe('too-large');
+  });
+
+  it('reads no value after the one that declined', () => {
+    let read = false;
+    const value = { a: () => {}, get b() { read = true; return 1; } };
+    expect(reason(value)).toBe('function');
+    expect(read).toBe(false);
+  });
+
+  it('still keys a value that shares a (non-circular) object after a declined call', () => {
+    const shared = { id: 1 };
+    expect(reason({ x: shared, y: () => {} })).toBe('function');
+    expect(key({ p: { x: shared, y: shared } })).not.toBeNull();
+  });
+});
+
 describe('author-supplied ids still take precedence', () => {
   it('prefers _jqhtml_cache_id over content serialization', () => {
     const k = key({ p: { _jqhtml_cache_id: 'ID7', a: 1 } });

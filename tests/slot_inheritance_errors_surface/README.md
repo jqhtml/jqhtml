@@ -39,7 +39,7 @@ parent produces no `SUMMARY:` line at all and `run-test.sh` fails on the missing
   is `_stopped` and carries `_Component_Stopped`
 - B. An error names `Sie_Orphan` and says the slot-only template has no parent template;
   the orphan is `_stopped`
-- C. The root reaches `on_ready()` within 1s of `on_create()` and is not itself stopped
+- C. The root reaches `on_ready()` (a wedged root never would) and is not itself stopped
 
 ## Related source
 

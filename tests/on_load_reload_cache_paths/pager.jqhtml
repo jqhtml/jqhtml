@@ -1,0 +1,7 @@
+<Define:Pager>
+  <ul class="items">
+    <% for (const item of this.data.items) { %>
+      <li class="item"><%= item %></li>
+    <% } %>
+  </ul>
+</Define:Pager>

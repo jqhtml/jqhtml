@@ -25,13 +25,13 @@ if (!fs.existsSync(BASELINE_DIR)) {
 // Function to compile a single template
 function compileTemplate(source, filename) {
   try {
-    const lexer = new Lexer(source);
+    const lexer = new Lexer(source, filename);
     const tokens = lexer.tokenize();
     const parser = new Parser(tokens, source, filename);
     const ast = parser.parse();
 
     const generator = new CodeGenerator();
-    const result = generator.generate(ast);
+    const result = generator.generate(ast, filename, source);
 
     return {
       success: true,

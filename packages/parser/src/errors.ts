@@ -9,7 +9,8 @@ export class JQHTMLParseError extends Error {
   public source?: string;
   public filename?: string;
   public severity: 'error' | 'warning' = 'error';
-  public suggestion?: string;
+  private base_message: string;
+  private _suggestion?: string;
 
   constructor(
     message: string,
@@ -25,11 +26,25 @@ export class JQHTMLParseError extends Error {
     this.source = source;
     this.filename = filename;
 
-    // Auto-add suggestions
-    this.suggestion = getSuggestion(message);
+    this.base_message = message;
 
-    // Build the full error message with context
-    this.message = this.buildErrorMessage(message);
+    // Auto-add suggestions (the setter builds the full message with context)
+    this.suggestion = getSuggestion(message) || undefined;
+  }
+
+  /**
+   * Guidance printed after the code snippet. The message always carries the current
+   * suggestion exactly once: assigning one rebuilds the message from scratch, so a
+   * suggestion set after construction replaces the automatic one instead of being
+   * left out of the message or printed beside it.
+   */
+  get suggestion(): string | undefined {
+    return this._suggestion;
+  }
+
+  set suggestion(value: string | undefined) {
+    this._suggestion = value;
+    this.message = this.buildErrorMessage(this.base_message);
   }
   
   private buildErrorMessage(message: string): string {
@@ -64,7 +79,8 @@ export class JQHTMLParseError extends Error {
     if (!this.source) return '';
 
     const lines = this.source.split('\n');
-    const lineIndex = this.line - 1;
+    // Clamp: a position past the end of the source must not lose the error
+    const lineIndex = Math.min(Math.max(0, this.line - 1), lines.length - 1);
 
     // Show 3 lines before and after for better context
     const contextLines = 3;
@@ -85,8 +101,11 @@ export class JQHTMLParseError extends Error {
 
       // Add pointer to error column with better highlighting
       if (isErrorLine) {
-        const spaces = ' '.repeat(this.column + 8);
-        const carets = '^'.repeat(Math.min(lines[i].length - this.column + 1, 20));
+        // Columns are 1-based; "> NNNNN | " is 10 characters, so column 1 sits under
+        // index 10. Column 0 (no column known) points at the start of the line.
+        const column = Math.max(1, Math.min(this.column, lines[i].length + 1));
+        const spaces = ' '.repeat(column + 9);
+        const carets = '^'.repeat(Math.max(1, Math.min(lines[i].length - column + 1, 20)));
         snippet += `${spaces}${carets}\n`;
       }
     }
@@ -224,4 +243,34 @@ export class ErrorCollector {
 
     throw new Error(message);
   }
+}
+/** Where a %> hidden in a // comment sits (1-based lines and columns). */
+export interface HiddenCloseLocation {
+  line: number;          // line of the // comment (the %> is on the same line)
+  column: number;        // column of the //
+  close_column: number;  // column of the %>
+  in_attribute?: boolean; // the expression is in an attribute value, so it must stay on one line
+}
+
+/**
+ * Add an explanation to a compile error for each %> that a // comment hid. A line
+ * comment in template code runs to the end of its line, so `<% a(); // note %>`
+ * does not close the tag; the block then runs on to a later %> (and usually fails
+ * to compile) or is never closed. Returns the error.
+ */
+export function add_hidden_close_note(error: any, hidden: HiddenCloseLocation[]): any {
+  if (!error || hidden.length === 0) return error;
+  const note = '\n\n' + hidden.map(h =>
+    `The %> on line ${h.line}, column ${h.close_column} is inside a // comment ` +
+    `(line ${h.line}, column ${h.column}), which runs to the end of the line, so it does ` +
+    (h.in_attribute
+      ? `not close the tag. Use /* */ for the comment: an expression in an attribute value must stay on one line.`
+      : `not close the tag. Close the tag on a new line, or use /* */ for the comment.`)
+  ).join('\n');
+  if (error instanceof JQHTMLParseError) {
+    error.suggestion = (error.suggestion || '') + note;
+  } else if (error instanceof Error) {
+    error.message += note;
+  }
+  return error;
 }

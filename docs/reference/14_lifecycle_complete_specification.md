@@ -217,7 +217,7 @@ class Subscribed_Feed extends Jqhtml_Component {
 | Trigger | Effect |
 |---------|--------|
 | All gates settle | Lifecycle resumes into `on_load` normally. |
-| `reload()` called | **Resumes** the paused lifecycle instead of its normal debounced re-fetch. The boot lifecycle runs `on_load` (the fresh fetch) exactly as `reload()` would want. A later gate settlement does nothing. |
+| `reload()` called | **Resumes** the paused lifecycle instead of queueing its normal re-fetch. The boot lifecycle runs `on_load` (the fresh fetch) exactly as `reload()` would want. A later gate settlement does nothing. |
 | `refresh()` called | Same as `reload()` — resumes the lifecycle. |
 | `stop()` called | The load is abandoned cleanly (the existing `_stopped` guards apply); a later gate settlement does nothing. |
 
@@ -232,6 +232,24 @@ class Subscribed_Feed extends Jqhtml_Component {
 **Purpose**: Process loaded data immediately after `on_load()` completes, before re-render or ready phase. Runs on the **real component** (not detached proxy), with full access to `this.$`, `this.state`, and `this.args`.
 
 **Execution**: Called after every `on_load()` completion - during boot, `load()`, `reload()`, and `refresh()`.
+
+**Every component gets it, with or without `on_load()`.** A component that does not
+override `on_load()` has nothing to fetch, but `on_loaded()` still runs and `'loaded'` still
+fires, at the point where `on_load()` would have completed:
+
+| Where | Order for a component without `on_load()` |
+|-------|--------------------------------------------|
+| Boot | first render → `on_render()` → `on_loaded()` → `'loaded'` → children ready → `on_ready()` |
+| `reload()` / `refresh()` | `on_loaded()` → `'loaded'` → render → `on_render()` → children ready → `on_ready()` |
+| `load()` | `on_loaded()` → `'loaded'`; returns `false`, `this.data` unchanged |
+
+This is the same order as a component with `on_load()`: `on_loaded()`, then `'loaded'`,
+then any re-render, then `on_ready()`. `'loaded'` fires even when `on_loaded()` is not
+overridden, so `once('loaded')` never waits forever. A component that overrides neither
+still boots without yielding: `'loaded'` has fired by the time `.component()` returns.
+`_load_only` and `_load_render_only` suppress both (see Lifecycle Truncation Flags), and a
+stopped component gets neither - a stop while an async `on_loaded()` runs suppresses
+`'loaded'`.
 
 **Method**: `on_loaded()`
 
@@ -281,6 +299,75 @@ class DataGridWidget extends Jqhtml_Component {
 ```
 
 **Key difference from `on_ready()`**: `on_loaded()` fires before re-render and before children are ready. It's specifically for data post-processing, not DOM manipulation. Use `on_ready()` for DOM work.
+
+---
+
+### 4c. on_load_error(error) - Load Failure Recovery
+
+**Purpose**: Decide what happens when `on_load()` throws or rejects. The framework always
+catches the failure and passes the error to `on_load_error(error)`.
+
+**Execution**: After a failed `on_load()` during boot, `load()`, `reload()` and
+`refresh()`. With deduplication, a failed shared load runs the hook on EVERY component
+that shared it (leader and followers), each with the same error object.
+
+**Method**: `on_load_error(error)`
+
+**Default (not overridden)**: the base implementation prints the error with
+`console.error`, naming the component (`[JQHTML] on_load() failed in User_Card (_cid: ...)`),
+and the failure then takes its usual course:
+
+- During boot the component **stops** (see Errors During Boot below). The boot error
+  report names the failure without printing the error a second time.
+- `reload()`, `refresh()` and `load()` **reject** with the error. The component is not
+  stopped. It keeps its previous render and its ready state: `ready()` resolves, and
+  `_ready_state` is back at 4.
+
+**Overridden**: there is no automatic print, and the component **continues**. The data
+the override leaves in `this.data` is applied exactly like loaded data: `on_loaded()`
+runs, the component re-renders if `this.data` changed, then `ready` fires. A failed
+`reload()`/`refresh()`/`load()` resolves instead of rejecting.
+
+- Call `super.on_load_error(error)` to keep the print and still continue.
+- Throw (or rethrow) from the override to take the default path: a boot stops the
+  component, and a `reload()`/`refresh()`/`load()` rejects.
+
+**Rules**:
+- Can be async (the lifecycle waits for it)
+- Same access as `on_load()`: `this.args` read-only, `this.data` read/write, everything
+  else (`this.$`, `this.state`, `this.$sid()`, other methods) throws
+- `this.data` starts from the `on_create()` state, as it does for every `on_load()`
+- Cannot be called manually (lifecycle method protection)
+
+```javascript
+class UserCard extends Jqhtml_Component {
+  on_create() {
+    this.data.user = null;
+    this.data.error = null;
+  }
+
+  async on_load() {
+    this.data.user = await fetch(`/api/users/${this.args.user_id}`).then(r => r.json());
+  }
+
+  on_load_error(error) {
+    this.data.error = error.message;   // the template renders the error state
+  }
+}
+```
+
+**Fallback data is never cached.** It is not written to the cache in any mode and is never
+handed to deduplication followers as a successful load (they run their own hooks).
+
+**One failure takes the instance out of caching.** Once any `on_load()` of a component
+instance has failed, that instance never reads or writes the cache again (`data` and
+`html` modes) for the rest of its lifespan, even after a later successful `reload()`.
+Deduplication (request sharing) is not caching and is unaffected. Other instances, and
+instances created later with the same args, cache normally.
+
+**Scope**: only a failure of `on_load()` itself (or of the shared load a deduplication
+follower waited on) reaches the hook. `on_load()` leaving `this.data` as a non-object, and
+`on_loaded()` throwing, are failures of their own and take the default path.
 
 ---
 
@@ -410,7 +497,7 @@ Both flags automatically cascade from parent to children during template renderi
 |-------|-------------|---------------------|--------|
 | `create` | fires | fires | fires |
 | `render` | skipped | fires | fires |
-| `loaded` | skipped | skipped | fires |
+| `loaded` | skipped | skipped | fires (with or without `on_load()`) |
 | `rendered` | skipped | skipped | fires |
 | `ready` | fires | fires | fires |
 
@@ -428,7 +515,9 @@ When a component's root element is **not in the DOM** at boot time (e.g., `$('<d
 
 **Detection:** The `_is_detached` flag is set during `create()` and is immutable after that. If you append the element to the DOM mid-load (while `on_load()` is still running), the flag remains `true` — the component still renders once after load, but now the rendered content is visible in the DOM because the element was appended.
 
-**Static components (no `on_load()`):** These complete their entire lifecycle synchronously. For detached static components, the initial render skip + forced post-load render still results in exactly one render, but it happens synchronously during boot rather than after an async yield.
+**Static components (no `on_load()`):** These complete their entire lifecycle synchronously. For detached static components, the initial render skip + forced post-load render still results in exactly one render, but it happens synchronously during boot rather than after an async yield. If the component
+overrides `on_loaded()`, that render follows `on_loaded()` and `'loaded'`, as it would follow
+`on_load()`.
 
 #### `_force_initial_render`
 
@@ -647,40 +736,16 @@ on_load() executes on:
 ### Why Detached Execution?
 
 1. **True Isolation**: `on_load()` cannot accidentally modify the component during execution
-2. **Parallel Safety**: Multiple `on_load()` calls can run simultaneously without interference
-3. **Race Condition Prevention**: Even if `reload()` is called during initial boot, data updates are serialized
+2. **Parallel Safety**: Different components' `on_load()` calls run simultaneously without interference
+3. **Race Condition Prevention**: A component's own loads never overlap - see "The Lifecycle Queue" below
 
-### Sequential Data Application Queue
+### Load Sequencing
 
-When `on_load()` completes, its result is applied to `this.data` via a sequential queue. This ensures FIFO ordering even when multiple loads complete out of order:
-
-```
-Timeline:
-  Call 1 (boot)   starts → on_load takes 100ms
-  Call 2 (reload) starts at 50ms → on_load takes 20ms
-
-Execution:
-  Call 1: [--------on_load--------]
-  Call 2:      [--on_load--]
-                           ↓
-                   Call 2 finishes first but waits
-                           ↓
-                                    [Call 1 applies data]
-                                    [Call 2 applies data]
-
-Final state: Call 2's data (most recent call wins)
-```
-
-### reload() During Initial Boot
-
-A common scenario is calling `reload()` on a component that's still in its initial boot phase (e.g., user triggers a filter change while data is loading). With detached execution:
-
-1. **Both loads run in parallel** - No blocking or errors
-2. **First load's data applies first** - Respects call order
-3. **Second load's data applies second** - Becomes final state
-4. **Component re-renders twice** - Once per data application
-
-This is the correct behavior: the component shows initial data briefly, then updates to reflect the reload.
+Every load is numbered when it starts. A load whose number is no longer the newest when it
+finishes is **superseded**: its result is dropped - no `this.data` assignment, no cache
+write, no `on_loaded()`. The lifecycle queue already keeps a component's loads from
+overlapping; the sequence number guards any path that ever does overlap, so data fetched
+for older args can never be applied over newer data.
 
 ### Implementation Details
 
@@ -697,6 +762,127 @@ After `on_load()` completes:
 6. Cache is updated if applicable
 7. `on_loaded()` is called on the real component (see below)
 8. `'loaded'` event is triggered
+
+---
+
+## The Lifecycle Queue
+
+Each component has ONE lifecycle lock and a queue in front of it. `render()`, `load()`,
+`reload()` and `refresh()` go through it, and **boot is its first entry**.
+
+### When the component is busy
+
+- **Every cycle holds the lock from its start through the end of its own `on_ready()`.**
+  Boot holds it through `on_create()`, the first render, `on_load()`, `on_loaded()`, the
+  re-render, the wait for children and `on_ready()`. A queued `render()`, `load()`,
+  `reload()` or `refresh()` holds it for its whole run, its own `on_ready()` included.
+- Calls made meanwhile - including from inside `on_ready()` - wait, and start after the
+  running cycle ends.
+- The component is idle when boot has ended and no queued call is running.
+- Each component's queue is its own. A parent waiting for its children does not make a
+  child busy, and a child's queue never waits on its parent's.
+
+### Queueing and merging
+
+- A call made while the component is busy waits as an entry; entries run one at a time, in
+  call order, once the component is idle.
+- A call merges only into the entry waiting **immediately before it** - never into the
+  running one - and only when it is the **same method with the same arguments**.
+  `reload()` and `reload(true)` are the same call; `refresh()` is `reload(false)`; `load()`
+  and `render()` take no arguments that matter here. The merged caller does not run; its
+  promise settles with the result of the entry it merged into.
+- An entry reads `this.args` when it **starts**, so callers that merged into a waiting entry
+  get the newest args.
+- No merging across methods: `reload(), refresh(), reload()` queued behind a running call
+  is three more runs. Each runs with its own render rule.
+- A caller's promise settles when ITS entry finishes, before the next entry starts.
+- A throwing entry rejects only its own callers; the queue continues.
+
+```
+reload() during the first on_load(), with new args:
+
+  boot     [create][render][----on_load(old args)----][re-render][children ready][on_ready]
+  reload()        ^ called here: waits                                                      [on_load(new args)][render][on_ready]
+
+  'ready' fires ONCE, after the reload - never on the old-args state.
+  The new-args data is cached under the new-args key.
+```
+
+### `ready` when boot ends with calls queued
+
+If calls are waiting when boot's `on_ready()` returns - made from `on_ready()` itself, or
+anywhere during boot - boot does NOT fire `ready`. The queued calls run, each with its own
+`on_ready()`, and `ready` fires **once, when the queue goes idle**. A `ready()` waiter or
+`.on('ready')` handler therefore sees the post-reload state, never the state a queued call
+is about to replace - also when the last entry is a `load()` (no `ready` of its own) or one
+that threw. A parent waiting on such a child waits for the same moment.
+
+This is what makes the "needs another cycle" pattern work:
+
+```javascript
+on_ready() {
+  if (this.data.needs_reload) {
+    this.reload();   // NO await - runs after this on_ready() returns
+    return;
+  }
+  // ... normal setup. on_ready() runs again on the reload's cycle.
+}
+```
+
+Once boot's `ready` has fired, each later call fires `ready` itself when it completes.
+
+### Awaiting a call inside `on_ready()`
+
+An unawaited call from `on_ready()` waits for `on_ready()` to return (above). An **awaited**
+one would wait forever - `on_ready()` is waiting for it - so it is pulled forward instead:
+`render()`, `load()`, `reload()` and `refresh()` called while the component's `on_ready()`
+is running return a `Promise` subclass, and when its `.then()` runs (`await`, or any
+`.then()`/`.catch()`/`.finally()`) before that `on_ready()` has settled, the call leaves
+the queue and runs at once, nested inside `on_ready()`. It resolves normally, with its own
+result; no warning.
+
+```javascript
+async on_ready() {
+  const changed = await this.load();   // runs now, resolves with true/false
+  if (changed) await this.render();    // runs now
+}
+```
+
+- Only the awaited call moves. Other calls made from `on_ready()` - before or after it -
+  still wait for `on_ready()` to return, in call order.
+- A call made after the promotion is its own entry; nothing merges into a promoted call.
+- The lock stays held while a promoted call runs, even if `on_ready()` returns first, so
+  nothing queued starts alongside it. `ready` still fires once: at the end of the cycle the
+  promoted call ran in, or when the queue goes idle.
+- Code outside the component that awaits a call while the component's `on_ready()` runs
+  gets the same treatment.
+
+### Where not to call these methods
+
+- From the component's own **`on_create()` or `on_render()`**: the call cannot run there -
+  it waits until the running cycle finishes. In development a warning names the method and
+  the hook (`on_render()` is for styling freshly rendered DOM). Call it from `on_ready()` or
+  an event handler.
+- **Never `await` one inside the component's own `on_loaded()`.** The call cannot start
+  until `on_loaded()` returns, and `on_loaded()` is waiting for the call: a deadlock. The
+  framework does not break the cycle. Call it without `await` (it runs after the current
+  cycle), or from `on_ready()`. In development, a call made while `on_loaded()` runs
+  returns a promise that warns once if awaited (or chained) before `on_loaded()` settles,
+  naming the real method and component:
+
+  ```
+  [JQHTML] reload() was awaited while My_Component's on_loaded() is still running. If on_loaded() awaits this call it will deadlock: call it without await. Code outside the component should await comp.ready() before awaiting reload() or refresh().
+  ```
+
+  Code outside the component that awaits during `on_loaded()` gets the same message (the
+  two cannot be told apart after an `await`); it should `await comp.ready()` first.
+- **During `on_load()`**, `this.reload()` and friends are not reachable (only `this.args`
+  and `this.data` are). Code outside the component that awaits a call made while
+  `on_load()` runs just waits its turn: no warning, no promotion.
+
+Unawaited calls never warn. The warnings are development-mode only
+(`jqhtml.configure({ mode: 'production' })` silences them); the `on_ready()` promotion is
+behaviour and applies in every mode.
 
 ---
 
@@ -848,9 +1034,10 @@ class ProductCard extends Jqhtml_Component {
 
 **Pattern**: `load()` invokes `on_load()` then `on_loaded()`, just as `render()` invokes `on_render()`. The unprefixed method is what you call; the `on_` method is the hook you override.
 
-**A component that does not override `on_load()`**: `load()` returns `false` immediately and
-runs nothing. `this.data` keeps what `on_create()` set. There is no fetch to redo, so the
-call is a no-op rather than a reset.
+**A component that does not override `on_load()`**: there is no fetch to redo, so `this.data`
+keeps what `on_create()` set (the call is not a reset). `load()` still runs `on_loaded()`
+and triggers `'loaded'` (see 4b), then returns `false`. It is queued like any other
+`load()`.
 
 **Behavior** (component with a custom `on_load()`):
 1. Snapshots current `this.data` for change detection
@@ -868,13 +1055,12 @@ call is a no-op rather than a reset.
 - `this.args` is read-only
 - `this.$`, `this.$sid()`, and all other properties are blocked
 
-**Concurrent calls collapse**: `load()` shares the component's lifecycle queue with
-`render()`, `reload()` and `refresh()`. Calls made while a load is already running collapse
-into ONE further execution - the most recent call's is the one that runs. Every collapsed
-caller receives the result of the load that actually ran, so three rapid `await this.load()`
-calls all see the same `true`/`false`, and none of them reports "unchanged" for a load it
-never got. A `render()` made while a `load()` is waiting does not replace it: both run, in
-call order.
+**Queued with the other lifecycle calls**: `load()` shares the component's lifecycle queue
+with boot, `render()`, `reload()` and `refresh()` (see "The Lifecycle Queue"). Called while
+the component is busy, it waits. Adjacent waiting `load()` calls merge into ONE run, and
+every merged caller receives that run's result, so three rapid `await this.load()` calls
+behind a running operation run `on_load()` once more and all see the same `true`/`false`.
+A `render()` made while a `load()` is waiting does not replace it: both run, in call order.
 
 **A caller resolves before the next queued operation starts**: `await this.load()` (and
 `render()`/`reload()`/`refresh()`) returns as soon as ITS operation finishes. It does not
@@ -917,11 +1103,15 @@ class InvoiceEditor extends Jqhtml_Component {
 
 **Purpose**: Re-runs `on_load()` to fetch fresh data, intelligently re-renders only when needed.
 
-**Debouncing behavior**: `reload()` is automatically debounced to prevent redundant executions:
-- Multiple rapid calls to `reload()` are coalesced into a single execution
-- If called while `on_load()` is running, additional calls are queued
-- Only the most recent call executes if multiple calls are queued
-- All callers receive the same promise, resolved when execution completes
+**Queueing**: `reload()` goes through the component's lifecycle queue (see "The Lifecycle
+Queue"):
+- Called while the component is busy - boot included, so also during the first
+  `on_load()` - it waits and runs afterwards, in call order, reading `this.args` when it starts
+- It merges only into an identical call waiting immediately before it; every merged caller
+  gets that run's result. Three rapid `reload()` calls behind a running one run once more
+- It never merges into a running call, or with a `refresh()`
+- Each caller's promise resolves when its own run finishes
+- The cache key it writes under is the key of the args it ran with
 
 **Smart caching behavior**:
 - If `this.args` changed since last render: checks cache for new args
@@ -983,7 +1173,7 @@ class ProductList extends Jqhtml_Component {
 - `reload()` always re-renders after `on_load()` completes
 - `refresh()` compares the fetched data against the last-rendered data snapshot and skips the re-render entirely if nothing changed
 
-**Debouncing behavior**: `refresh()` shares the same debounced queue as `reload()`. If `reload()` is called while a `refresh()` is queued, `reload()` takes precedence and forces a re-render.
+**Queueing**: `refresh()` uses the same lifecycle queue as `reload()` (it is `reload(false)`). A `refresh()` and a `reload()` are separate entries and never merge: each runs with its own render rule, so a `refresh()` queued behind a `reload()` still skips its render when the data is unchanged.
 
 **Behavior**:
 1. Restores `this.data` to the `on_create()` snapshot
@@ -1035,6 +1225,12 @@ class LivePriceTicker extends Jqhtml_Component {
 5. Calls `on_stop()` - only if the component overrides it
 6. Triggers `stop` event
 7. **Does NOT** remove DOM (caller is responsible for removal)
+
+A component stopped while its lifecycle is still in flight abandons it. Stopped during
+`on_load()`, it never applies the result: no `this.data` assignment, no cache write, no
+`on_loaded()`. Stopped while its ready phase waits for its children, it never runs
+`on_ready()`, never takes an html cache snapshot and never fires `ready`. No lifecycle
+hook runs after `on_stop()`.
 
 Steps 3, 4 and 6 are unconditional. They are not cleanup the component asked for; they
 are how the rest of the framework learns the component is dead. The class is the
@@ -1263,9 +1459,10 @@ to be ready races each child's `ready` against its `stop`, so the failed child's
 releases the parent, which goes on to run `on_ready()` normally. The failed component stays
 in the DOM, stopped and marked, with whatever it had rendered before the throw.
 
-There is no error hook to override. Handle recoverable failures inside `on_load()`
-(`try`/`catch`, then render an error state from `this.data`); a throw that escapes is
-treated as a defect, not as a control-flow signal.
+A failed `on_load()` goes through `on_load_error(error)` first (section 4c). Without an
+override, the base implementation prints the error and the component stops as above; the
+boot error report then names the failure without printing the error a second time. With
+an override, the component continues on the fallback data instead of stopping.
 
 ---
 
@@ -1487,8 +1684,12 @@ the component.
 ### Dispatch Rules
 
 On resize the framework walks `$('.Component')` in document order (parents before
-children) and calls the hook on each live instance.
+children) and calls the hook on each live instance that overrides it.
 
+- **Components without an override are skipped** - at all three triggers, while the
+  hook is still the base no-op, so they pay nothing for it. A hook assigned to an
+  instance (`this.on_viewport_resize = fn` in `on_create()`, a class field, or an
+  assignment later) counts as an override, and it is checked on every call.
 - **Detached components are skipped** - a component not in the document is not found by
   the walk. It receives the hook again on its next render or ready.
 - **Stopped components are skipped** - checked explicitly, so a stopped component whose
@@ -1704,7 +1905,17 @@ class ProductList extends Jqhtml_Component {
   object). `Date`, `Map`, `Set` and instances of classes registered with
   `register_cache_class()` are returned unwrapped - a Proxy receiver cannot satisfy their
   internal slots, and `this.data.created.getTime()` has to keep working - so mutating one
-  of those is the one remaining shallow spot.
+  of those is the one remaining shallow spot. Every other route throws as well:
+  `Object.defineProperty`, `Object.setPrototypeOf` and `Object.preventExtensions` /
+  `seal` / `freeze`, on `this.data` or anything nested in it; a property descriptor's
+  `value` is the read-only view.
+- **What `on_create()` leaves is copied.** When `on_create()` returns, `this.data` is
+  replaced by its cache-serializer copy - the same snapshot `on_load()` restarts from, for
+  components with or without `on_load()`. An object `on_create()` also stored elsewhere is
+  therefore not part of `this.data`: after `this.state.list = this.data.list = []`,
+  `this.state.list.push(x)` changes `this.state.list` only. Values the serializer drops
+  (functions, DOM nodes, jQuery objects, component instances) are dropped here too, with a
+  development warning; callbacks belong in `this.args`, elements in `this.state`.
 - **Mutable bookkeeping belongs in `this.state`**, which is unrestricted: a log you append
   to from `on_render()`/`on_ready()`, a counter, a list you filter locally.
 - **The restore point is the `on_create()` state, always.** `create()` snapshots `this.data`
@@ -2202,6 +2413,8 @@ Registers a callback for an event. Callback signature: `(component, data?) => vo
 
 - `component`: The component instance that triggered the event
 - `data`: Optional data passed as second parameter to `trigger()`
+- `this` (in a `function` handler): the same component, whether the handler runs from
+  `trigger()`, as a `once()` handler, or immediately because the event already fired
 
 ```javascript
 component.on('selected', (comp, data) => {
@@ -2459,4 +2672,4 @@ on_ready() {
 9. **Future caching**: Conventions enable smart caching feature
 10. **Lifecycle manipulation**: render(), reload(), reinitialize(), stop()
 11. **Synchronous requirements**: on_create(), on_render(), on_stop(), stop() must be synchronous
-12. **render() is async**: Always `await this.render()` and `await this.reload()`
+12. **render() is async**: `await this.render()` / `await this.reload()` freely - in `on_ready()` an awaited call runs at once; never await one inside the component's own `on_loaded()` (deadlock; see "The Lifecycle Queue")

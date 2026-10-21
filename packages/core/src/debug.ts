@@ -214,10 +214,16 @@ export function isSequentialProcessing(): boolean {
 }
 
 // Error handling with break on error
-export function handleComponentError(component: Jqhtml_Component, phase: string, error: Error): void {
+export function handleComponentError(component: Jqhtml_Component, phase: string, error: Error, already_printed: boolean = false): void {
   const jqhtml = getJqhtml();
-  
-  console.error(`[JQHTML Error] ${component.constructor.name}#${component._cid} failed in ${phase}:`, error);
+
+  if (already_printed) {
+    // The base on_load_error() printed this error a moment ago: name the failure, but
+    // do not print the same error twice.
+    console.error(`[JQHTML Error] ${component.constructor.name}#${component._cid} failed in ${phase}: on_load() error (printed above)`);
+  } else {
+    console.error(`[JQHTML Error] ${component.constructor.name}#${component._cid} failed in ${phase}:`, error);
+  }
   
   if (jqhtml?.debug?.breakOnError) {
     debugger; // This will pause execution in dev tools

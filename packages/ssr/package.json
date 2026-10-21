@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/ssr",
-  "version": "2.3.74",
+  "version": "2.3.76",
   "description": "Server-Side Rendering for JQHTML components - renders components to HTML for SEO",
   "main": "src/index.js",
   "bin": {
@@ -45,7 +45,6 @@
     "jsdom": "^24.0.0",
     "jquery": "^3.7.1"
   },
-  "devDependencies": null,
   "bugs": {
     "url": "https://github.com/jqhtml/jqhtml/issues"
   },

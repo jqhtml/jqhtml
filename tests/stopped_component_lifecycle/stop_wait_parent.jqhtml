@@ -1,0 +1,8 @@
+<%--
+Stop_Wait_Parent - renders one Stop_Wait_Child, which section A removes while it waits.
+--%>
+<Define:Stop_Wait_Parent>
+  <div>
+    <Stop_Wait_Child $sid="child" />
+  </div>
+</Define:Stop_Wait_Parent>

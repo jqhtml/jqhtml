@@ -54,11 +54,15 @@ class Test_Underscore_Component_Name extends Jqhtml_Component {
 
     console.log('');
     console.log('5. REPLACEMENT STRIPS THE UNDERSCORE COMPONENT CLASS:');
-    mounted.$.component('Plain_Marker', {});
-    const replaced = mounted.$.component();
-    await replaced.ready();
-    assert('old class _Registered_By_Name removed on replacement', !mounted.$.hasClass('_Registered_By_Name'));
-    assert('new class Plain_Marker present', mounted.$.hasClass('Plain_Marker'));
+    // Plain_Marker is tag="span": replacing it onto the <div> swaps in a new element, so
+    // the element to inspect is the one the setter returns, not mounted.$.
+    const $replaced = mounted.$.component('Plain_Marker', {});
+    const replaced = $replaced.component();
+    assert('the setter returns the swapped-in <span>', $replaced.is('span') && $replaced[0] !== mounted.$[0]);
+    assert('the returned element holds the Plain_Marker instance', !!replaced && replaced.component_name() === 'Plain_Marker');
+    if (replaced) await replaced.ready();
+    assert('old class _Registered_By_Name removed on replacement', !$replaced.hasClass('_Registered_By_Name'));
+    assert('new class Plain_Marker present', $replaced.hasClass('Plain_Marker'));
 
     console.log('');
     console.log('6. TWO LEADING UNDERSCORES AND UNDERSCORE+LOWERCASE ARE REJECTED:');

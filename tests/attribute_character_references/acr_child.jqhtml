@@ -1,0 +1,7 @@
+<%--
+Acr_Child - a Define default holding character references. The element gets the
+resolved value, as static HTML would.
+--%>
+<Define:Acr_Child title="d &lt;i&gt; &amp; &quot;q&quot; &copy x">
+  <span>child</span>
+</Define:Acr_Child>

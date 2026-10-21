@@ -27,7 +27,7 @@ Tests that components can be created detached from the DOM, complete their full 
 5. Fourth_Level_Child completes async load (25ms delay)
 6. Third_Level_Child's `on_ready()` fires after children ready
 7. Second_Component's `on_ready()` fires, uses `$sid()` to modify Fourth_Level_Child text
-8. After 100ms delay, Second_Component appended to Base_Component
+8. Once the off-DOM subtree is ready (awaited), Second_Component is appended to Base_Component
 9. Test validates Fourth_Level_Child has correct text set by Second_Component
 
 ## Success Criteria

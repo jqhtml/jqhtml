@@ -1,0 +1,4 @@
+<%-- Ejc_Direct - class extends Jqhtml_Component directly, so extends= is the only parent. --%>
+<Define:Ejc_Direct extends="Ejc_Grid_A">
+  <Slot:body><span class="ejc-slot">Ejc_Direct</span></Slot:body>
+</Define:Ejc_Direct>

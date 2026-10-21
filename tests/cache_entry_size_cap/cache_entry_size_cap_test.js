@@ -49,7 +49,7 @@ class Cache_Entry_Size_Cap_Test extends Jqhtml_Component {
   }
 
   // Scan raw localStorage for keys JQHTML wrote for Size_Cap_Component.
-  // Keys are namespaced as `jqhtml::<developer_key>::<app_cache_key>`
+  // Keys are namespaced as `jqhtml::<developer_key>::<jqhtml_version>::<app_cache_key>`
   // (see local-storage.ts _build_key()); html-mode keys get an extra `::html` segment.
   find_cache_keys() {
     const keys = [];

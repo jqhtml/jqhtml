@@ -1,0 +1,7 @@
+<%--
+Dn_Child - the nearest <Define>. Its own defaults must beat both ancestors'; only the
+invocation beats it.
+--%>
+<Define:Dn_Child extends="Dn_Parent" title="child" tabindex="-1" data-mode="child"
+    $kind="child kind" style="color: blue" class="c1 g1">
+</Define:Dn_Child>

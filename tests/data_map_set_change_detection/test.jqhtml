@@ -1,0 +1,6 @@
+<Define:Data_Map_Set_Change_Detection>
+  <div>
+    <h1>Data loaded into a Map or Set is change-detected</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Data_Map_Set_Change_Detection>

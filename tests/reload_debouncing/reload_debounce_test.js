@@ -41,24 +41,24 @@ class Reload_Debounce_Test extends Jqhtml_Component {
 
     console.log('');
     console.log(`Final total on_load calls: ${window.__reload_debounce_calls}`);
-    console.log('Expected: 3 (initial + 2 debounced reloads)');
+    console.log('Expected: 2 (initial + 1 merged reload)');
     console.log('');
-    console.log('Why 3 is correct:');
+    console.log('Why 2 is correct (merge rule: identical calls waiting next to each other merge):');
     console.log('  1. Initial load executes');
-    console.log('  2. Five reload() calls made rapidly');
-    console.log('  3. First reload starts while others queue');
-    console.log('  4. When first reload completes, debouncer runs one more time');
-    console.log('  5. This guarantees fresh data even if state changed during execution');
+    console.log('  2. Five reload() calls made in on_ready() wait behind the running cycle');
+    console.log('  3. The 2nd-5th merge into the 1st waiting entry');
+    console.log('  4. Awaiting them runs that one entry; all five promises get its result');
     console.log('');
 
-    if (window.__reload_debounce_calls === 3) {
+    window.testPassed = (window.__reload_debounce_calls === 2);
+    if (window.__reload_debounce_calls === 2) {
       console.log('✅ PASS: reload() debouncing works correctly');
-      console.log('   - 5 rapid calls coalesced to 2 executions (after initial)');
+      console.log('   - 5 rapid calls merged into 1 execution (after initial)');
       console.log('   - Guarantees data freshness');
       console.log('   - All promises resolved');
       this.$sid('results').html('<h3 style="color: green;">✅ Test passed</h3>');
     } else {
-      console.log(`❌ FAIL: Expected 3 executions, got ${window.__reload_debounce_calls}`);
+      console.log(`❌ FAIL: Expected 2 executions, got ${window.__reload_debounce_calls}`);
       console.log('   Note: Exact count may vary based on timing');
       this.$sid('results').html('<h3 style="color: orange;">⚠️ Test inconclusive (timing-dependent)</h3>');
     }

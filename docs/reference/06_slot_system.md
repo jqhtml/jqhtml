@@ -182,6 +182,55 @@ This is the most common pattern (95% of components). Only use named slots when y
 
 **Note**: Within slot content, `row` variable is available from the parent's loop context.
 
+## Optional Slots: Did the Caller Supply Anything?
+
+`content(name)` returns the slot's markup, or `''` when the caller supplied nothing. Nothing
+means either:
+
+- the caller did not write the slot at all, or
+- the slot body emitted nothing but HTML whitespace (space, tab, line breaks). An empty
+  `<Slot:note></Slot:note>`, one spanning lines with only indentation inside, and one whose
+  expressions all printed `''`/`null` or whose `<% if %>` was false all count as nothing.
+
+Anything else is content: text, an element (even an empty `<b></b>`), a component (even one
+that later renders nothing), `&nbsp;`, a printed `0`. A slot that only passes another slot
+down (`<Slot:note><%= content('note') %></Slot:note>`) is judged by what the passed-down slot
+emits. Unnamed `content()` follows the same rule.
+
+To draw a wrapper only when the caller supplied something, call `content()` once, keep the
+result, test it, and emit it:
+
+```jqhtml
+<Define:Property_Row>
+  <% const _note = content('note'); %>
+  <div class="value"><%= content('value') %></div>
+  <% if (_note) { %><div class="note"><%= _note %></div><% } %>
+</Define:Property_Row>
+```
+
+A caller with nothing for a slot writes it empty, or leaves it out - both read as `''`:
+
+```jqhtml
+<Define:Activity_Panel>
+  <Property_Row>
+    <Slot:value><%= this.data.last_activity %></Slot:value>
+    <Slot:note></Slot:note>
+  </Property_Row>
+</Define:Activity_Panel>
+```
+
+Rules:
+
+- **Test truthiness only** (`if (_note)`). Never inspect the returned value: the markup is
+  an internal object whose shape is not part of the API and changes between versions.
+- **Call once per region.** Each `content()` call runs the slot body again; keep the
+  result in a variable rather than calling once to test and again to emit.
+- **`''` prints nothing**, so `<%= content('note') %>` without a test is always safe.
+- **A slot with `$params` is judged on each call:** `content('row', record)` can be `''`
+  for one record and markup for the next.
+- The caller cannot express "sometimes" by wrapping the `<Slot:>` tag in `<% if %>` (that
+  is the all-or-nothing rule below); put the condition inside the slot body instead.
+
 ## Passing Data to Slots
 
 Parent templates can pass data when invoking slots using `content('slotname', data)`:
@@ -266,7 +315,7 @@ Clicking the button runs `Engagement_View.view_as_client` with `this` bound to t
 
 ## Slot-Based Template Inheritance
 
-When a component template contains **ONLY slots at the top level** (no HTML), it automatically inherits the parent class template:
+When a component template contains **ONLY slots at the top level** (no HTML), it automatically inherits the parent class template. A template that mixes top-level slots with any other content (markup, text including non-breaking spaces, `<% %>` or `<%= %>`) is a compile error; only HTML whitespace may sit between the slots.
 
 **Parent template (provides structure):**
 ```jqhtml
@@ -330,6 +379,18 @@ Default `<Define>` attributes follow the same chain. A child that inherits
 `DataGrid_Abstract`'s template also inherits `<Define:DataGrid_Abstract>`'s `class=""` and
 other attributes, whether the chain came from `extends=""` or from `class UsersDataGrid
 extends DataGrid_Abstract`.
+
+When two `<Define>`s in the chain set the same attribute, the nearer one wins: the child
+over its parent, the parent over the grandparent. `style` merges per property, so a child
+`style="color: blue"` over a parent `style="color: red; margin: 1px"` gives
+`margin: 1px; color: blue` (the winning declarations last). `class` merges, farthest `<Define>` first. The invocation beats
+every `<Define>`.
+
+`$` arg defaults (`<Define:DataGrid_Abstract $per_page=25>`) are inherited the same way: a
+child that does not set `$per_page` gets the nearest ancestor's value in `this.args`.
+`$foo` and `data-foo` defaults are one arg, so the nearer `<Define>` wins whichever
+spelling each uses. A `data-` attribute or `$` arg at the invocation beats every
+`<Define>`.
 
 ## Slot Forwarding (Advanced Pattern)
 

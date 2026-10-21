@@ -1,0 +1,37 @@
+<Define:Test_Empty_Slot_Content>
+  <div>
+    <h1>content() returns '' for a slot that emits nothing</h1>
+
+    <Es_Row $sid="absent"><Slot:value>v</Slot:value></Es_Row>
+    <Es_Row $sid="written_empty"><Slot:value>v</Slot:value><Slot:note></Slot:note></Es_Row>
+    <Es_Row $sid="whitespace">
+      <Slot:value>v</Slot:value>
+      <Slot:note>
+      </Slot:note>
+    </Es_Row>
+    <Es_Row $sid="empty_values"><Slot:value>v</Slot:value><Slot:note> <%= '' %> <%= null %> <% if (false) { %>x<% } %> </Slot:note></Es_Row>
+    <Es_Row $sid="text"><Slot:value>v</Slot:value><Slot:note>Text</Slot:note></Es_Row>
+    <Es_Row $sid="tag"><Slot:value>v</Slot:value><Slot:note><b></b></Slot:note></Es_Row>
+    <Es_Row $sid="component"><Slot:value>v</Slot:value><Slot:note><Es_Leaf /></Slot:note></Es_Row>
+    <Es_Row $sid="nbsp_entity"><Slot:value>v</Slot:value><Slot:note>&nbsp;</Slot:note></Es_Row>
+    <Es_Row $sid="nbsp_char"><Slot:value>v</Slot:value><Slot:note><%= ' ' %></Slot:note></Es_Row>
+    <Es_Row $sid="zero"><Slot:value>v</Slot:value><Slot:note><%= 0 %></Slot:note></Es_Row>
+
+    <Es_Fwd $sid="fwd_empty"><Slot:note>
+    </Slot:note></Es_Fwd>
+    <Es_Fwd $sid="fwd_absent"></Es_Fwd>
+    <Es_Fwd $sid="fwd_text"><Slot:note>passed down</Slot:note></Es_Fwd>
+
+    <Es_Box $sid="box_none" />
+    <Es_Box $sid="box_whitespace">
+    </Es_Box>
+    <Es_Box $sid="box_text">body text</Es_Box>
+
+    <Es_Row_Empty_Note $sid="inherit_empty" />
+    <Es_Row_Text_Note $sid="inherit_text" />
+
+    <Es_List $sid="list" $records=this.state.records>
+      <Slot:row $params="record"><% if (record.show) { %><%= record.name %><% } %></Slot:row>
+    </Es_List>
+  </div>
+</Define:Test_Empty_Slot_Content>

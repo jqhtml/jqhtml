@@ -15,6 +15,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/dbg_loader.jqhtml" \
   "$SCRIPT_DIR/dbg_marker.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -29,3 +30,6 @@ echo "5. Components created after enable() are covered with no extra setup"
 echo "6. disable() removes listeners, classes, the gate and the host; styles stay installed and inert"
 echo "7. enable() again reuses the installation"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

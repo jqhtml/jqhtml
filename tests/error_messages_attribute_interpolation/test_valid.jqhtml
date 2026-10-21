@@ -1,16 +1,18 @@
 <!--
-Test case: Valid attribute interpolation (with quotes)
-This should compile successfully
+Test case: Valid attribute interpolation
+This should compile successfully. A multi-line $ value uses the bracketed form;
+quoted interpolation stays on one line.
 -->
 <Define:Test_Valid_Interpolation>
   <div class="mb-3">
     <Form_Field $name="role_id" $label="Role" $required=true>
-      <Select_Input $options="<%= JSON.stringify([
+      <Select_Input $options=(JSON.stringify([
         {value: 3, label: 'Member'},
         {value: 2, label: 'Admin'},
         {value: 1, label: 'Owner'},
         {value: 4, label: 'Viewer'}
-      ]) %>" />
+      ])) $placeholder="<%= this.args.placeholder || 'Choose a role' %>" />
     </Form_Field>
+    <div title="<%= 'This is a\nmultiline\nvalue' %>"></div>
   </div>
 </Define:Test_Valid_Interpolation>

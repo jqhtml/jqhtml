@@ -1,0 +1,6 @@
+<%--
+Smc_Base - Define style defaults whose values hold ':' and ';' that are not
+declaration boundaries. Double-quoted attribute, single quotes inside.
+--%>
+<Define:Smc_Base style="background: url(http://x.test/base.png) no-repeat; font-family: 'Base:Font;One', serif; color: red; --Gap: 1px; --gap: 2px">
+</Define:Smc_Base>

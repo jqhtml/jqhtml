@@ -14,24 +14,35 @@ import {
   CodeBlockNode,
   SlotNode,
   ConditionalAttributeNode,
+  CodeLocation,
   createNode
 } from './ast.js';
 import {
   JQHTMLParseError,
   unclosedError,
   mismatchedTagError,
-  syntaxError,
-  getSuggestion
+  syntaxError
 } from './errors.js';
 import { CodeGenerator, VOID_ELEMENTS } from './codegen.js';
 import { COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
+import { join_lines, join_lines_mapped } from './js_scanner.js';
+import { decode_attribute_text } from './html_attribute.js';
+
+/** Only HTML whitespace (space, tab, LF, CR, FF). String.trim() also strips U+00A0,
+ *  which is content: an author's non-breaking space. */
+function is_html_whitespace(text: string): boolean {
+  return /^[ \t\n\r\f]*$/.test(text);
+}
 
 export class Parser {
   private tokens: Token[];
   private current: number = 0;
   private source?: string;
   private filename?: string;
-
+  // Paired tags and slots currently being parsed, innermost last; names the
+  // open element when a closing tag does not match it.
+  private open_elements: Array<{ name: string, kind: 'tag' | 'component' | 'slot', token: Token }> = [];
+  private define_name: string | null = null;
 
   constructor(tokens: Token[], source?: string, filename?: string) {
     this.tokens = tokens;
@@ -44,13 +55,18 @@ export class Parser {
    */
   private validate_javascript_code(code: string, token: Token): void {
     // Check for this.innerHTML usage (should use content() function instead)
-    if (/\bthis\.innerHTML\b/.test(code)) {
+    const match = /\bthis\.innerHTML\b/.exec(code);
+    if (match) {
+      // Point at the match: the token starts at the whitespace after <%=
+      const before = code.slice(0, match.index);
+      const newline = before.lastIndexOf('\n');
       const error = new JQHTMLParseError(
         `Invalid usage: this.innerHTML is not available in JQHTML templates.\n` +
         `Did you mean to use the content() function instead?`,
-        token.line,
-        token.column,
-        this.source
+        token.line + (before.match(/\n/g) || []).length,
+        newline === -1 ? token.column + match.index : match.index - newline,
+        this.source,
+        this.filename
       );
       error.suggestion =
         `\nJQHTML uses content() to render child elements, not this.innerHTML:\n\n` +
@@ -75,7 +91,7 @@ export class Parser {
     // Skip leading whitespace and newlines
     while (!this.is_at_end() && (
       this.match(TokenType.NEWLINE) ||
-      (this.match(TokenType.TEXT) && this.previous_token().value.trim() === '')
+      (this.match(TokenType.TEXT) && is_html_whitespace(this.previous_token().value))
     )) {
       // Skip whitespace
     }
@@ -113,7 +129,7 @@ export class Parser {
     }
     
     // Skip trailing whitespace and newlines
-    while (!this.is_at_end() && (this.match(TokenType.NEWLINE) || this.match(TokenType.TEXT) && this.previous_token().value.trim() === '')) {
+    while (!this.is_at_end() && (this.match(TokenType.NEWLINE) || this.match(TokenType.TEXT) && is_html_whitespace(this.previous_token().value))) {
       // Skip whitespace
     }
     
@@ -141,26 +157,11 @@ export class Parser {
     );
   }
   
-  // Parse top-level constructs
-  private parse_top_level(): ASTNode | null {
-    // Skip whitespace-only text nodes at top level
-    if (this.match(TokenType.NEWLINE)) {
-      return null;
-    }
-    
-    // Component definition
-    if (this.check(TokenType.DEFINE_START)) {
-      return this.parse_component_definition();
-    }
-    
-    // Regular content
-    return this.parse_content();
-  }
-  
   // Parse <Define:ComponentName>...</Define:ComponentName>
   private parse_component_definition(): ComponentDefinitionNode {
     const start_token = this.consume(TokenType.DEFINE_START, 'Expected <Define:');
     const name_token = this.consume(TokenType.COMPONENT_NAME, 'Expected component name');
+    this.define_name = name_token.value;
 
     // Validate component name against the shared rule
     if (!is_component_name(name_token.value)) {
@@ -278,6 +279,7 @@ export class Parser {
         defineArgs[propName] = attr_value;
       } else {
         // Regular attributes (tag="span", class="card", etc.)
+        if (attr_name.value === 'tag') this.reject_forbidden_tag_attribute(attr_value, attr_name.line, attr_name.column);
         attributes[attr_name.value] = attr_value;
       }
 
@@ -302,7 +304,6 @@ export class Parser {
           this.source,
           this.filename
         );
-        error.message += getSuggestion(error.message);
         throw error;
       }
       
@@ -336,7 +337,7 @@ export class Parser {
     // Check if body contains only slot nodes (ignoring whitespace-only text)
     const nonWhitespaceNodes = body.filter(node => {
       if (node.type === NodeType.TEXT) {
-        return (node as TextNode).content.trim() !== '';
+        return !is_html_whitespace((node as TextNode).content);
       }
       return true;
     });
@@ -348,6 +349,17 @@ export class Parser {
       if (allSlots) {
         isSlotOnly = true;
         slotNames = nonWhitespaceNodes.map(node => (node as SlotNode).name);
+      } else if (nonWhitespaceNodes.some(node => node.type === NodeType.SLOT)) {
+        // A slot in a template with other content would compile to invalid JavaScript
+        const stray = nonWhitespaceNodes.find(node => node.type !== NodeType.SLOT)!;
+        throw syntaxError(
+          `Mixed content not allowed in <Define:${name_token.value}>: a template with slots overrides its parent's, ` +
+          `so all content must be inside <Slot:slotname> tags (non-slot content at line ${stray.line}, col ${stray.column})`,
+          stray.line,
+          stray.column,
+          this.source,
+          this.filename
+        );
       }
     }
 
@@ -410,26 +422,92 @@ export class Parser {
       return this.parse_tag();
     }
     
-    // Skip newlines in content
+    // A newline in content is whitespace text. Codegen emits it on the line the
+    // newline leads into (its end position), so the whitespace before a line's
+    // markup is generated with that markup and a header line carries no body.
     if (this.match(TokenType.NEWLINE)) {
       const token = this.previous();
+      const end = token.loc ? token.loc.end : { line: token.line + 1, column: 1 };
       return createNode(
         NodeType.TEXT,
         { content: token.value },
         token.start,
         token.end,
-        token.line,
-        token.column,
+        end.line,
+        end.column,
         this.create_location(token, token)
       );
     }
     
-    // Advance if we don't recognize the token
+    // Anything else is a token that cannot appear here. Skipping it silently
+    // dropped stray closing tags and stray %> from the output.
     if (!this.is_at_end()) {
-      this.advance();
+      throw this.unexpected_content_error(this.peek());
     }
-    
+
     return null;
+  }
+
+  /** 1-based line/column where a token starts. */
+  private position_of(token: Token): { line: number, column: number } {
+    return { line: token.line, column: token.column };
+  }
+
+  /** Error for a token parse_content() cannot place: stray or mismatched closing
+   *  tags, a stray %>, a nested <Define:>. */
+  private unexpected_content_error(token: Token): JQHTMLParseError {
+    const at = this.position_of(token);
+    const where = `(line ${at.line}, col ${at.column})`;
+    const fail = (message: string) => new JQHTMLParseError(message, at.line, at.column, this.source, this.filename);
+
+    let closing: string | null = null;
+    if (token.type === TokenType.TAG_CLOSE) {
+      const name = this.peek_ahead(1);
+      closing = name.type === TokenType.DYNAMIC_TAG_NAME ? `{${Parser.normalize_expression(name.value)}}`
+        : name.type === TokenType.TAG_NAME ? name.value : '';
+    } else if (token.type === TokenType.SLOT_END) {
+      closing = `Slot:${this.peek_ahead(1).value}`;
+    } else if (token.type === TokenType.DEFINE_END) {
+      closing = `Define:${this.peek_ahead(1).value}`;
+    }
+
+    if (closing !== null) {
+      if (token.type === TokenType.TAG_CLOSE && !is_component_name(closing) && VOID_ELEMENTS.has(closing.toLowerCase())) {
+        return fail(
+          `Closing </${closing}> is not allowed: <${closing}> is a void element and has no closing tag ${where}. ` +
+          `Write <${closing}> or <${closing} /> alone.`
+        );
+      }
+      const open = this.open_elements[this.open_elements.length - 1];
+      if (!open) {
+        return fail(`Closing </${closing}> has no matching open tag ${where}`);
+      }
+      const opened = this.position_of(open.token);
+      // A closing tag for an element further out means the innermost one was
+      // never closed (<div><span></div>); report that, not a mismatch.
+      const closes_outer = closing === `Define:${this.define_name}` ||
+        this.open_elements.slice(0, -1).some((e) => e.name === closing);
+      if (closes_outer) {
+        const name = open.kind === 'slot' ? open.name.slice('Slot:'.length) : open.name;
+        return new JQHTMLParseError(
+          `Unclosed ${open.kind}: ${name} (line ${opened.line}, col ${opened.column}); ` +
+          `</${closing}> ${where} closes an enclosing element first`,
+          opened.line, opened.column, this.source, this.filename
+        );
+      }
+      return fail(
+        `Closing </${closing}> does not match open <${open.name}> ${where}; ` +
+        `<${open.name}> was opened at line ${opened.line}, col ${opened.column}`
+      );
+    }
+
+    if (token.type === TokenType.TAG_END) {
+      return fail(`Stray %> with no matching <% ${where}`);
+    }
+    if (token.type === TokenType.DEFINE_START) {
+      return fail(`<Define:${this.peek_ahead(1).value}> cannot appear inside a component definition ${where}`);
+    }
+    return fail(`Unexpected ${token.type} ${JSON.stringify(token.value)} ${where}`);
   }
   
   // Parse <%= expression %> or <%!= expression %> or <%br= expression %>
@@ -440,6 +518,8 @@ export class Parser {
     // Validate JavaScript code for common mistakes
     this.validate_javascript_code(code_token.value, code_token);
 
+    // With no %>, the lexer ran the expression to the end of the file
+    if (this.is_at_end()) this.throw_unterminated_expression(start_token);
     const end_token = this.consume(TokenType.TAG_END, 'Expected %>');
 
     // EXPRESSION_START and EXPRESSION_BR are escaped, EXPRESSION_UNESCAPED is not
@@ -448,12 +528,17 @@ export class Parser {
     // Only EXPRESSION_BR converts newlines to <br />
     const is_nl2br = start_token.type === TokenType.EXPRESSION_BR;
 
+    // One line: codegen emits the expression on the line it starts on. The
+    // source's newlines stay inside the <% %> - none becomes template text.
+    const joined = join_lines_mapped(code_token.value);
+
     return createNode(
       NodeType.EXPRESSION,
       {
-        code: code_token.value,
+        code: joined.code,
         escaped: is_escaped,
-        nl2br: is_nl2br
+        nl2br: is_nl2br,
+        code_loc: { line: code_token.line, column: code_token.column, line_starts: joined.line_starts }
       },
       start_token.start,
       end_token.end,
@@ -469,7 +554,8 @@ export class Parser {
     
     // Collect tokens with their types
     const tokens: Array<{type: TokenType, value: string}> = [];
-    
+    let code_loc: { line: number, column: number } | undefined;
+
     while (!this.check(TokenType.TAG_END)) {
       if (this.is_at_end()) {
         throw syntaxError(
@@ -486,6 +572,7 @@ export class Parser {
       // Validate JavaScript tokens for common mistakes
       if (token.type === TokenType.JAVASCRIPT) {
         this.validate_javascript_code(token.value, token);
+        if (!code_loc) code_loc = { line: token.line, column: token.column };
       }
 
       tokens.push({type: token.type, value: token.value});
@@ -495,7 +582,7 @@ export class Parser {
 
     return createNode(
       NodeType.CODE_BLOCK,
-      { tokens },  // Pass tokens array instead of concatenated code
+      { tokens, code_loc },  // Pass tokens array instead of concatenated code
       start_token.start,
       end_token.end,
       start_token.line,
@@ -574,6 +661,17 @@ export class Parser {
     const start_token = this.previous(); // SLOT_START
     const name_token = this.consume(TokenType.SLOT_NAME, 'Expected slot name');
 
+    // A slot name becomes an object key and the slot function's parameter name
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name_token.value)) {
+      throw syntaxError(
+        `Slot name "${name_token.value}" is not a valid JavaScript identifier: a slot name must start with a letter or underscore`,
+        name_token.line,
+        name_token.column,
+        this.source,
+        this.filename
+      );
+    }
+
     // Validate slot name against JavaScript reserved words
     if (Parser.JAVASCRIPT_RESERVED_WORDS.has(name_token.value.toLowerCase())) {
       throw syntaxError(
@@ -618,6 +716,7 @@ export class Parser {
     this.consume(TokenType.GT, 'Expected >');
     
     const children: ASTNode[] = [];
+    this.open_elements.push({ name: `Slot:${name_token.value}`, kind: 'slot', token: start_token });
     
     // Parse until we find the closing tag
     while (!this.check(TokenType.SLOT_END)) {
@@ -630,7 +729,6 @@ export class Parser {
           this.source,
           this.filename
         );
-        error.message += getSuggestion(error.message);
         throw error;
       }
       
@@ -640,8 +738,10 @@ export class Parser {
       }
     }
     
+    this.open_elements.pop();
+
     // Consume closing tag
-    this.consume(TokenType.SLOT_END, 'Expected </Slot:');
+    const close_token = this.consume(TokenType.SLOT_END, 'Expected </Slot:');
     const closing_name = this.consume(TokenType.SLOT_NAME, 'Expected slot name');
     
     if (closing_name.value !== name_token.value) {
@@ -664,7 +764,8 @@ export class Parser {
         attributes,
         params,
         children,
-        selfClosing: false
+        selfClosing: false,
+        close_loc: this.position_of(close_token)
       },
       start_token.start,
       end_token.end,
@@ -686,6 +787,13 @@ export class Parser {
     const is_dynamic = this.check(TokenType.DYNAMIC_TAG_NAME);
     const name_token = this.consume(is_dynamic ? TokenType.DYNAMIC_TAG_NAME : TokenType.TAG_NAME, 'Expected tag name');
     const dynamic_expression = is_dynamic ? name_token.value : null;
+    // Emitted as code on the tag's line, so a multi-line expression is joined there.
+    // The token starts at the {; the expression one column later.
+    const dynamic_joined = dynamic_expression !== null ? join_lines_mapped(dynamic_expression) : null;
+    const dynamic_code = dynamic_joined ? {
+      expression: dynamic_joined.code,
+      expression_loc: { line: name_token.line, column: name_token.column + 1, line_starts: dynamic_joined.line_starts }
+    } : {};
     if (is_dynamic && name_token.value.trim() === '') {
       throw syntaxError(
         `Dynamic component tag <{}> has an empty expression`,
@@ -698,9 +806,9 @@ export class Parser {
     let tag_name = is_dynamic ? Parser.normalize_expression(name_token.value) : name_token.value;
     let original_tag_name: string | null = null;  // Track original for $redrawable
 
-    // Check for forbidden tags
+    // Check for forbidden tags (any <script text is already a lexer error)
     const tag_lower = tag_name.toLowerCase();
-    if (!is_dynamic && (tag_lower === 'script' || tag_lower === 'style')) {
+    if (!is_dynamic && tag_lower === 'style') {
       throw syntaxError(
         `<${tag_name}> tags are not allowed in JQHTML templates. ` +
         `Use external files or inline styles via attributes instead.`,
@@ -719,6 +827,7 @@ export class Parser {
 
     // Parse attributes
     const { attributes, conditionalAttributes } = this.parse_attributes();
+    if (is_component) this.reject_forbidden_tag_attribute(attributes['tag'], name_token.line, name_token.column);
 
     // Check for $redrawable attribute transformation
     // Transform <div $redrawable> to <Redrawable tag="div">
@@ -749,7 +858,7 @@ export class Parser {
           {
             name: tag_name,
             dynamic: is_dynamic || undefined,
-            expression: dynamic_expression || undefined,
+            ...dynamic_code,
             attributes,
             conditionalAttributes: conditionalAttributes.length > 0 ? conditionalAttributes : undefined,
             children: [],
@@ -815,6 +924,11 @@ export class Parser {
     
     // Parse children
     const children: ASTNode[] = [];
+    this.open_elements.push({
+      name: is_dynamic ? `{${tag_name}}` : (original_tag_name || tag_name),
+      kind: is_component && !original_tag_name ? 'component' : 'tag',
+      token: start_token
+    });
 
     // Keep parsing content until we hit the closing tag
     // For $redrawable transforms, accept either original or transformed name
@@ -857,8 +971,10 @@ export class Parser {
       }
     }
 
+    this.open_elements.pop();
+
     // Consume closing tag
-    this.consume(TokenType.TAG_CLOSE, 'Expected </');
+    const close_token = this.consume(TokenType.TAG_CLOSE, 'Expected </');
     const close_name = this.consume(is_dynamic ? TokenType.DYNAMIC_TAG_NAME : TokenType.TAG_NAME, 'Expected tag name');
     if (is_dynamic) close_name.value = Parser.normalize_expression(close_name.value);
 
@@ -887,11 +1003,12 @@ export class Parser {
         {
           name: tag_name,
           dynamic: is_dynamic || undefined,
-          expression: dynamic_expression || undefined,
+          ...dynamic_code,
           attributes,
           conditionalAttributes: conditionalAttributes.length > 0 ? conditionalAttributes : undefined,
           children,
-          selfClosing: false
+          selfClosing: false,
+          close_loc: this.position_of(close_token)
         },
         start_token.start,
         end_token.end,
@@ -912,7 +1029,8 @@ export class Parser {
           conditionalAttributes: conditionalAttributes.length > 0 ? conditionalAttributes : undefined,
           children,
           selfClosing: false,
-          preserveWhitespace
+          preserveWhitespace,
+          close_loc: this.position_of(close_token)
         },
         start_token.start,
         end_token.end,
@@ -965,8 +1083,7 @@ export class Parser {
         // Check if this is a compound value with interpolation
         if (this.check(TokenType.ATTR_VALUE) ||
             this.check(TokenType.EXPRESSION_START) ||
-            this.check(TokenType.EXPRESSION_UNESCAPED) ||
-            this.check(TokenType.EXPRESSION_BR)) {
+            this.check(TokenType.EXPRESSION_UNESCAPED)) {
           value = this.parse_attribute_value();
         }
       }
@@ -1040,8 +1157,9 @@ export class Parser {
         );
       }
 
-      // Extract just the condition part (between parens, including parens)
-      condition = jsCode.substring(openParen, closeBrace).trim();
+      // Extract just the condition part (between parens, including parens). It is
+      // emitted on the tag's line, so a multi-line condition is joined there.
+      condition = join_lines(jsCode.substring(openParen, closeBrace).trim());
 
     } else {
       // Not an if statement
@@ -1095,60 +1213,94 @@ export class Parser {
     ) as ConditionalAttributeNode;
   }
 
-  // Parse potentially compound attribute value
-  private parse_attribute_value(): any {
-    const parts: Array<{type: 'text' | 'expression', value: string, escaped: boolean, nl2br?: boolean}> = [];
+  /** tag="script" / tag="style" on a <Define:> or a component would build the element
+   *  the template rules forbid. */
+  private reject_forbidden_tag_attribute(value: any, line: number, column: number): void {
+    if (value && typeof value === 'object' && value.quoted && /^\s*(script|style)\s*$/i.test(value.value)) {
+      throw syntaxError(
+        `tag="${value.value}" is not allowed: <script> and <style> elements cannot appear in JQHTML templates`,
+        line,
+        column,
+        this.source,
+        this.filename
+      );
+    }
+  }
 
-    // For simple string values that are quoted in the source, return them with a quoted flag
-    // This helps the codegen distinguish between $foo="bar" and $foo=bar
-    const firstToken = this.peek();
-    const isSimpleValue = this.check(TokenType.ATTR_VALUE) &&
-                         !this.check_ahead(1, TokenType.EXPRESSION_START) &&
-                         !this.check_ahead(1, TokenType.EXPRESSION_UNESCAPED) &&
-                         !this.check_ahead(1, TokenType.EXPRESSION_BR);
+  /** An expression whose %> never comes: report the opening tag, not the end of file. */
+  private throw_unterminated_expression(open_token: Token): never {
+    throw syntaxError(
+      `Unterminated ${open_token.value} expression - expected %>`,
+      open_token.line,
+      open_token.column,
+      this.source,
+      this.filename
+    );
+  }
+
+  // Parse potentially compound attribute value. <%br= never reaches here: the
+  // lexer rejects it in attribute values.
+  private parse_attribute_value(): any {
+    const parts: Array<{type: 'text' | 'expression', value: string, escaped: boolean}> = [];
+    let interpolated = false;
+
+    // Where a lone value token starts: the position of an unquoted JS value
+    const first = this.peek();
 
     // Collect all parts of the attribute value
     while (this.check(TokenType.ATTR_VALUE) ||
            this.check(TokenType.EXPRESSION_START) ||
-           this.check(TokenType.EXPRESSION_UNESCAPED) ||
-           this.check(TokenType.EXPRESSION_BR)) {
+           this.check(TokenType.EXPRESSION_UNESCAPED)) {
 
       if (this.check(TokenType.ATTR_VALUE)) {
         const token = this.advance();
+        if (token.interpolation_text) interpolated = true;
         // Preserve whitespace in interpolated attribute values - spaces between
         // expressions and text are significant (e.g., "<%= expr %> suffix")
         // Only skip completely empty parts
         if (token.value.length > 0) {
-          parts.push({ type: 'text', value: token.value, escaped: true });
+          // Literal text inside a quoted value with <%= %> parts: resolve its
+          // character references here (a lone token is classified below).
+          const value = token.interpolation_text ? decode_attribute_text(token.value) : token.value;
+          parts.push({ type: 'text', value, escaped: true });
         }
-      } else if (this.check(TokenType.EXPRESSION_START) ||
-                 this.check(TokenType.EXPRESSION_UNESCAPED) ||
-                 this.check(TokenType.EXPRESSION_BR)) {
-        const token_type = this.peek().type;
-        const is_escaped = token_type === TokenType.EXPRESSION_START || token_type === TokenType.EXPRESSION_BR;
-        const is_nl2br = token_type === TokenType.EXPRESSION_BR;
-        this.advance(); // consume <%=, <%!=, or <%br=
+      } else {
+        const is_escaped = this.peek().type === TokenType.EXPRESSION_START;
+        const open_token = this.advance(); // consume <%= or <%!=
         const expr_token = this.consume(TokenType.JAVASCRIPT, 'Expected expression');
+        if (this.is_at_end()) this.throw_unterminated_expression(open_token);
         this.consume(TokenType.TAG_END, 'Expected %>');
-        parts.push({ type: 'expression', value: expr_token.value, escaped: is_escaped, nl2br: is_nl2br });
+        const joined = join_lines_mapped(expr_token.value);
+        parts.push(Parser.with_code_loc(
+          { type: 'expression', value: joined.code, escaped: is_escaped },
+          { line: expr_token.line, column: expr_token.column, line_starts: joined.line_starts }
+        ));
+        interpolated = true;
       }
     }
     
-    // If it's a single text part, check if it's quoted
-    if (parts.length === 1 && parts[0].type === 'text') {
+    // A single text part that is not literal text from an interpolated value:
+    // classify it (quoted string, parenthesised expression, identifier, ...)
+    if (!interpolated && parts.length === 1 && parts[0].type === 'text') {
       const value = parts[0].value;
       
       // Check if the value has quotes (preserved by lexer for quoted strings)
       if ((value.startsWith('"') && value.endsWith('"')) || 
           (value.startsWith("'") && value.endsWith("'"))) {
-        // Return a marker that this was a quoted string
-        return { quoted: true, value: value.slice(1, -1) };
+        // Return a marker that this was a quoted string. Its character references
+        // are resolved as the HTML tokenizer resolves them (html_attribute.ts).
+        return { quoted: true, value: decode_attribute_text(value.slice(1, -1)) };
       }
       
       // Check if it's a parenthesized expression: $attr=(expr)
       if (value.startsWith('(') && value.endsWith(')')) {
-        // Return as an expression - remove the parentheses
-        return { expression: true, value: value.slice(1, -1) };
+        // Return as an expression - remove the parentheses. It is emitted on the
+        // tag's line, so a multi-line expression is joined there.
+        const joined = join_lines_mapped(value.slice(1, -1));
+        return Parser.with_code_loc(
+          { expression: true, value: joined.code },
+          { line: first.line, column: first.column + 1, line_starts: joined.line_starts }
+        );
       }
       
       // Check if it's a bare identifier or member expression: $attr=identifier or $attr=this.method
@@ -1157,7 +1309,7 @@ export class Parser {
       // Pattern: optional ! then starts with letter/$/_ then any combo of letters/numbers/$/_ and dots
       if (/^!?[a-zA-Z_$][a-zA-Z0-9_$.]*$/.test(value)) {
         // Return as an identifier expression
-        return { identifier: true, value: value };
+        return Parser.with_code_loc({ identifier: true, value: value }, { line: first.line, column: first.column });
       }
 
       // Check if it contains function calls (parentheses)
@@ -1165,17 +1317,26 @@ export class Parser {
       // Examples: getData(), obj.method(arg), rsx.route('A','B').url(123)
       if (value.includes('(') || value.includes(')')) {
         // Return as an identifier expression (function call chain)
-        return { identifier: true, value: value };
+        return Parser.with_code_loc({ identifier: true, value: value }, { line: first.line, column: first.column });
       }
 
       // Otherwise, treat as a JavaScript expression (includes numeric literals like 42, 3.14, etc.)
-      return { expression: true, value: value };
+      return Parser.with_code_loc({ expression: true, value: value }, { line: first.line, column: first.column });
     }
     
     // Any expression or multiple parts needs interpolation handling
     return { interpolated: true, parts };
   }
   
+  /**
+   * Attach where an attribute's JavaScript starts in the source (for sourcemaps) as a
+   * non-enumerable `loc`, so the value object keeps its documented shape.
+   */
+  static with_code_loc<T extends object>(value: T, loc: CodeLocation): T {
+    Object.defineProperty(value, 'loc', { value: loc, enumerable: false });
+    return value;
+  }
+
   // Check if we're at a closing tag for the given name
   /** Trim and collapse internal whitespace: the textual identity of a dynamic tag expression. */
   static normalize_expression(expression: string): string {
@@ -1344,7 +1505,7 @@ export class Parser {
       } else if (child.type === NodeType.TEXT) {
         // Check if it's non-whitespace text
         const textContent = (child as TextNode).content;
-        if (textContent.trim() !== '') {
+        if (!is_html_whitespace(textContent)) {
           hasNonSlotContent = true;
         }
       } else {

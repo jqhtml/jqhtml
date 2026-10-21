@@ -17,6 +17,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/text_input.jqhtml" \
   "$SCRIPT_DIR/tester.jqhtml" \
   --delay=1
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -45,3 +46,6 @@ echo "  ✅ Child methods (get_formatted_phone) work"
 echo "  ✅ Phone formatting: '5551234567' → '(555) 123-4567'"
 echo "  ✅ Auto-formatting: set_phone('8005551212') → '(800) 555-1212'"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

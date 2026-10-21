@@ -32,9 +32,14 @@ Verifies that lifecycle methods still execute correctly when called by the frame
 
 - `on_create()` sets initial state
 - `on_render()` called after DOM update
-- `on_load()` fetches data
+- `on_load()` fetches data; `on_loaded()` records the step (`on_load()` cannot touch
+  `this.state`)
 - `on_ready()` called when component ready
 - Data from `on_load()` is available in `on_ready()`
+- The order is exactly create, render, loaded, render (data changed), ready
+
+`test.js` (the root component) reads every child's status once all are ready and sets
+`window.testPassed`.
 
 ### Cross-Component Protection Test (Test 7)
 

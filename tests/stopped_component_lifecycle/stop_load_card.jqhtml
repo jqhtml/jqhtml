@@ -1,0 +1,7 @@
+<%--
+Stop_Load_Card - slow on_load(); records on_load/on_loaded/on_ready per $key in
+window.stop_log. A function arg ($fn) gives it no dedup key.
+--%>
+<Define:Stop_Load_Card>
+  <span><%= this.data.label || 'loading' %></span>
+</Define:Stop_Load_Card>

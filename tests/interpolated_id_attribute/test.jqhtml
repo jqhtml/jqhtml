@@ -1,0 +1,8 @@
+<Define:Test_Interpolated_Id_Attribute>
+  <div>
+    <p id="x_<%= this.args.missing || this.state.value %>">or-fallback</p>
+    <p id="row_<%= this.state.n > 0 ? 'pos' : 'neg' %>_end">ternary</p>
+    <p id="t_<%= this.state.value %>" @click=this.on_click>tracked</p>
+    <p id="plain_static">static</p>
+  </div>
+</Define:Test_Interpolated_Id_Attribute>

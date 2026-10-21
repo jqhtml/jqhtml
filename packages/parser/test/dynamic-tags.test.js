@@ -100,8 +100,8 @@ describe('codegen', () => {
 
   it('paired: content is compiled as an inline content function, as for a literal tag', () => {
     const code = compile(wrap(`<{this.data.wrapper}>\n<b>x</b>\n</{this.data.wrapper}>`));
-    assert.ok(code.includes(`{comp: [jqhtml.dynamic_component_name(this.data.wrapper), {}, function(_dynamic_component) { let _output = [];`), code);
-    assert.ok(code.includes(`return [_output, this]; }.bind(this)]});`), code);
+    assert.ok(code.includes(`{comp: [jqhtml.dynamic_component_name(this.data.wrapper), {}, function(_dynamic_component) { let _output = new jqhtml.Markup(this);`), code);
+    assert.ok(code.includes(`return _output; }.bind(this)]});`), code);
   });
 
   it('paired with slots: slot functions are attached exactly as for a literal tag', () => {

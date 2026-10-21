@@ -1,0 +1,6 @@
+<Define:Event_Invalidate_And_Sticky_Payloads>
+  <div>
+    <h1>invalidate(event_name) and sticky event payloads</h1>
+    <Eis_Target $sid="target" />
+  </div>
+</Define:Event_Invalidate_And_Sticky_Payloads>

@@ -23,9 +23,14 @@ This is invalid because unquoted `$` attributes expect a JavaScript variable/exp
 <!-- $ attributes with literal JavaScript -->
 <Component $foo=variable_name />
 <Component $foo=this.data.options />
-<Component $foo=JSON.stringify(data) />
+<Component $foo=(JSON.stringify(data)) />
 
-<!-- $ attributes with string values (less preferred) -->
+<!-- A bracketed $ value may span lines -->
+<Component $options=(JSON.stringify([
+  {value: 3, label: 'Member'},
+])) />
+
+<!-- $ attributes with string values (less preferred); one line only -->
 <Component $foo="<%= variable_name %>" />
 ```
 
@@ -36,22 +41,17 @@ This is invalid because unquoted `$` attributes expect a JavaScript variable/exp
 <Component foo=<%= bar() %> />          ❌ Invalid
 <Component $foo=<%= bar() %> />         ❌ Invalid
 
-<!-- These should use quotes -->
-<Component foo="<%= bar() %>" />        ✅ Valid
-<Component $foo="<%= bar() %>" />       ✅ Valid (but prefer $foo=bar())
+<!-- A <%= %> expression in a quoted value spanning lines -->
+<Component $foo="<%= bar(
+  1) %>" />                             ❌ Invalid (use $foo=(bar(\n 1)))
 ```
 
 ## Test Files
 
-- `test_invalid.jqhtml` - Reproduces the user's error (`$options=<%= ...`)
-- `test_valid.jqhtml` - Shows correct pattern (`$options="<%= ..."`)
-- `run-test.sh` - Runs both tests
-
-## Expected Behavior
-
-**Invalid test** should fail with clear error message explaining:
-- You cannot assign attributes directly to `<%= %>` blocks
-- Put quotes around interpolation: `attr="<%= value %>"`
-- Or use literal JavaScript for `$` attributes: `$attr=value`
-
-**Valid test** should compile successfully.
+- `test_invalid.jqhtml` - `$options=<%= ...` (unquoted): fails, and the error names
+  `$options=(JSON.stringify(data))`
+- `test_multiline_quoted.jqhtml` - `$options="<%= ...` spanning lines: fails with "must be
+  on one line", and the error shows the bracketed form
+- `test_valid.jqhtml` - the bracketed multi-line `$` value and one-line quoted
+  interpolation compile
+- `run-test.sh` - asserts all three (each error's text is checked)

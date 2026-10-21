@@ -47,7 +47,8 @@ they cost today. The compiled wrapper decides before anything else runs:
 |---|---|
 | `null`, `undefined` | prints nothing (unchanged) |
 | string, number, boolean, bigint | the existing escape path - the chain is never walked |
-| an array | the existing behaviour (an instruction splice) - the chain is never walked |
+| the markup buffer `content()` returns | spliced into the output - the chain is never walked |
+| any other array | the literal text `(Array)` - the chain is never walked |
 | any other object | the printer chain |
 
 The chain is walked only in the branch nothing previously used, so its cost is paid only

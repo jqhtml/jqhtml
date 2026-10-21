@@ -1,0 +1,4 @@
+<%-- Sw_Throw_Create - booted from a _Component_Init placeholder; on_create() throws. --%>
+<Define:Sw_Throw_Create class="sw-throw-create">
+  <span>never rendered</span>
+</Define:Sw_Throw_Create>

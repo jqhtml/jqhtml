@@ -1,0 +1,11 @@
+<%--
+Le_Parent - one child per on_load_error() variant, each failing its boot load.
+No on_load() of its own: its readiness depends purely on its children.
+--%>
+<Define:Le_Parent>
+  <Le_Plain $sid="plain" $key="b_plain" />
+  <Le_Fallback $sid="fallback" $key="b_fb" />
+  <Le_Super $sid="super" $key="b_super" />
+  <Le_Rethrow $sid="rethrow" $key="b_rethrow" />
+  <Le_Async $sid="async" $key="b_async" />
+</Define:Le_Parent>

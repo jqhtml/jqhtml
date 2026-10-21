@@ -1,0 +1,4 @@
+<%-- Ejc_Skip - extends= names a FURTHER templated ancestor (class extends Ejc_Grid_Mid extends Ejc_Grid_B), skipping the Mid layer on purpose. --%>
+<Define:Ejc_Skip extends="Ejc_Grid_B">
+  <Slot:body><span class="ejc-slot">Ejc_Skip</span></Slot:body>
+</Define:Ejc_Skip>

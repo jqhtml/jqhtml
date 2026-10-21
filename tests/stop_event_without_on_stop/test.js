@@ -10,6 +10,7 @@ class Stop_Event_Test_Main extends Jqhtml_Component {
       const child = this.sid('child');
       if (!child) {
         console.log('❌ SETUP FAIL: could not get child component instance');
+        window.testPassed = false;
         console.log('❌ SOME TESTS FAILED');
         return;
       }
@@ -60,6 +61,7 @@ class Stop_Event_Test_Main extends Jqhtml_Component {
       }
 
       console.log('');
+      window.testPassed = tests.every(t => t);
       if (tests.every(t => t)) {
         console.log('✅ ALL TESTS PASSED');
         $('#results').html('<span style="color: green;">✅ All tests passed</span>');

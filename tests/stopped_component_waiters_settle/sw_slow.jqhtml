@@ -1,0 +1,8 @@
+<%--
+Sw_Slow - on_load() takes 300ms, so both 'rendered' (fired after the post-load
+render) and 'ready' are still pending for that long: the window in which the test
+stops it.
+--%>
+<Define:Sw_Slow class="sw-slow">
+  <span><%= this.data.label %></span>
+</Define:Sw_Slow>

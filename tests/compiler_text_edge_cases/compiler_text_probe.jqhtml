@@ -1,0 +1,14 @@
+<Define:Compiler_Text_Probe>
+  <p $sid="nbsp">a  b </p><p $sid="nbsp_lead"> c</p>
+  <b $sid="multi"><%= 'x'
+  %></b>
+  <% const lit = `one
+
+  two
+    
+three`; %><i $sid="literal" title="<%= lit %>"></i>
+  <i $sid="comma"><%= 1, 2 %></i><i $sid="comma_attr" title="<%= 'a', 'b' %>"></i>
+  <i $sid="semi" title="<%= 'v'; %>"></i>
+  <b $sid="br"><%br= 'l1\nl2'
+  %></b>
+</Define:Compiler_Text_Probe>

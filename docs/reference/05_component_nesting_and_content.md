@@ -68,16 +68,21 @@ JQHTML components can be nested within other components. The `content()` functio
 
 ### Content Markers
 
-Templates compile to instruction arrays. Content written between a component's tags is
-compiled as a function closed over the component whose template contains it. When
-`<%= content() %>` runs, that function's instructions are spliced into the receiving
-component's stream as a `['_content', instructions, definer]` marker, and the instruction
-processor renders them in `definer` — so `this` in a `@click` handler, the scoping of a
+Templates compile to markup buffers of instructions. Content written between a component's
+tags is compiled as a function closed over the component whose template contains it, and it
+returns its own buffer, which records that component as its definer. When
+`<%= content() %>` runs, the buffer is spliced into the receiving component's stream as
+itself, and the instruction processor renders it in its definer — so `this` in a `@click` handler, the scoping of a
 hand-written `id=`, and `instantiator()` of a component written in the content all name the
 component that wrote the markup, exactly as `<%= this.x %>` and `$sid` already do.
 
 The receiving component controls where the content appears; it is never the `this` of
 anything written in it.
+
+When the caller supplied nothing - no content between the tags, or only HTML whitespace -
+`content()` returns `''` instead of a buffer, so it can be tested before drawing a wrapper:
+`<% const _body = content(); %><% if (_body) { %><div class="body"><%= _body %></div><% } %>`.
+The same rule applies to named slots; see "Optional Slots" in `06_slot_system.md`.
 
 ### Template Compilation
 

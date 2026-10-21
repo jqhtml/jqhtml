@@ -1,0 +1,6 @@
+<Define:Reload_Cache_Key_Refresh>
+  <div>
+    <h1>reload() refreshes the cache key and the html snapshot</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Reload_Cache_Key_Refresh>

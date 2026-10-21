@@ -1,0 +1,19 @@
+<%--
+Define_Defaults_Nearest_Template_Wins - when a <Define> and an ancestor <Define> set the
+same attribute, the nearer <Define> wins; the invocation beats both.
+
+Defect: _apply_default_attributes() applied each template of the chain parent first with
+"only if not already set", so the PARENT's value won for plain attributes, $/data- args
+and each style property.
+--%>
+<Define:Define_Defaults_Nearest_Template_Wins>
+  <div>
+    <h1>Define defaults: nearest template wins</h1>
+    <Dn_Parent $sid="parent" />
+    <Dn_Child $sid="child" />
+    <Dn_Child $sid="invoked" title="invocation" data-mode="invocation" $kind="invocation kind"
+        style="color: black" tabindex="0" class="inv c1" />
+    <Dn_Slot_Child $sid="slot_child" />
+    <div $sid="stage"></div>
+  </div>
+</Define:Define_Defaults_Nearest_Template_Wins>

@@ -1,0 +1,4 @@
+<%-- Ejc_Missing - extends= names a template that does not exist; resolution falls back to the prototype chain (Ejc_Grid_B). --%>
+<Define:Ejc_Missing extends="Ejc_Not_Registered">
+  <Slot:body><span class="ejc-slot">Ejc_Missing</span></Slot:body>
+</Define:Ejc_Missing>

@@ -365,6 +365,7 @@ class Test_Container extends Jqhtml_Component {
     console.log('FINAL RESULTS');
     console.log('========================================');
     const all_passed = tests.every(t => t);
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log(`✅ ALL ${tests.length} TESTS PASSED`);
       this.$sid('results').html('<span style="color: green;">✅ All tests passed</span>');

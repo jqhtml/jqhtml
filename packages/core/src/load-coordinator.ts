@@ -226,7 +226,7 @@ export class Load_Coordinator {
     static register_leader(
         component: Jqhtml_Component,
         key: string
-    ): (final_data: Record<string, any>) => void {
+    ): (final_text: string | null) => void {
         // Create a promise that we control - it settles when coordination completes or fails
         let resolve_promise!: () => void;
         let reject_promise!: (error: Error) => void;
@@ -251,8 +251,8 @@ export class Load_Coordinator {
 
         this._registry.set(key, entry);
 
-        // Return cleanup function that accepts the final data
-        return (final_data: Record<string, any>) => this._complete_coordination(key, component, final_data);
+        // Return cleanup function that accepts the final data, already serialized
+        return (final_text: string | null) => this._complete_coordination(key, component, final_text);
     }
 
     /**
@@ -276,10 +276,11 @@ export class Load_Coordinator {
      *
      * @param key - The coordination key captured at registration
      * @param leader - The leader component
-     * @param final_data - The final data after on_load and normalization
+     * @param final_text - The leader's final this.data as Jqhtml_Local_Storage.serialize()
+     *                     text - the text the leader already holds for change detection
      * @private
      */
-    private static _complete_coordination(key: string, leader: Jqhtml_Component, final_data: Record<string, any>): void {
+    private static _complete_coordination(key: string, leader: Jqhtml_Component, final_text: string | null): void {
         const entry = this._registry.get(key);
 
         if (!entry) {
@@ -291,8 +292,9 @@ export class Load_Coordinator {
         // The cache serializer, not JSON.stringify: this.data holds live Date/Map/Set
         // and register_cache_class() instances, and only the serializer that made
         // them knows how to carry them across. null means the data as a whole could
-        // not be expressed; followers then load independently.
-        entry.leader_data = Jqhtml_Local_Storage.serialize(final_data);
+        // not be expressed; followers then load independently. The leader passes the
+        // text it already holds (its data snapshot), so nothing is serialized here.
+        entry.leader_data = final_text;
         entry.status = 'completed';
 
         if ((window as any).jqhtml?.debug?.verbose) {
@@ -359,7 +361,8 @@ export class Load_Coordinator {
     }
 
     /**
-     * Handle leader on_load() error
+     * Handle a failed leader load: on_load() threw, or applying its result failed
+     * (non-object this.data, or on_loaded() threw).
      * Rejects every waiting follower and clears the entry so the next component retries
      *
      * @param key - The dedup key captured at registration
@@ -373,10 +376,15 @@ export class Load_Coordinator {
 
         entry.status = 'failed';
 
-        console.error(
-            `[Load Coordinator] Leader ${entry.leader_component._cid} on_load() failed for key: ${key}`,
-            error
-        );
+        // Not printed here: the leader and every follower report the failure themselves
+        // (each runs its own on_load_error(), or fails its boot), so printing it here too
+        // only showed the same error once more.
+        if ((window as any).jqhtml?.debug?.verbose) {
+            console.log(
+                `[Load Coordinator] Leader ${entry.leader_component._cid} load failed for key: ${key}`,
+                error
+            );
+        }
 
         // Reject FIRST: followers are parked on this promise and their catch in _load()
         // propagates the failure exactly as if their own on_load() had thrown. Deleting

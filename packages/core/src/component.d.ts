@@ -28,6 +28,7 @@ export declare class Jqhtml_Component {
     on_render(): void;
     on_create(): void;
     on_load(): Promise<void>;
+    on_load_error(error: any): void | Promise<void>;
     on_ready(): Promise<void>;
     on_stop(): void;
     on_attach(): void;

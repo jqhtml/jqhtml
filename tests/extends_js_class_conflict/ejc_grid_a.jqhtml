@@ -1,0 +1,4 @@
+<%-- Ejc_Grid_A - a templated parent. Its marker shows when A's markup rendered. --%>
+<Define:Ejc_Grid_A class="ejc-grid-a">
+  <div class="ejc-a-marker">A:<%= content('body') %></div>
+</Define:Ejc_Grid_A>

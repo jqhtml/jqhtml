@@ -18,7 +18,7 @@
   "fixtures": {
     "test-error.jqhtml": {
       "reason": "Malformed on purpose - exercises the parser's error reporting.",
-      "error": "Unbalanced bracket error in component \"TestError\": Unexpected token ':'"
+      "error": "JavaScript syntax error in component \"TestError\": Unexpected token ':'"
     },
     "test-highlighting.jqhtml": {
       "reason": "Syntax-highlighting fixture: deliberately pairs correct and incorrect forms so the VS Code grammar can be checked against both. Lines 8-9 carry quoted event handlers labelled \"Wrong - String Not Function\"; the parser stops at the first of them.",

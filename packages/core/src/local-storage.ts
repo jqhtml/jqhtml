@@ -34,11 +34,18 @@
  * Storage is scoped by a user-provided cache key (typically a session identifier,
  * user ID, or combination of relevant scope factors). This scope is stored in
  * `_jqhtml_cache_key`. If the cache key changes between page loads, all JQHTML
- * storage is cleared to prevent stale data from different sessions/users.
+ * storage is cleared to prevent stale data from different sessions/users. The check
+ * runs once, in set_cache_key(), not on every write: entry keys already carry the
+ * jqhtml version and the cache key, so tabs with different scopes (or different
+ * jqhtml versions) can write side by side without reading each other's entries.
  *
  * Key Format:
- * Keys are stored as: `jqhtml::developer_key::cache_key`
- * Example: `jqhtml::User_Profile_data::user_123`
+ * Keys are stored as: `jqhtml::<developer_key>::<jqhtml_version>::<cache_key>`
+ * Example: `jqhtml::User_Profile::{"id":5}::2.3.75::user_123`
+ * The part after the developer key is exactly the scope marker stored in
+ * `_jqhtml_cache_key` (`<jqhtml_version>::<cache_key>`), so the version appears once.
+ * Entries in the older `jqhtml::<developer_key>::<cache_key>` format are never read
+ * (their key never matches); the scope check or the quota cleanup removes them.
  *
  * The `jqhtml::` prefix identifies JQHTML keys, allowing safe clearing of only our keys
  * without affecting other JavaScript libraries. This enables transparent coexistence
@@ -150,6 +157,30 @@ const CORE_VERSION = '__VERSION__';
 const CLASS_MARKER = '__jqhtml_class__';
 const PROPS_MARKER = '__jqhtml_props__';
 
+// How a serialized text is checked for anything the deserialize walk has to act
+// on. A class marker is always written as a KEY, so its quoted form is in the text
+// whenever one is present. A false positive (a string value that happens to equal
+// the marker) only costs the walk; a false negative is impossible. `__proto__` is
+// listed because the walk assigns keys with `result[key] =`, which treats that one
+// key differently from JSON.parse's own property; texts carrying it keep the walk
+// so the result is unchanged.
+const CLASS_MARKER_TEXT = `"${CLASS_MARKER}"`;
+const PROTO_KEY_TEXT = '"__proto__"';
+const needs_deserialize_walk = (text: string): boolean =>
+    text.indexOf(CLASS_MARKER_TEXT) !== -1 || text.indexOf(PROTO_KEY_TEXT) !== -1;
+
+// The on_create() snapshot (Jqhtml_Local_Storage.snapshot()) must give on_load()
+// back exactly what on_create() left, and that includes a key holding `undefined`,
+// which JSON cannot express. Only the snapshot writes this marker; the cache and
+// this.data never contain it. The name cannot be a class name, so it cannot collide
+// with a registered class.
+const UNDEFINED_CLASS = '(undefined)';
+const UNDEFINED_WIRE = { [CLASS_MARKER]: UNDEFINED_CLASS, [PROPS_MARKER]: 0 };
+
+// Set only for the duration of a snapshot() call (the serializer is synchronous and
+// never re-entered by it), so the hot paths take no extra parameter.
+let keep_undefined = false;
+
 /**
  * Register a class for cache serialization/deserialization.
  * Must be called before attempting to cache instances of this class.
@@ -194,6 +225,17 @@ register_cache_class(Set, {
     to_plain: (set: Set<any>) => Array.from(set),
     from_plain: (items: any[]) => new Set(items)
 });
+
+/**
+ * True when `value` is an instance of a class the cache restores as itself: Date, Map,
+ * Set or a class passed to register_cache_class().
+ */
+export function is_registered_cache_class_instance(value: any): boolean {
+    const ctor = value && value.constructor;
+    if (typeof ctor !== 'function') return false;
+    const entry = class_registry[ctor.name];
+    return !!entry && entry.klass === ctor;
+}
 
 /**
  * Find the registry entry for a live value: by constructor name first, then by
@@ -305,7 +347,8 @@ function process_for_serialization(
         return null;
     }
     if (value === undefined) {
-        return undefined; // JSON.stringify will omit this property
+        // JSON.stringify omits the property - except in a snapshot, which keeps it
+        return keep_undefined ? UNDEFINED_WIRE : undefined;
     }
 
     // Handle primitives
@@ -571,7 +614,7 @@ function make_strip_collector(component_name?: string): Strip_Collector | undefi
             console.warn(
                 `[JQHTML] <${component_name}> dropped ${path} from this.data: ${strip_advice(kind, detail)}\n` +
                 `  this.data is always the serialized copy jqhtml stores in and restores from cache, ` +
-                `so only serializable values survive on_load() - in every cache mode.`,
+                `so only serializable values survive on_create() and on_load() - in every cache mode.`,
                 { component: component_name, path, kind }
             );
         } catch {
@@ -595,6 +638,11 @@ function make_strip_collector(component_name?: string): Strip_Collector | undefi
 function deserialize_value(str: string, verbose: boolean): any | null {
     try {
         const parsed = JSON.parse(str);
+        // Nothing to restore: JSON.parse already built a fresh graph, and the walk
+        // would only copy it again.
+        if (!needs_deserialize_walk(str)) {
+            return parsed;
+        }
         return process_for_deserialization(parsed, verbose);
     } catch (e) {
         if (verbose) {
@@ -626,6 +674,11 @@ function process_for_deserialization(value: any, verbose: boolean): any {
     if (value[CLASS_MARKER] !== undefined && value[PROPS_MARKER] !== undefined) {
         const class_name = value[CLASS_MARKER];
         const props = value[PROPS_MARKER];
+
+        // A snapshot's `undefined` (see UNDEFINED_CLASS)
+        if (class_name === UNDEFINED_CLASS) {
+            return undefined;
+        }
 
         // Look up registered class (Date, Map and Set are registered like any other)
         const entry = class_registry[class_name];
@@ -688,7 +741,7 @@ export type CacheMode = 'data' | 'html';
 
 export class Jqhtml_Local_Storage {
     private static _cache_key: string | null = null;
-    /** Versioned scope identity - compared in _validate_scope() to clear on a core upgrade. */
+    /** Versioned scope identity `<version>::<cache_key>` - compared in _validate_scope() to clear on a core upgrade, and the suffix of every entry key (_build_key()). */
     private static _scope_marker: string | null = null;
     private static _cache_mode: CacheMode = 'data';
     private static _storage_available: boolean | null = null;
@@ -703,11 +756,12 @@ export class Jqhtml_Local_Storage {
     static set_cache_key(cache_key: string, cache_mode: CacheMode = 'data'): void {
         this._cache_key = cache_key;
 
-        // Key SHAPE is a function of the library (see cache-key-serializer.ts), so an
-        // upgrade that changes it must invalidate everything persisted under the old shape.
-        // Version the SCOPE MARKER rather than the key itself: _validate_scope() already
-        // clears every jqhtml key when this value changes, and leaving the per-entry key
-        // format alone keeps stored keys readable and avoids repeating the version in each.
+        // Key SHAPE and the stored data format are functions of the library (see
+        // cache-key-serializer.ts), so entries written by another jqhtml version must never
+        // be read. The marker is versioned so _validate_scope() clears every jqhtml key on a
+        // version change, and _build_key() puts the same `<version>::<cache_key>` suffix on
+        // every entry key: a tab still running another version against the same app cache
+        // key writes keys this runtime never looks up.
         this._scope_marker = `${CORE_VERSION}::${cache_key}`;
         this._cache_mode = cache_mode;
         this._init();
@@ -777,6 +831,10 @@ export class Jqhtml_Local_Storage {
     /**
      * Validate storage scope and clear JQHTML keys if cache key changed
      * Only clears keys prefixed with 'jqhtml::' to preserve other libraries' data
+     *
+     * Runs once per set_cache_key(), never per write. The clear here is what bounds
+     * storage: entries of scopes no longer in use are removed the next time any tab sets
+     * a different scope. A tab still using such a scope simply re-caches.
      * @private
      */
     private static _validate_scope(): void {
@@ -840,13 +898,15 @@ export class Jqhtml_Local_Storage {
     }
 
     /**
-     * Build scoped key with JQHTML namespace prefix
+     * Build scoped key with JQHTML namespace prefix:
+     * `jqhtml::<developer_key>::<jqhtml_version>::<cache_key>`.
+     * The suffix is the scope marker, so the version is in the key exactly once.
      * @param {string} key - Developer-provided key
      * @returns {string}
      * @private
      */
     private static _build_key(key: string): string {
-        return `jqhtml::${key}::${this._cache_key}`;
+        return `jqhtml::${key}::${this._scope_marker}`;
     }
 
     /**
@@ -872,11 +932,25 @@ export class Jqhtml_Local_Storage {
             return;
         }
 
+        this.set_serialized(key, serialize_value(value, this._is_verbose()));
+    }
+
+    /**
+     * Store text that serialize() (or normalize()) already produced - the write
+     * set() performs, without serializing a second time. A component's freshly
+     * loaded data is written this way: the text it was normalized through IS the
+     * cache entry.
+     *
+     * @param {string} key - Storage key
+     * @param {string|null} serialized - serialize() output; null removes the entry
+     */
+    static set_serialized(key: string, serialized: string | null): void {
+        if (!this._is_ready()) {
+            return;
+        }
+
         const verbose = this._is_verbose();
         const scoped_key = this._build_key(key);
-
-        // Serialize with class-aware processing
-        const serialized = serialize_value(value, verbose);
 
         if (serialized === null) {
             // Serialization failed - remove any existing cache entry
@@ -1013,6 +1087,19 @@ export class Jqhtml_Local_Storage {
      * @returns {any} The round-tripped value. Never the original object.
      */
     static normalize_for_cache(value: any, component_name?: string): any {
+        return this.normalize(value, component_name).value;
+    }
+
+    /**
+     * normalize_for_cache(), also returning the serialized text the value went
+     * through. The text IS the value's serialized form - what serialize() of the
+     * result produces and what the cache stores - so a component keeps it as the
+     * snapshot of its new this.data (change detection, the cache write, the
+     * coordinator hand-off) instead of serializing the same data again.
+     *
+     * @returns {{value: any, text: string}} The round-tripped value and its text.
+     */
+    static normalize(value: any, component_name?: string): { value: any; text: string } {
         const verbose = this._is_verbose();
         const collector = make_strip_collector(component_name);
 
@@ -1023,7 +1110,7 @@ export class Jqhtml_Local_Storage {
             // The value as a WHOLE could not be expressed (it was itself a function,
             // a promise, a DOM node...). The round trip of such a value is nothing;
             // returning the original would put an uncacheable object into this.data.
-            return {};
+            return { value: {}, text: '{}' };
         }
 
         // Deserialize back to object
@@ -1034,22 +1121,53 @@ export class Jqhtml_Local_Storage {
         // serialized text disambiguates.
         if (deserialized === null && serialized !== 'null') {
             // Only reachable when a registered class constructor blew up on restore.
-            return {};
+            return { value: {}, text: '{}' };
         }
 
-        return deserialized;
+        return { value: deserialized, text: serialized };
     }
 
     /**
-     * Internal set implementation with scope validation and quota handling
+     * Serialize the on_create() state of this.data for restore_snapshot().
+     *
+     * The cache serializer, so Date, Map, Set and register_cache_class() instances
+     * come back as themselves, plus one thing the cache never stores: a key holding
+     * `undefined` keeps its key. Functions, DOM nodes and the like are dropped, as
+     * the JSON copy this replaces dropped them.
+     *
+     * @param component_name - Names the component in the development warning for each
+     *        dropped value, as normalize() does. Omit to drop silently.
+     * @returns The snapshot text, or null when the value cannot be expressed at all.
+     */
+    static snapshot(value: any, component_name?: string): string | null {
+        keep_undefined = true;
+        try {
+            return serialize_value(value, this._is_verbose(), 'this.data', make_strip_collector(component_name));
+        } finally {
+            keep_undefined = false;
+        }
+    }
+
+    /**
+     * Rebuild a fresh copy of the value snapshot() serialized. Every call returns a
+     * new object graph, so each on_load() starts from its own copy.
+     */
+    static restore_snapshot(text: string): any {
+        return deserialize_value(text, this._is_verbose());
+    }
+
+    /**
+     * Internal set implementation with quota handling.
+     *
+     * Does NOT validate the scope: that happens once, in set_cache_key(). Entry keys
+     * already carry the jqhtml version and the cache key, so tabs with different scopes write disjoint keys and
+     * coexist. Re-checking the shared `_jqhtml_cache_key` marker here made two such tabs
+     * clear every jqhtml key on each other's every write.
      * @param {string} key
      * @param {string} serialized - Pre-serialized JSON string
      * @private
      */
     private static _set_item(key: string, serialized: string): void {
-        // Validate scope before every write
-        this._validate_scope();
-
         const scoped_key = this._build_key(key);
 
         try {
@@ -1062,8 +1180,8 @@ export class Jqhtml_Local_Storage {
                 // Clear only JQHTML keys and retry once
                 this._clear_jqhtml_keys();
                 // Re-stamp the SCOPE MARKER, not the raw developer key: _validate_scope()
-                // compares against `${CORE_VERSION}::${key}`, so writing the bare key here
-                // made the very next write look like a scope change and wipe the cache again.
+                // compares against `${CORE_VERSION}::${key}`, so a bare key here would make
+                // the next set_cache_key() look like a scope change and wipe the cache again.
                 localStorage.setItem('_jqhtml_cache_key', this._scope_marker!);
 
                 try {

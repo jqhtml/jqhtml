@@ -18,11 +18,11 @@ const version = parserPackage.version;
 
 console.log(`Injecting parser version: ${version}`);
 
-// Files to process
+// Files that carry the placeholder: codegen's module output, and compileTemplate's
+// fallback version when its caller passes none
 const filesToProcess = [
   path.join(__dirname, '..', 'packages', 'parser', 'dist', 'codegen.js'),
-  path.join(__dirname, '..', 'packages', 'parser', 'dist', 'codegen.cjs'),
-  path.join(__dirname, '..', 'packages', 'parser', 'lib', 'codegen.js'),
+  path.join(__dirname, '..', 'packages', 'parser', 'dist', 'compiler.js'),
 ];
 
 // Process each file

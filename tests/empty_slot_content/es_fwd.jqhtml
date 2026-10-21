@@ -1,0 +1,6 @@
+<Define:Es_Fwd>
+  <Es_Row>
+    <Slot:value>forwarded</Slot:value>
+    <Slot:note><%= content('note') %></Slot:note>
+  </Es_Row>
+</Define:Es_Fwd>

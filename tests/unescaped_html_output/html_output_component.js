@@ -73,6 +73,7 @@ class Html_Output_Component extends Jqhtml_Component {
 
     console.log('');
     console.log('========================================');
+    console.log('SUMMARY: checks complete (a failed check prints FAIL above)');
     console.log('');
   }
 }

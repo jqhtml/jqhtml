@@ -1,0 +1,4 @@
+<%-- Ejc_Grid_Mid - an intermediate templated layer: class Ejc_Grid_Mid extends Ejc_Grid_B. --%>
+<Define:Ejc_Grid_Mid class="ejc-grid-mid">
+  <div class="ejc-mid-marker">MID:<%= content('body') %></div>
+</Define:Ejc_Grid_Mid>

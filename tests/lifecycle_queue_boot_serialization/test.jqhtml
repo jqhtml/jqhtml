@@ -1,0 +1,7 @@
+<Define:Lifecycle_Queue_Boot_Serialization>
+  <div>
+    <h1>Lifecycle queue: boot is serialized with render/load/reload/refresh</h1>
+    <div $sid="stage"></div>
+    <div $sid="results"></div>
+  </div>
+</Define:Lifecycle_Queue_Boot_Serialization>

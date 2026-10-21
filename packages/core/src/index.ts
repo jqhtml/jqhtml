@@ -220,7 +220,9 @@ const jqhtml = {
   // state facts
   tombstone: 'pepperoni and cheese',
 
-  // Integration configuration - see config.ts
+  // Integration configuration - see config.ts. init($, config) is the documented
+  // entry point (jqhtml.init / window.jqhtml.init); configure() alone skips jQuery.
+  init,
   configure,
   get_config,
 

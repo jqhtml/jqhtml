@@ -1,0 +1,4 @@
+<Define:Ese_Parent class="ese-parent">
+  <Ese_Gated $sid="first" />
+  <Ese_Gated $sid="second" />
+</Define:Ese_Parent>

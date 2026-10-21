@@ -15,12 +15,15 @@ class Stop_Test extends Jqhtml_Component {
       console.log('========================================');
       console.log('');
 
-      const before_stop = Date.now();
-      this.stop(); // Synchronous
-      const after_stop = Date.now();
+      // stop() is synchronous: on_stop() runs inside the call, and stop() returns
+      // nothing to await. Checked by call order, not by elapsed time, so the test
+      // holds however loaded the machine is.
+      this.inside_stop_call = true;
+      const stop_result = this.stop();
+      this.inside_stop_call = false;
 
       console.log('stop() completed');
-      console.log(`stop() execution time: ${after_stop - before_stop}ms (should be < 5ms - synchronous)`);
+      console.log(`stop() returned: ${stop_result === undefined ? 'undefined' : typeof stop_result}`);
       console.log('');
 
       // DOM should still exist after stop()
@@ -68,13 +71,15 @@ class Stop_Test extends Jqhtml_Component {
         tests.push(false);
       }
 
-      // TEST 4: stop() was synchronous (< 5ms)
-      const execution_time = after_stop - before_stop;
-      if (execution_time < 5) {
-        console.log(`✅ TEST 4 PASS: stop() is synchronous (${execution_time}ms)`);
+      // TEST 4: stop() is synchronous - on_stop() ran inside the stop() call, and
+      // stop() returned no promise
+      const returned_promise = stop_result !== undefined && stop_result !== null &&
+        typeof stop_result.then === 'function';
+      if (this.on_stop_ran_inside_stop_call === true && !returned_promise) {
+        console.log('✅ TEST 4 PASS: stop() is synchronous (on_stop() ran inside the call; no promise returned)');
         tests.push(true);
       } else {
-        console.log(`❌ TEST 4 FAIL: stop() took too long (${execution_time}ms)`);
+        console.log(`❌ TEST 4 FAIL: stop() is not synchronous (on_stop() inside the call: ${this.on_stop_ran_inside_stop_call}, returned a promise: ${returned_promise})`);
         tests.push(false);
       }
 
@@ -91,6 +96,7 @@ class Stop_Test extends Jqhtml_Component {
 
       // Final result
       const all_passed = tests.every(t => t);
+      window.testPassed = all_passed;
       if (all_passed) {
         console.log('✅ ALL TESTS PASSED');
         $('#results').html('<span style="color: green;">✅ All tests passed</span>');
@@ -107,8 +113,9 @@ class Stop_Test extends Jqhtml_Component {
   }
 
   on_stop() {
-    // Set flag to verify on_stop was called
+    // Set flag to verify on_stop was called, and whether it ran inside stop()
     this.stop_called = true;
+    this.on_stop_ran_inside_stop_call = this.inside_stop_call === true;
 
     // Cleanup interval
     if (this.update_interval) {

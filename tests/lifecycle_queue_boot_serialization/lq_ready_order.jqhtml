@@ -1,0 +1,5 @@
+<%-- Lq_Ready_Order - on_ready() awaits one reload() (pulled forward, runs at once) and
+makes two unawaited calls after it, which must still wait for on_ready() to return. --%>
+<Define:Lq_Ready_Order class="lq-ready-order">
+  <span><%= this.data.run %></span>
+</Define:Lq_Ready_Order>

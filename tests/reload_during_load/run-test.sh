@@ -16,6 +16,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/parent_a.jqhtml" \
   "$SCRIPT_DIR/child_b.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -30,5 +31,9 @@ echo "  50ms  - Parent A's setTimeout fires, calls child.reload()"
 echo "  100ms - Child B's first on_load() completes"
 echo ""
 echo "Expected: reload() during active on_load() should NOT throw error"
-echo "          Instead, reload() should queue/debounce properly"
+echo "          Instead, reload() waits for the boot load, then runs: on_load runs twice, never"
+echo "          overlapping, and the child fires ready once, with the reload's data"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

@@ -1,0 +1,7 @@
+<Define:Map_Loader>
+  <ul class="entries">
+    <% for (const [key, value] of this.data.by_id) { %>
+      <li class="entry"><%= key %>=<%= value %></li>
+    <% } %>
+  </ul>
+</Define:Map_Loader>

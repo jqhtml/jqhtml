@@ -3,7 +3,7 @@
  *
  * Extracted from component.ts - handles cache key generation,
  * cache reads during create(), cache checks during reload(),
- * and HTML cache snapshots during ready().
+ * and HTML cache snapshots during ready() and reload().
  *
  * Uses Jqhtml_Local_Storage as the underlying storage layer.
  */
@@ -121,6 +121,35 @@ export function warn_uncacheable_component(
 }
 
 /**
+ * Keep the element's `data-nocache` marker in step with a cache key result. Boot,
+ * `load()` and `reload()` all call this with the key they just computed, so the marker
+ * always describes the CURRENT args:
+ *
+ *   key        - remove any `data-nocache` (args that were unkeyable are keyable again)
+ *   no key     - `data-nocache="<arg>:<reason>"`, plus the dev warning when `warn` is set
+ *                (itself gated by `warn_uncacheable_args`, once per component+arg+reason)
+ */
+export function mark_cacheability(component: any, result: Cache_Key_Result, warn: boolean = true): void {
+  const { cache_key, uncacheable_property, uncacheable_reason } = result;
+  if (cache_key !== null) {
+    component.$.removeAttr('data-nocache');
+    return;
+  }
+
+  if (uncacheable_property) {
+    // "<arg>:<reason>" - a bare property name left authors reverse-engineering why
+    component.$.attr(
+      'data-nocache',
+      uncacheable_reason ? `${uncacheable_property}:${uncacheable_reason}` : uncacheable_property
+    );
+  }
+
+  if (warn) {
+    warn_uncacheable_component(component, uncacheable_property, uncacheable_reason);
+  }
+}
+
+/**
  * An HTML-cache entry: the inner HTML of a component plus the cid it was rendered
  * under. Scoped ids inside the markup are "<name>:<cid>", so the owner's cid is what
  * lets a replaying instance tell its own elements from its children's.
@@ -132,8 +161,9 @@ export interface Html_Cache_Snapshot {
 
 /**
  * Read an HTML-cache entry, rejecting anything that is not a well-formed snapshot.
- * Entries written by an older core are bare strings; they are treated as a miss (and
- * are cleared wholesale by the CORE_VERSION scope marker on the next version bump).
+ * Entries written by an older core are bare strings. They are never looked up (entry keys
+ * carry the core version), and the versioned scope marker clears them on the next version
+ * bump; the shape check below is a second guard.
  */
 function read_html_snapshot(html_cache_key: string): Html_Cache_Snapshot | null {
   const entry = Jqhtml_Local_Storage.get(html_cache_key);
@@ -155,21 +185,14 @@ function read_html_snapshot(html_cache_key: string): Html_Cache_Snapshot | null 
  * @param component - The component instance
  */
 export function read_cache_in_create(component: any): void {
-  const { cache_key, uncacheable_property, uncacheable_reason } = generate_cache_key(component);
+  const key_result = generate_cache_key(component);
+  const { cache_key, uncacheable_property } = key_result;
+
+  // Set or clear data-nocache (and warn) for debugging
+  mark_cacheability(component, key_result);
 
   // If cache_key is null, caching disabled
   if (cache_key === null) {
-    // Set data-nocache attribute for debugging
-    if (uncacheable_property) {
-      // "<arg>:<reason>" - a bare property name left authors reverse-engineering why
-      component.$.attr(
-        'data-nocache',
-        uncacheable_reason ? `${uncacheable_property}:${uncacheable_reason}` : uncacheable_property
-      );
-    }
-
-    warn_uncacheable_component(component, uncacheable_property, uncacheable_reason);
-
     if ((window as any).jqhtml?.debug?.verbose) {
       console.log(
         `[Cache] Component ${component._cid} (${component.component_name()}) has non-serializable args - caching disabled`,
@@ -228,6 +251,7 @@ export function read_cache_in_create(component: any): void {
     if (cached_data !== null && typeof cached_data === 'object') {
       // Hydrate this.data with cached data
       component.data = cached_data;
+      component._data_cache_key = cache_key;
 
       if (component.args.use_cached_data === true) {
         component._use_cached_data_hit = true;
@@ -258,21 +282,32 @@ export function read_cache_in_create(component: any): void {
 }
 
 /**
- * Check cache during reload() when args have changed.
- * If cache hit, hydrates data/html and triggers an immediate render.
+ * Refresh the cache key at the start of every reload(), then - if args have changed -
+ * check the cache. On a hit, hydrates data/html and triggers an immediate render.
+ *
+ * The recomputed key is ALWAYS assigned, null included: every cache write later in the
+ * reload (data after on_load(), the html snapshot after render) goes to _cache_key, so
+ * a key left over from the previous args would file the new args' content under the
+ * old args' entry.
  *
  * @param component - The component instance
+ * @param args_changed - Whether this.args differ from the last render's
  * @returns true if rendered from cache, false otherwise
  */
-export function check_cache_on_reload(component: any): boolean {
-  const { cache_key } = generate_cache_key(component);
+export function check_cache_on_reload(component: any, args_changed: boolean): boolean {
+  const key_result = generate_cache_key(component);
+  const { cache_key } = key_result;
+  component._cache_key = cache_key;
 
-  if (cache_key === null) {
+  // The same data-nocache marker and dev warning boot and load() give, for these args.
+  mark_cacheability(component, key_result);
+
+  // An instance whose on_load() has ever failed is out of caching for good.
+  if (!args_changed || cache_key === null || component._load_failed) {
     return false;
   }
 
   const cache_mode = Jqhtml_Local_Storage.get_cache_mode();
-  component._cache_key = cache_key;
 
   if (cache_mode === 'html') {
     // HTML cache mode - check for cached HTML
@@ -309,6 +344,7 @@ export function check_cache_on_reload(component: any): boolean {
       component.__data_frozen = false;
       component.data = cached_data;
       component.__data_frozen = true;
+      component._data_cache_key = cache_key;
 
       // Call _render() directly (not render()) since _reload() manages the full lifecycle
       component._render();
@@ -320,13 +356,21 @@ export function check_cache_on_reload(component: any): boolean {
 }
 
 /**
- * Write HTML cache snapshot during ready() phase.
- * Only caches if the component is dynamic (data changed during on_load).
+ * Write HTML cache snapshot during ready() phase, and at the end of a reload() that
+ * loaded changed data. Only caches if the component is dynamic (data changed during
+ * on_load).
  *
  * @param component - The component instance
  */
 export function write_html_cache_snapshot(component: any): void {
   if (!component._should_cache_html_after_ready || !component._cache_key) {
+    return;
+  }
+
+  // An instance whose on_load() has ever failed is out of caching for good: its markup
+  // may be an on_load_error() fallback.
+  if (component._load_failed) {
+    component._should_cache_html_after_ready = false;
     return;
   }
 
@@ -359,21 +403,49 @@ export function write_html_cache_snapshot(component: any): void {
 }
 
 /**
- * Write data/HTML to cache after on_load() completes.
+ * Write data/HTML to cache after on_load() completes, and set component._is_dynamic.
  * Called from _apply_load_result().
+ *
+ * A load is written when its data changed to something other than the empty '{}', OR
+ * when its data is unchanged but the cache key moved: a reload() with new args whose
+ * data equals the previous load's must still file that data under the new key, or a
+ * later boot with those args misses. Same key and unchanged data writes nothing.
+ * component._data_cache_key is the key the current this.data is cached under (written
+ * or hydrated from), null when it is not cached.
  *
  * @param component - The component instance
  * @param data_changed - Whether this.data changed during on_load
+ * @param data_text - this.data's serialized text (what it was normalized through)
  */
-export function write_cache_on_loaded(component: any, data_changed: boolean): void {
-  if (!data_changed || !component._cache_key) {
+export function write_cache_on_loaded(component: any, data_changed: boolean, data_text: string): void {
+  const cache_key = component._cache_key;
+  const key_moved =
+    !data_changed &&
+    component._data_cache_key !== null &&
+    cache_key !== null &&
+    cache_key !== component._data_cache_key;
+
+  // Read by write_html_cache_snapshot(): only a load worth writing is snapshotted.
+  component._is_dynamic = (data_changed && data_text !== '{}') || key_moved;
+
+  // New data: whatever entry held the old data no longer holds this.data.
+  if (data_changed) {
+    component._data_cache_key = null;
+  }
+
+  // _load_failed: an on_load() of this instance has failed, so the data may be an
+  // on_load_error() fallback - and the instance is out of caching for good either way.
+  if (!component._is_dynamic || !cache_key || component._load_failed) {
     return;
   }
+
+  component._data_cache_key = cache_key;
 
   const cache_mode = Jqhtml_Local_Storage.get_cache_mode();
 
   if (cache_mode === 'html') {
-    // HTML cache mode - flag to cache HTML after children ready in _ready()
+    // HTML cache mode - flag to cache HTML after children render, in _ready() at boot
+    // or at the end of _reload()
     component._should_cache_html_after_ready = true;
 
     if ((window as any).jqhtml?.debug?.verbose) {
@@ -383,8 +455,9 @@ export function write_cache_on_loaded(component: any, data_changed: boolean): vo
       );
     }
   } else {
-    // Data cache mode (default) - write this.data to cache
-    Jqhtml_Local_Storage.set(component._cache_key, component.data);
+    // Data cache mode (default) - write this.data to cache. The text this.data was
+    // normalized through is its serialized form, so it is stored as-is.
+    Jqhtml_Local_Storage.set_serialized(component._cache_key, data_text);
 
     if ((window as any).jqhtml?.debug?.verbose) {
       console.log(

@@ -1,0 +1,4 @@
+<%-- Nl_Plain - no on_load(), no on_loaded(): template-only --%>
+<Define:Nl_Plain>
+  <span>plain</span>
+</Define:Nl_Plain>

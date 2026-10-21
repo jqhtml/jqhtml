@@ -6,9 +6,9 @@
  * invalidation path, the core version is folded into the SCOPE MARKER that _validate_scope()
  * already compares - it clears every jqhtml key when that value changes.
  *
- * The per-entry storage key format (`jqhtml::<cache_key>::<developer_key>`) is deliberately
- * NOT versioned: repeating the version in every key would bloat storage and break tooling
- * that reads the layout.
+ * Entry keys carry the same `<version>::<cache_key>` suffix as the marker
+ * (`jqhtml::<developer_key>::<version>::<cache_key>`), so a tab on another version that keeps
+ * writing after the clear never has its entries read here - see cache-version-keying.test.js.
  */
 
 import jqhtml, { version, Jqhtml_Local_Storage } from '../dist/index.js';
@@ -92,7 +92,7 @@ describe('quota-exceeded recovery keeps the cache scope', () => {
   it('re-stamps the scope marker so the next write does not wipe the cache again', () => {
     jqhtml.set_cache_key('quota_app_v1');
 
-    const scoped_key = `jqhtml::First::quota_app_v1`;
+    const scoped_key = `jqhtml::First::${version}::quota_app_v1`;
     throw_quota_once_on(scoped_key);
 
     Jqhtml_Local_Storage.set('First', { n: 1 });
@@ -115,7 +115,7 @@ describe('quota-exceeded recovery keeps the cache scope', () => {
  * remove() must scope its key exactly as get()/set() do.
  *
  * Every caller hands these three methods a DEVELOPER key (`<Component>::<args>`), and
- * _build_key() turns it into `jqhtml::<key>::<developer_key>`. A remove() that skipped
+ * _build_key() turns it into `jqhtml::<key>::<version>::<cache_key>`. A remove() that skipped
  * that step would delete nothing and leave the entry for the next get() to serve - which
  * is what the debug overlay's cache drop relies on not happening.
  */
@@ -126,12 +126,12 @@ describe('remove() uses the same key scoping as get()/set()', () => {
     jqhtml.set_cache_key('myapp_user_1');
     Jqhtml_Local_Storage.set('Some_Component::{}', { rows: 1 });
 
-    expect(localStorage.getItem('jqhtml::Some_Component::{}::myapp_user_1')).not.toBeNull();
+    expect(localStorage.getItem(`jqhtml::Some_Component::{}::${version}::myapp_user_1`)).not.toBeNull();
     expect(Jqhtml_Local_Storage.get('Some_Component::{}')).toEqual({ rows: 1 });
 
     Jqhtml_Local_Storage.remove('Some_Component::{}');
 
-    expect(localStorage.getItem('jqhtml::Some_Component::{}::myapp_user_1')).toBeNull();
+    expect(localStorage.getItem(`jqhtml::Some_Component::{}::${version}::myapp_user_1`)).toBeNull();
     expect(Jqhtml_Local_Storage.get('Some_Component::{}')).toBeNull();
   });
 
@@ -148,11 +148,11 @@ describe('remove() uses the same key scoping as get()/set()', () => {
 
   it('leaves entries from another cache scope alone', () => {
     jqhtml.set_cache_key('myapp_user_1');
-    localStorage.setItem('jqhtml::Some_Component::{}::other_scope', '{"keep":true}');
+    localStorage.setItem(`jqhtml::Some_Component::{}::${version}::other_scope`, '{"keep":true}');
     Jqhtml_Local_Storage.set('Some_Component::{}', { rows: 1 });
 
     Jqhtml_Local_Storage.remove('Some_Component::{}');
 
-    expect(localStorage.getItem('jqhtml::Some_Component::{}::other_scope')).toBe('{"keep":true}');
+    expect(localStorage.getItem(`jqhtml::Some_Component::{}::${version}::other_scope`)).toBe('{"keep":true}');
   });
 });

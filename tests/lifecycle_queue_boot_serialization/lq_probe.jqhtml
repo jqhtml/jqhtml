@@ -1,0 +1,5 @@
+<%-- Lq_Probe - every on_load() run is numbered and logged with the args.v it read when
+it started, so ordering, overlap and merging are visible in window.__lq_probe.marks. --%>
+<Define:Lq_Probe class="lq-probe">
+  <span $sid="value"><%= this.data.value %></span>
+</Define:Lq_Probe>

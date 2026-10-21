@@ -16,6 +16,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/no_load_gated_component.jqhtml" \
   "$SCRIPT_DIR/no_load_gated_component.js" \
   --delay=5
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -33,3 +34,6 @@ echo "H.  stop() during gate wait abandons the load cleanly"
 echo "I.  reload() while gated resumes the lifecycle (late gate settle is a no-op)"
 echo "J.  refresh() while gated resumes the lifecycle"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

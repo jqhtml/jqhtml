@@ -1,0 +1,7 @@
+<%--
+Ia_Data_Mid extends Ia_Base. A $ arg default (defineArgs) and a data- attribute default
+are one arg: this nearer data-size must beat Ia_Base's $size.
+--%>
+<Define:Ia_Data_Mid extends="Ia_Base" data-size="mid data">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Data_Mid>

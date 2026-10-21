@@ -10,5 +10,6 @@ class Fourth_Level_Child extends Jqhtml_Component {
 
   async on_ready() {
     console.log('[Fourth_Level_Child] on_ready: Component fully ready');
+    (window.__off_dom_log = window.__off_dom_log || []).push('Fourth_Level_Child.on_ready');
   }
 }

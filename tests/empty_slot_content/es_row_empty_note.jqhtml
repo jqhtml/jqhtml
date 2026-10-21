@@ -1,0 +1,5 @@
+<Define:Es_Row_Empty_Note extends="Es_Row">
+  <Slot:value>inherited</Slot:value>
+  <Slot:note>
+  </Slot:note>
+</Define:Es_Row_Empty_Note>

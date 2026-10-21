@@ -28,13 +28,13 @@ const BASELINE_DIR = path.join(__dirname, '../baseline-outputs');
 // Function to compile template with current compiler
 function compileTemplate(source, filename) {
   try {
-    const lexer = new Lexer(source);
+    const lexer = new Lexer(source, filename);
     const tokens = lexer.tokenize();
     const parser = new Parser(tokens, source, filename);
     const ast = parser.parse();
 
     const generator = new CodeGenerator();
-    const result = generator.generate(ast);
+    const result = generator.generate(ast, filename, source);
 
     return {
       success: true,

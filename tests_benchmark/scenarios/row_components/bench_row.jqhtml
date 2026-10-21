@@ -1,0 +1,4 @@
+<Define:Bench_Row tag="tr" class="bench-row">
+  <td><%= this.args.row.id %></td><td><%= this.args.row.name %></td><td><%= this.args.row.email %></td><td><%= this.args.row.city %></td>
+  <td><%= this.args.row.status %></td><td><%= this.args.row.amount %></td><td><%= this.args.row.date %></td><td><%= this.args.row.note %></td>
+</Define:Bench_Row>

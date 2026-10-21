@@ -16,6 +16,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/static_child.jqhtml" \
   "$SCRIPT_DIR/static_child.js" \
   --delay=8
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -32,3 +33,6 @@ echo "7. null/empty set_preload_data is no-op"
 echo "8. Full round-trip: capture → preload"
 echo "9. Static components excluded from capture"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

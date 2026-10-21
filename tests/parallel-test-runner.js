@@ -7,6 +7,9 @@
  * Each test runs in THREE cache modes: none, data, html
  * Outputs ✓ or ✗ as each test completes (no newlines).
  * Shows summary at the end with failed test names.
+ *
+ * A run passes only when its run-test.sh exits 0 AND prints at least one
+ * "VERDICT: PASS" line AND no "VERDICT: FAIL" line (see judge()).
  */
 
 import { spawn } from 'child_process';
@@ -78,6 +81,31 @@ async function discoverTests(testsDir) {
   return tests.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+// ---------------------------------------------------------------------------
+// Pass/fail rule
+//
+// The exit code alone is not trusted: a run-test.sh that forgets to propagate the
+// harness's exit code scores green whatever happened. So a run passes only when ALL hold:
+//   - run-test.sh exited 0
+//   - its output contains at least one line that is exactly "VERDICT: PASS"
+//   - its output contains no "VERDICT: FAIL" line
+// jqhtml-render-harness/test-runner.js prints the VERDICT line for every harness run.
+// A script that does not use the harness (it tests the compiler directly) must print the
+// same line itself as its final marker. A test that prints no verdict FAILS.
+// ---------------------------------------------------------------------------
+
+const VERDICT_PASS = /^VERDICT: PASS\s*$/m;
+const VERDICT_FAIL = /^VERDICT: FAIL.*$/m;
+
+/** null when the run passed, else a one-line reason. */
+function judge(code, stdout) {
+  const fail_line = stdout.match(VERDICT_FAIL);
+  if (fail_line) return fail_line[0].trim().slice(0, 300);
+  if (code !== 0) return `run-test.sh exited ${code}`;
+  if (!VERDICT_PASS.test(stdout)) return 'no VERDICT line (run-test.sh exited 0 without a verdict)';
+  return null;
+}
+
 function runTest(test, portOffset) {
   return new Promise((resolve) => {
     const startTime = Date.now();
@@ -107,15 +135,17 @@ function runTest(test, portOffset) {
         ...test,
         passed: false,
         duration: Date.now() - startTime,
-        error: 'Timeout exceeded'
+        error: `Timeout exceeded (${TIMEOUT_MS / 1000}s)`
       });
     }, TIMEOUT_MS);
 
     proc.on('close', (code) => {
       clearTimeout(timeout);
+      const error = judge(code, stdout);
       resolve({
         ...test,
-        passed: code === 0,
+        passed: error === null,
+        error,
         duration: Date.now() - startTime,
         stdout,
         stderr
@@ -311,12 +341,15 @@ async function main() {
       if (summary.allFailed) {
         // All modes failed - show error once, no mode info
         console.log(`${RED}✗${NC} ${summary.name}`);
+        console.log(`    ${summary.firstFailure?.error || 'failed'}`);
+        console.log(`    ${CYAN}Run individually:${NC} cd tests/${summary.name} && ./run-test.sh`);
       } else {
         // Some modes passed, some failed
         const passedStr = summary.passedModes.map(m => `${GREEN}${m}${NC}`).join(', ');
         const failedStr = summary.failedModes.map(m => `${RED}${m}${NC}`).join(', ');
         console.log(`${RED}✗${NC} ${summary.name}`);
         console.log(`    ${YELLOW}Passed:${NC} ${passedStr}  ${YELLOW}Failed:${NC} ${failedStr}`);
+        console.log(`    [${summary.failedModes[0]}] ${summary.firstFailure?.error || 'failed'}`);
         console.log(`    ${CYAN}Run individually:${NC} cd tests/${summary.name} && JQHTML_TEST_CACHE_MODE=${summary.failedModes[0]} ./run-test.sh`);
       }
     }

@@ -13,7 +13,8 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/vp_rich_text.jqhtml" \
   "$SCRIPT_DIR/vp_primitives.jqhtml" \
   "$SCRIPT_DIR/vp_orphan.jqhtml" \
-  --delay=3
+  --delay=3 --expect-boot-errors
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -27,3 +28,6 @@ echo "4. Attribute position keeps toString() coercion and never consults printer
 echo "5. Primitives and arrays never enter the chain"
 echo "6. An object no printer handles throws, naming its constructor"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

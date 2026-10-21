@@ -12,6 +12,7 @@ TEST_FILE="$SCRIPT_DIR/test.jqhtml"
 
 # Run the test using the jqhtml-tester
 node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" "$TEST_FILE"
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -26,3 +27,6 @@ echo ""
 echo "This proves that paired .js files are loaded and"
 echo "component lifecycle methods execute correctly."
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

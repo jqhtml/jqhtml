@@ -1,0 +1,8 @@
+<%--
+Ejc_Full_Conflict - a FULL template whose extends="Ejc_Grid_A" conflicts with its class
+(extends Ejc_Grid_B). Its markup would render fine, but extends= still decides which
+parent <Define>'s class/attributes it inherits, so the conflict is an error here too.
+--%>
+<Define:Ejc_Full_Conflict extends="Ejc_Grid_A">
+  <div class="ejc-own-marker">OWN</div>
+</Define:Ejc_Full_Conflict>

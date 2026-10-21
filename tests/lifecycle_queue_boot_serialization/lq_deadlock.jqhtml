@@ -1,0 +1,5 @@
+<%-- Lq_Deadlock - on_loaded() AWAITS this.reload(). The reload cannot start until
+on_loaded() returns, so this component never becomes ready: a real deadlock, on purpose. --%>
+<Define:Lq_Deadlock class="lq-deadlock">
+  <span><%= this.data.x %></span>
+</Define:Lq_Deadlock>

@@ -1,0 +1,5 @@
+<Define:Test_Js_Regions>
+  <div>
+    <Js_Regions_Probe $label="L" />
+  </div>
+</Define:Test_Js_Regions>

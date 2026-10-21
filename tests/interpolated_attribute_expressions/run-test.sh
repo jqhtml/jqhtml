@@ -12,6 +12,7 @@ echo ""
 
 # Run the test
 node ../../jqhtml-render-harness/test-runner.js "$TEST_DIR/test.jqhtml"
+HARNESS_STATUS=$?
 
 echo ""
 echo "=================================================="
@@ -26,3 +27,6 @@ echo "Test 6: class='visible'"
 echo "Test 7: class='hidden'"
 echo "Test 8: class='not-first'"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

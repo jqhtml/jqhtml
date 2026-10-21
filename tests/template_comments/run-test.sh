@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/comment_component.jqhtml" \
   "$SCRIPT_DIR/comment_component.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -32,3 +33,6 @@ echo "3. INLINE COMMENTS:"
 echo "   - Before<%-- comment --%>After renders as 'Before After'"
 echo "   - NOTE: Known bug - comment leaves space (documented in BUGS_FOUND.md)"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

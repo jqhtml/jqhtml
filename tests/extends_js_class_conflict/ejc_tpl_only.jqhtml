@@ -1,0 +1,4 @@
+<%-- Ejc_Tpl_Only - template-only component (no JS class of its own) with extends=; nothing to conflict with. --%>
+<Define:Ejc_Tpl_Only extends="Ejc_Grid_A">
+  <Slot:body><span class="ejc-slot">Ejc_Tpl_Only</span></Slot:body>
+</Define:Ejc_Tpl_Only>

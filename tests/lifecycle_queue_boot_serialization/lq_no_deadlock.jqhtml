@@ -1,0 +1,5 @@
+<%-- Lq_No_Deadlock - on_loaded() calls this.reload() WITHOUT awaiting it. It runs after
+the boot cycle and completes; no warning may name this component. --%>
+<Define:Lq_No_Deadlock class="lq-no-deadlock">
+  <span><%= this.data.x %></span>
+</Define:Lq_No_Deadlock>

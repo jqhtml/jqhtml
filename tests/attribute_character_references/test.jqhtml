@@ -1,0 +1,16 @@
+<Define:Attribute_Character_References>
+  <div>
+    <%-- Static values: the same text on every path --%>
+    <b class="plain" title="a &lt;i&gt; &amp; &quot;q&quot; &#39;s&#x27; &amp=x &copy; &copyx &#x80;">p</b>
+    <b $sid="tracked" title="a &lt;i&gt; &amp; &quot;q&quot; &#39;s&#x27; &amp=x &copy; &copyx &#x80;" data-x="1 &amp; 2" @click=this.on_click>t</b>
+    <Acr_Child $sid="invoked" title="a &lt;i&gt; &amp; &quot;q&quot; &#39;s&#x27; &amp=x &copy; &copyx &#x80;" $arg="v &lt;i&gt; &amp;" />
+    <Acr_Child $sid="defaulted" />
+    <textarea class="raw" title="r &amp; &lt;">x</textarea>
+    <i class="id_plain" id="x&amp;y">i</i>
+    <Acr_Child class="id_comp" id="c&amp;d" />
+    <%-- Interpolated values are taken literally: entity text in data is not decoded --%>
+    <b class="dyn_plain" title="<%= this.state.v %>">d</b>
+    <b $sid="dyn_tracked" title="<%= this.state.v %>" @click=this.on_click>d</b>
+    <Acr_Child $sid="dyn_comp" title="pre &amp; <%= this.state.v %>" />
+  </div>
+</Define:Attribute_Character_References>

@@ -36,6 +36,7 @@ class Tester extends Jqhtml_Component {
     });
 
     console.log('[Tester] All tests complete');
+    window.testPassed = results.every((r) => r.startsWith('✓'));
   }
 
   testInstance(grid, label, results) {

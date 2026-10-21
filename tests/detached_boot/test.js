@@ -163,8 +163,11 @@ class Test_Detached_Boot extends Jqhtml_Component {
 
     window.__render_log = [];
 
-    // Create detached but with _force_initial_render — should render TWICE (like normal)
-    const $forced = $('<div>').component('Loading_Defaults', { _force_initial_render: true });
+    // Create detached but with _force_initial_render — should render TWICE (like normal).
+    // `group: 5` gives it a cache key of its own: _-prefixed args are not part of the key,
+    // so without it this instance shares the key of the {} instances above and the data/html
+    // cache modes correctly paint their cached result instead of the on_create() default.
+    const $forced = $('<div>').component('Loading_Defaults', { _force_initial_render: true, group: 5 });
 
     // Synchronous check — forced component SHOULD have rendered once already (initial render)
     const forced_sync_renders = count('Loading_Defaults');

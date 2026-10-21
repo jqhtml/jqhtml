@@ -1,0 +1,5 @@
+<%-- Lq_Ready_Await - on_ready() AWAITS this.render(), this.load() and this.reload() in
+turn, once. Each awaited call runs at once, nested, and resolves. --%>
+<Define:Lq_Ready_Await class="lq-ready-await">
+  <span $sid="run"><%= this.data.run %></span>
+</Define:Lq_Ready_Await>

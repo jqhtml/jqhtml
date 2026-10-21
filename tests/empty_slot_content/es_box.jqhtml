@@ -1,0 +1,4 @@
+<Define:Es_Box>
+  <% const _body = content(); %>
+  <% if (_body) { %><div class="body"><%= _body %></div><% } %>
+</Define:Es_Box>

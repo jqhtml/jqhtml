@@ -98,13 +98,14 @@ class Refresh_Test extends Jqhtml_Component {
     }
     console.log('');
 
-    // TEST 4: Debounce precedence - reload() beats refresh()
-    console.log('TEST 4: Debounce precedence - reload() beats refresh()');
+    // TEST 4: refresh() then reload() - each keeps its own render rule
+    console.log('TEST 4: refresh() then reload() - each keeps its own render rule');
     const renders_before_test4 = window.counter_stats.render_count;
     console.log(`  Renders before: ${renders_before_test4}`);
 
-    // Call refresh() (reload(false)), then reload() (reload(true))
-    // Both will execute (debounced), but reload(true) forces the second execution to always render
+    // Call refresh() (reload(false)), then reload() (reload(true)).
+    // Both execute, in call order, as separate queue entries (they never merge): the
+    // refresh() finds unchanged data and skips its render; the reload() always renders.
     window.server_data.count = 2; // Unchanged from previous test
     const refresh_promise = counter.refresh();
     const reload_promise = counter.reload();
@@ -114,13 +115,13 @@ class Refresh_Test extends Jqhtml_Component {
 
     const renders_after_test4 = window.counter_stats.render_count;
     console.log(`  Renders after: ${renders_after_test4}`);
-    console.log(`  Expected: 2 new renders (both debounced calls execute, reload(true) precedence ensures second call always renders)`);
+    console.log(`  Expected: 1 new render (refresh() skips it on unchanged data, reload() always renders)`);
 
-    if (renders_after_test4 === renders_before_test4 + 2) {
-      console.log('✅ PASS: Both calls executed with reload() precedence');
+    if (renders_after_test4 === renders_before_test4 + 1) {
+      console.log('✅ PASS: Both calls executed, each with its own render rule');
       tests.push(true);
     } else {
-      console.log(`❌ FAIL: Expected 2 renders, got ${renders_after_test4 - renders_before_test4}`);
+      console.log(`❌ FAIL: Expected 1 render, got ${renders_after_test4 - renders_before_test4}`);
       tests.push(false);
     }
     console.log('');
@@ -150,6 +151,7 @@ class Refresh_Test extends Jqhtml_Component {
     // Final result
     console.log('========================================');
     const all_passed = tests.every(t => t);
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log('✅ ALL TESTS PASSED');
       this.$sid('results').html('<span style="color: green;">✅ All tests passed</span>');

@@ -74,6 +74,11 @@ describe('default export', () => {
     expect(typeof jqhtml.register).toBe('function');
     expect(typeof jqhtml.set_cache_key).toBe('function');
   });
+
+  it('carries init, the documented jqhtml.init($, config) entry point', () => {
+    expect(typeof jqhtml.init).toBe('function');
+    expect(jqhtml.init).toBe(core.init);
+  });
 });
 
 describe('version', () => {

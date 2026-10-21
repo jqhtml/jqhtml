@@ -69,6 +69,10 @@ Verify that whitespace in JQHTML templates is properly preserved or collapsed ac
 | test9 | `Line1<br />Line2` | br tag preserved |
 | test10 | Complex nesting with expressions | All spaces preserved correctly |
 
+`test.js` asserts each case on COLLAPSED text/markup (every whitespace run -> one space,
+trimmed), so it pins where a space is and is not rather than the exact count the template's
+indentation leaves. test9 renders two spaces before `Line1`; that is accepted as is.
+
 ## Implementation Details
 
 ### Lexer (lexer.ts)

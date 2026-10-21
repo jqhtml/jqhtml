@@ -1,11 +1,10 @@
 /**
- * Unit tests for merging consecutive _output.push() calls.
+ * Unit tests for merging consecutive _output.p() calls.
  *
- * push(a); push(b); push(c)  ->  push(a, b, c)
+ * p(a); p(b); p(c)  ->  p(a, b, c)
  *
- * Array.prototype.push takes varargs and evaluates arguments left to right, so the
- * merge is behaviour-preserving; it trims call overhead and shortens the instruction
- * array the runtime walks.
+ * Markup.p() takes varargs and its arguments are evaluated left to right, so the
+ * merge is behaviour-preserving; it trims call overhead.
  *
  * Merging is strictly within one line. Codegen is line-based so that generated line N
  * maps to source line N; moving a statement across a newline would silently
@@ -24,20 +23,20 @@ function render_body(body) {
   return code;
 }
 
-const push_calls = code => (code.match(/_output\.push\(/g) || []).length;
+const push_calls = code => (code.match(/_output\.p\(/g) || []).length;
 
 describe('Output push merging', () => {
 
   it('should merge consecutive pushes on one line into a single call', () => {
     const code = render_body('  <h3>A</h3>');
     // opening tag + text + closing tag + leading space would be 4 separate calls
-    assert.ok(code.includes('_output.push(" ", {tag: ["h3"'), code);
+    assert.ok(code.includes('_output.p(" ", {tag: ["h3"'), code);
     assert.ok(code.includes('"A", "</h3>");'), code);
   });
 
   it('should not merge across a newline', () => {
     const code = render_body('  <p>one</p>\n  <p>two</p>');
-    const body_lines = code.split('\n').filter(l => l.includes('_output.push('));
+    const body_lines = code.split('\n').filter(l => l.includes('_output.p('));
     assert.ok(body_lines.length >= 2, 'each source line keeps its own push call');
   });
 
@@ -45,7 +44,7 @@ describe('Output push merging', () => {
     const code = render_body('  <% if (this.data.x) { %><p>y</p><% } %>');
     const line = code.split('\n').find(l => l.includes('if (this.data.x)'));
     assert.ok(line, 'control flow line present');
-    assert.ok(line.indexOf('if (this.data.x)') < line.lastIndexOf('_output.push('),
+    assert.ok(line.indexOf('if (this.data.x)') < line.lastIndexOf('_output.p('),
       'the run is flushed before the if: ' + line);
   });
 

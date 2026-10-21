@@ -1,13 +1,17 @@
 /**
  * JQHTML v2 Lifecycle Manager
  *
- * Simple lifecycle orchestration - no queues, no batching.
- * Components boot when created. That's it.
+ * Components boot when created. Boot is the first entry on the component's lifecycle
+ * queue (component-queue.ts): it holds the component's lock from boot start through the
+ * end of its on_ready(), so a render()/load()/reload()/refresh() made meanwhile -
+ * on_ready() included - waits and runs after it. When calls are waiting as boot ends,
+ * 'ready' fires once they have run (the queue is idle).
  *
  * Lifecycle order:
  * 1. create() - SYNC - Calls on_create() BEFORE first render
  * 2. render() - SYNC - Creates DOM, instantiates child components, calls on_render()
- * 3. _load() - ASYNC - Calls on_load() if overridden, may trigger re-render if this.data changes
+ * 3. _load() - ASYNC - Calls on_load() if overridden, may trigger re-render if this.data changes.
+ *    Every component then gets on_loaded() and 'loaded' (without on_load(), at this point).
  * 4. ready() - ASYNC - Waits for children to be ready, calls on_ready()
  *
  * Key insight: create/render/on_render are synchronous. If a component doesn't
@@ -50,10 +54,14 @@ export class LifecycleManager {
    * Called when component is created
    *
    * Supports lifecycle truncation flags:
-   * - _load_only: on_create + on_load only. No render, no children, no on_render, no on_loaded, no on_ready.
-   * - _load_render_only: on_create + render + on_load + re-render. No on_render, no on_loaded, no on_ready.
+   * - _load_only: on_create + on_load only. No render, no children, no on_render, no on_loaded/'loaded', no on_ready.
+   * - _load_render_only: on_create + render + on_load + re-render. No on_render, no on_loaded/'loaded', no on_ready.
    */
   async boot_component(component: Jqhtml_Component): Promise<void> {
+    // Boot is the first entry: take the component's lifecycle lock. The finally below
+    // releases it - after on_ready(), or on any earlier exit.
+    const queue = (component as any)._queue;
+    queue.begin_boot();
     try {
       // Create phase - SYNCHRONOUS, runs BEFORE first render
       component.create();
@@ -91,7 +99,7 @@ export class LifecycleManager {
       }
 
       // Load phase - ASYNC, but only if on_load() is overridden
-      // Skip entirely if component uses default stub to avoid unnecessary yield
+      // Without one there is nothing to fetch and no yield; only the loaded step runs
       if ((component as any)._has_on_load()) {
         // Load gates: await any promises registered via gate_load() during
         // on_create() before the FIRST on_load(). Gates delay ONLY this load
@@ -113,6 +121,12 @@ export class LifecycleManager {
         // This ensures async queue tasks always run before the on_load process completes,
         // even if on_load() itself completes instantly (deterministic behavior)
         await Promise.resolve();
+      } else {
+        // No on_load(): still the loaded step every component gets - on_loaded(), then
+        // 'loaded' - here, where on_load() would have completed. Synchronous (no yield)
+        // when on_loaded() is not overridden. Suppressed by _load_only/_load_render_only.
+        const loaded = (component as any)._loaded_without_on_load();
+        if (loaded) await loaded;
       }
 
       // Check if stopped during load
@@ -168,6 +182,14 @@ export class LifecycleManager {
         return;
       }
 
+      // The boot's render chain is over: whatever the load decided, the DOM this component
+      // has now is its final, post-load DOM. A re-render after on_load() already set the
+      // flag in _render(); a load whose data came back equal to the on_create() defaults
+      // does not re-render, and without this an html-cache parent waited forever in
+      // _wait_for_children_on_render() for a render that never comes. That waiter wakes on
+      // the 'rendered' trigger just below.
+      (component as any)._on_render_complete = true;
+
       // Fire 'rendered' event - component has completed its synchronous render chain
       // This happens once, after the final on_render (whether from first render or re-render after on_load)
       if (!(component as any)._has_rendered) {
@@ -195,7 +217,7 @@ export class LifecycleManager {
         return; // Stale render, don't call ready
       }
 
-      // Ready phase - waits for children, then calls on_ready()
+      // Ready phase - waits for children, then calls on_ready() (inside the lock)
       await (component as any)._ready();
 
       // Check if stopped during ready
@@ -212,8 +234,12 @@ export class LifecycleManager {
       // rethrow surfaces as an unhandled promise rejection instead of an error report.
       // The error object stays a console.error argument so callers (and tests) that
       // grep the console for the thrown message still see it.
+      // An on_load() failure without an on_load_error() override has already been
+      // printed by the base on_load_error(); the boot report then names it once more
+      // without printing the error a second time.
+      const printed = (component as any)._load_error_printed;
       try {
-        handleComponentError(component, 'boot', error as Error);
+        handleComponentError(component, 'boot', error as Error, !!printed && printed.error === error);
       } catch {
         // handleComponentError needs the global jqhtml object and throws without it.
         // Never lose the original error to a failure in the reporting path.
@@ -225,6 +251,9 @@ export class LifecycleManager {
       } catch (stop_error) {
         console.error(`[JQHTML] on_stop() threw while unwinding a failed boot:`, stop_error);
       }
+    } finally {
+      // Release the lock; a call queued during boot starts on the next macrotask.
+      queue.end_boot();
     }
   }
 }

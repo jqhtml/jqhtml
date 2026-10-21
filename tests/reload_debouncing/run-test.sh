@@ -7,7 +7,9 @@ OUTPUT=$(node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/reload_debounce_test.jqhtml" \
   "$SCRIPT_DIR/reload_debounce_test.js" \
   --delay=2 2>&1)
+STATUS=$?
 echo "$OUTPUT"
+[ $STATUS -ne 0 ] && exit $STATUS
 echo "$OUTPUT" | grep -q "❌ FAIL" && exit 1
 echo "$OUTPUT" | grep -q "✅ PASS: reload() debouncing" || exit 1
 exit 0

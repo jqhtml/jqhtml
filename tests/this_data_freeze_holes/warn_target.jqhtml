@@ -1,0 +1,7 @@
+<%--
+Warn_Target - on_create() puts simple and non-simple values at the top level of this.data
+(and one non-simple value nested a level down, which is not checked).
+--%>
+<Define:Warn_Target class="card">
+  <div>warn target: <%= this.data.label %></div>
+</Define:Warn_Target>

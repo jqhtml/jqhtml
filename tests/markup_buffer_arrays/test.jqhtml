@@ -1,0 +1,33 @@
+<Define:Test_Markup_Buffer_Arrays>
+  <div>
+    <h1>Markup buffer: arrays print (Array), content() splices</h1>
+
+    <div $sid="esc"><%= this.state.evil %></div>
+    <div $sid="raw"><%!= this.state.evil %></div>
+    <div $sid="br"><%br= this.state.evil %></div>
+    <div $sid="tuple_esc"><%= this.state.tuple %></div>
+    <div $sid="tuple_raw"><%!= this.state.tuple %></div>
+    <div $sid="tuple_br"><%br= this.state.tuple %></div>
+    <div $sid="empty"><%= [] %></div>
+
+    <Mb_Box $sid="default_box" $records=this.state.none>
+      <button $sid="default_btn" @click=this.on_default_click>default button</button>
+    </Mb_Box>
+
+    <Mb_Box $sid="slot_box" $records=this.state.records>
+      <Slot:row $params="record, index">
+        <li class="row-line" @click=this.on_row_click><%= index %>:<%= record.name %></li>
+      </Slot:row>
+    </Mb_Box>
+
+    <Mb_Fwd_B $sid="fwd">
+      <Slot:item $params="item">
+        <span class="fwd-item" @click=this.on_fwd_click><%= item %></span>
+      </Slot:item>
+    </Mb_Fwd_B>
+
+    <Mb_Undefined_Wrapper $sid="undef">
+      <p class="undef-content">undefined wrapper content</p>
+    </Mb_Undefined_Wrapper>
+  </div>
+</Define:Test_Markup_Buffer_Arrays>

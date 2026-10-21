@@ -19,14 +19,16 @@ import {
   HtmlTagNode,
   TextNode,
   ExpressionNode,
-  IfStatementNode,
-  ForStatementNode,
   CodeBlockNode,
-  SlotNode
+  SlotNode,
+  CodeLocation,
+  ClosePosition
 } from './ast.js';
 import { SourceMapGenerator } from 'source-map';
 import { JQHTMLParseError } from './errors.js';
+import { find_matching_bracket, find_statement_end, code_line_starts, strip_trailing_semicolons, has_top_level_comma, find_template_close, scan_js } from './js_scanner.js';
 import * as vm from 'vm';
+import { js_string, js_string_single } from './js_literal.js';
 
 export interface GeneratedCode {
   code: string;
@@ -35,9 +37,24 @@ export interface GeneratedCode {
   components: Map<string, ComponentCode>;
 }
 
+/** One sourcemap segment of a render function: generated line 1-based, columns 0-based. */
+export interface RenderMapping {
+  generated: { line: number, column: number };
+  original: { line: number, column: number };
+  name?: string;
+  /** Author JavaScript copied verbatim from here on, so columns run in step. */
+  code?: boolean;
+}
+
 export interface ComponentCode {
   name: string;
   render_function: string;
+  // Sourcemap segments within render_function, one per emitted node. Render line N is
+  // source line N; line 1 is the function header.
+  source_mappings: RenderMapping[];
+  // Where the <Define> tag starts (1-based line, 0-based column): the target for code
+  // that stands for the component as a whole (the function header, module wrapper)
+  define_position: { line: number, column: number };
   dependencies: string[]; // Other components referenced
   tagName: string; // Element type (div, span, etc.)
   defaultAttributes: Record<string, any>; // Default attributes from Define tag
@@ -46,24 +63,14 @@ export interface ComponentCode {
 }
 
 export class CodeGenerator {
-  private indent_level: number = 0;
   private components: Map<string, ComponentCode> = new Map();
   private current_component: string | null = null;
-  private in_slot: boolean = false;
   private tag_depth: number = 0;
   private lastOutput: string = ''; // Track last generated output for deduplication
+  private marks: Array<{ line: number, column: number, name?: string, code?: boolean }> = []; // see mark()
 
-  private sourceMapGenerator?: SourceMapGenerator;
   private sourceContent?: string;
   private sourceFile?: string;
-
-  // Line preservation for 1:1 source mapping
-  private currentOutputLine: number = 1;
-  private preserveLines: boolean = false;
-
-  // For true 1:1 line mapping
-  private outputLines: string[] = [];
-  private sourceLines: string[] = [];
 
   generate(ast: ProgramNode, sourceFile?: string, sourceContent?: string): GeneratedCode {
     // Reset state
@@ -112,42 +119,8 @@ export class CodeGenerator {
       });
       generator.setSourceContent(sourceFile, sourceContent);
 
-      // Parse the render function to find line count
-      const renderLines = component.render_function.split('\n');
-
-      // The first line is the function declaration - maps to the Define line (line 1)
-      generator.addMapping({
-        generated: { line: 1, column: 0 },
-        source: sourceFile,
-        original: { line: 1, column: 0 }
-      });
-
-      // Map ALL lines in the generated output
-      // This ensures that even lines beyond the source file length are mapped
-      const sourceLines = sourceContent.split('\n');
-      const numSourceLines = sourceLines.length;
-
-      // CRITICAL FIX: The render function has a consistent offset from source
-      // We need to map with the proper offset, not naive 1:1
-      // The parser generates code with a fixed offset (typically around 10-13 lines)
-      // Calculate the actual offset by looking at the generated code
-
-      // The render function's first real content line starts around line 2
-      // but it maps to source line 1 (the Define line)
-      // After that, we need to maintain proper offset mapping
-
-      // For now, use the simple 1:1 mapping with clamping
-      // The CLI's adjustSourcemapForCLI will handle the offset adjustment
-      for (let lineNum = 2; lineNum <= renderLines.length; lineNum++) {
-        // Map each line to its corresponding source line
-        // When we go beyond source length, clamp to last source line
-        const sourceLine = Math.min(lineNum, numSourceLines);
-        generator.addMapping({
-          generated: { line: lineNum, column: 0 },
-          source: sourceFile,
-          original: { line: sourceLine, column: 0 }
-        });
-      }
+      // The render function stands alone: it starts at line 1, column 0
+      add_render_mappings(generator, component, sourceFile, 1, 0);
 
       // Generate the sourcemap
       const sourcemap = generator.toJSON();
@@ -176,19 +149,10 @@ export class CodeGenerator {
   private generate_component(node: ComponentDefinitionNode) {
     this.current_component = node.name;
     this.lastOutput = ''; // Reset output tracking for each component
+    this.marks = [];
+    const define_position = { line: node.line, column: Math.max(0, node.column - 1) };
     const dependencies = new Set<string>();
 
-    // Always use 1:1 line mapping for proper sourcemaps
-    // Even when using SourceMapGenerator, we need the line structure
-
-    // Enable line preservation for 1:1 source maps
-    this.preserveLines = true;
-    this.currentOutputLine = 1;
-
-    // Initialize output lines array for 1:1 mapping
-    // We'll build the function line by line to match source structure
-    this.outputLines = [];
-    
     // Extract metadata and default attributes
     // Handle the 'tag' attribute which might be a quoted object from the parser
     let tagName = 'div';
@@ -209,13 +173,8 @@ export class CodeGenerator {
         }
       } else {
         // Store as default attribute - extract actual value from quoted objects
+        // The lexer accepts only quoted values for plain attributes
         if (typeof value === 'object' && value.quoted) {
-          defaultAttributes[key] = value.value;
-        } else if (typeof value === 'object' && value.expression) {
-          // For expressions, we need to store them as is to be evaluated at runtime
-          defaultAttributes[key] = value.value;
-        } else if (typeof value === 'object' && value.identifier) {
-          // For identifiers, store as is to be evaluated at runtime
           defaultAttributes[key] = value.value;
         } else {
           defaultAttributes[key] = value;
@@ -236,7 +195,7 @@ export class CodeGenerator {
       }
 
       // Filter out TEXT nodes (whitespace) from slot-only templates
-      // TEXT nodes cause _output.push() calls which are invalid in slot-only context
+      // TEXT nodes cause _output.p() calls which are invalid in slot-only context
       const slotsOnly = node.body.filter(child => child.type === NodeType.SLOT);
 
       // Use 1:1 line mapping for slot-only templates
@@ -247,7 +206,7 @@ export class CodeGenerator {
 
       // Line 1: function declaration returning slots object, plus anything
       // written on the Define line itself (bodyLines[0] is source line 1)
-      lines.push(`function render(data, args, content, jqhtml) { return [{_slots: {` + (bodyLines[0] ? ' ' + bodyLines[0] : ''));
+      lines.push(`function render(data, args, content, jqhtml) { return {_slots: {` + (bodyLines[0] ? ' ' + bodyLines[0] : ''));
 
       // Lines 2-N: Body lines with slot functions
       lines.push(...bodyLines.slice(1));
@@ -263,17 +222,20 @@ export class CodeGenerator {
 
       // Last line: close slots object and return
       if (lines[lines.length - 1]) {
-        lines[lines.length - 1] += ' }}, this]; }';
+        lines[lines.length - 1] += ' }}; }';
       } else {
-        lines[lines.length - 1] = '}}, this]; }';
+        lines[lines.length - 1] = '}}; }';
       }
 
-      const render_function = lines.map(line => this.merge_output_pushes(line || '')).join('\n');
+      const { render_function, source_mappings } = this.finish_render(lines);
+      this.validate_render_function(render_function, source_mappings, node);
 
       // Store component with slot-only metadata
       this.components.set(node.name, {
         name: node.name,
         render_function,
+        source_mappings,
+        define_position,
         dependencies: Array.from(dependencies),
         tagName,
         defaultAttributes,
@@ -294,76 +256,27 @@ export class CodeGenerator {
 
     // First line: function declaration and initial setup (corresponds to the
     // Define line) followed by any markup written on that same line
-    lines.push(`function render(data, args, content, jqhtml) { let _output = []; const _cid = this._cid; const that = this;` + (bodyLines[0] ? ' ' + bodyLines[0] : ''));
+    lines.push(`function render(data, args, content, jqhtml) { let _output = new jqhtml.Markup(this); const _cid = this._cid; const that = this;` + (bodyLines[0] ? ' ' + bodyLines[0] : ''));
 
     // Body lines: each corresponds to a source line
     lines.push(...bodyLines.slice(1));
 
     // Last line: closing (corresponds to closing Define tag)
     if (lines[lines.length - 1]) {
-      lines[lines.length - 1] += ' return [_output, this]; }';
+      lines[lines.length - 1] += ' return _output; }';
     } else {
-      lines[lines.length - 1] = 'return [_output, this]; }';
+      lines[lines.length - 1] = 'return _output; }';
     }
 
-    const render_function = lines.map(line => this.merge_output_pushes(line || '')).join('\n');
-    
-    // Validate the generated function syntax using vm.Script for better error reporting
-    try {
-      const generatedCode = `
-        let _output = [];
-        const _cid = this._cid;
-        const that = this;
-        ${bodyLines.join('\n')}
-      `;
-      new vm.Script(generatedCode, {
-        filename: this.sourceFile || 'component.jqhtml'
-      });
-    } catch (error: any) {
-      // Extract JavaScript error details
-      const errorDetail = error.message || String(error);
-      let sourceLine = 1; // Default to component definition line
-      let sourceColumn = 0;
+    const { render_function, source_mappings } = this.finish_render(lines);
 
-      // Extract line number from vm.Script stack trace
-      // Stack format: "filename.jqhtml:LINE\n..." or "evalmachine.<anonymous>:LINE\n..."
-      if (error.stack && typeof error.stack === 'string') {
-        // Extract line number from first line of stack (before first newline)
-        const firstLine = error.stack.split('\n')[0];
-        const lineMatch = firstLine.match(/:(\d+)/);
-        if (lineMatch) {
-          const generatedLine = parseInt(lineMatch[1], 10);
-          // Map generated line to source line
-          // The bodyLines array has 1:1 correspondence with source lines
-          // Generated code includes 3-line header, so subtract that offset
-          const headerOffset = 3; // "let _output = [];\n const _cid = this._cid;\n const that = this;"
-          const bodyLineIndex = generatedLine - headerOffset - 1; // Convert to 0-based
+    this.validate_render_function(render_function, source_mappings, node);
 
-          if (bodyLineIndex >= 0 && bodyLineIndex < bodyLines.length) {
-            // Map to actual source line (bodyLines starts at source line 1)
-            // Subtract 1 because syntax errors typically get detected on the line AFTER the problem
-            sourceLine = Math.max(1, bodyLineIndex + 1 - 1);
-          }
-        }
-      }
-
-      // Build error message emphasizing unbalanced brackets
-      // Keep the helpful context about what to check for
-      const errorMessage = `Unbalanced bracket error in component "${node.name}": ${errorDetail}\n\nCheck for unclosed brackets, missing quotes, or invalid JavaScript syntax.`;
-
-      // Create proper JQHTMLParseError with file/line info for Laravel Ignition integration
-      throw new JQHTMLParseError(
-        errorMessage,
-        sourceLine,
-        sourceColumn,
-        this.sourceContent,
-        this.sourceFile
-      );
-    }
-    
     this.components.set(node.name, {
       name: node.name,
       render_function,
+      source_mappings,
+      define_position,
       dependencies: Array.from(dependencies),
       tagName,  // Store metadata
       defaultAttributes,  // Store default attributes
@@ -374,35 +287,163 @@ export class CodeGenerator {
     this.current_component = null;
   }
   
-  private generate_function_body(nodes: ASTNode[], preserveLines: boolean = false): string {
-    // For simplicity and better sourcemaps, generate everything on minimal lines
-    // This matches the rspade team's recommendation for 1:1 line mapping
-    const statements: string[] = [];
-
-    for (const node of nodes) {
-      const code = this.generate_node(node);
-      if (code) {
-        statements.push(code);
+  /**
+   * Parse the exact render function text that will be emitted, so invalid JS in any
+   * template (slot-only included) fails compilation instead of failing at load time.
+   * The text is 1:1 with the source lines, so the reported line is the source line.
+   * A bracket the <% %> blocks leave unbalanced is reported where it is; any other
+   * syntax error at the template column V8's caret maps back to.
+   */
+  private validate_render_function(render_function: string, source_mappings: RenderMapping[], node: ComponentDefinitionNode): void {
+    try {
+      new vm.Script('(' + render_function + ')', {
+        filename: this.sourceFile || 'component.jqhtml'
+      });
+    } catch (error: any) {
+      const position = CodeGenerator.syntax_error_position(error, source_mappings, this.sourceContent);
+      // Whichever comes first in the template is the real fault: V8 fails at the end
+      // of the function for an unclosed {, but at the ':' of `if (a: { }` before the
+      // bracket scan reaches the } that does not match.
+      const bracket = this.find_unbalanced_code_bracket(node);
+      const v8_first = bracket && position.column > 0 &&
+        (position.line < bracket.line || (position.line === bracket.line && position.column < bracket.column));
+      if (bracket && !v8_first) {
+        throw new JQHTMLParseError(
+          `Unbalanced bracket error in component "${node.name}": ${bracket.message}`,
+          bracket.line,
+          bracket.column,
+          this.sourceContent,
+          this.sourceFile
+        );
       }
-    }
 
-    // Join all statements on a single line to minimize output lines
-    // This makes sourcemap generation much simpler
-    return statements.join(' ');
+      const errorDetail = error.message || String(error);
+
+      throw new JQHTMLParseError(
+        `JavaScript syntax error in component "${node.name}": ${errorDetail}\n\nCheck for unclosed brackets, missing quotes, or invalid JavaScript syntax.`,
+        position.line,
+        position.column,
+        this.sourceContent,
+        this.sourceFile
+      );
+    }
   }
 
   /**
-   * Generate function body with true 1:1 line mapping
-   * Each line in the source produces exactly one line in the output
+   * The template position of a vm.Script SyntaxError. Its stack starts
+   * "filename:LINE", then the generated line and a caret under the column. The mapping
+   * at or before the caret gives the template position: inside author JavaScript
+   * (copied verbatim) the offset from the mapping carries over; otherwise it is the
+   * start of the node. Without a usable caret: the line, column 0.
+   */
+  private static syntax_error_position(error: any, source_mappings: RenderMapping[], source?: string): { line: number, column: number } {
+    const stack = typeof error.stack === 'string' ? error.stack.split('\n') : [];
+    const line_match = (stack[0] || '').match(/:(\d+)\s*$/);
+    if (!line_match) return { line: 1, column: 0 };
+    const generated_line = parseInt(line_match[1], 10);
+    const caret = (stack[2] || '').indexOf('^');
+    if (caret < 0 || !/^\s*\^+\s*$/.test(stack[2])) return { line: generated_line, column: 0 };
+
+    // Line 1 of the checked text has the '(' wrapper in front of the render function
+    const generated_column = caret - (generated_line === 1 ? 1 : 0);
+    let mapping: RenderMapping | undefined;
+    for (const m of source_mappings) {
+      if (m.generated.line === generated_line && m.generated.column <= generated_column) mapping = m;
+    }
+    if (!mapping) return { line: generated_line, column: 0 };
+
+    const line = mapping.original.line;
+    let column = mapping.original.column + 1;
+    if (mapping.code) column += generated_column - mapping.generated.column;
+    const source_line = source ? source.replace(/\r\n?/g, '\n').split('\n')[line - 1] : undefined;
+    if (source_line !== undefined) column = Math.min(column, source_line.length + 1);
+    return { line, column };
+  }
+
+  /**
+   * The first bracket the definition's <% %> blocks leave unbalanced, read as one
+   * stream of JavaScript in source order (a block may open what a later one closes).
+   * <%= %> expressions are self-contained and not part of the stream; <%-- --%> and
+   * HTML comments are not code.
+   */
+  private find_unbalanced_code_bracket(node: ComponentDefinitionNode): { message: string, line: number, column: number } | null {
+    if (!this.sourceContent) return null;
+    const blank = (m: string) => m.replace(/[^\n]/g, ' ');
+    const text = this.sourceContent.replace(/\r\n?/g, '\n')
+      .replace(/<%--[\s\S]*?--%>/g, blank)
+      .replace(/<!--[\s\S]*?-->/g, blank);
+    const line_offsets = [0];
+    for (let k = 0; k < text.length; k++) if (text[k] === '\n') line_offsets.push(k + 1);
+    const at = (offset: number) => {
+      let l = line_offsets.length - 1;
+      while (line_offsets[l] > offset) l--;
+      return { line: l + 1, column: offset - line_offsets[l] + 1 };
+    };
+    const describe = (ch: string, offset: number) => {
+      const p = at(offset);
+      return `${ch} at line ${p.line}, col ${p.column}`;
+    };
+
+    const from = line_offsets[node.line - 1] || 0;
+    const end_line = node.loc ? node.loc.end.line : line_offsets.length;
+    const to = end_line < line_offsets.length ? line_offsets[end_line] : text.length;
+    const PAIRS: Record<string, string> = { ')': '(', ']': '[', '}': '{' };
+    const open: Array<{ ch: string, offset: number }> = [];
+    let problem: { message: string, offset: number } | null = null;
+
+    let i = from;
+    while (!problem && (i = text.indexOf('<%', i)) !== -1 && i < to) {
+      const rest = text.substring(i + 2, i + 5);
+      const is_expression = rest.startsWith('=') || rest.startsWith('!=') || rest.startsWith('br=');
+      const close = find_template_close(text, i + 2);
+      if (close === -1) break;
+      if (!is_expression) {
+        scan_js(text.substring(0, close), i + 2, {
+          on_code: (k, ch) => {
+            if (ch === '(' || ch === '[' || ch === '{') {
+              open.push({ ch, offset: k });
+            } else if (PAIRS[ch]) {
+              const top = open.pop();
+              if (!top) {
+                problem = { message: `${describe(ch, k)} closes nothing that a <% %> block opened`, offset: k };
+              } else if (top.ch !== PAIRS[ch]) {
+                problem = { message: `${describe(ch, k)} does not match ${describe(top.ch, top.offset)}`, offset: k };
+              }
+              if (problem) return true;
+            }
+            return false;
+          }
+        });
+      }
+      i = close + 2;
+    }
+
+    if (!problem && open.length > 0) {
+      const top = open[open.length - 1];
+      problem = { message: `${describe(top.ch, top.offset)} is never closed`, offset: top.offset };
+    }
+    if (!problem) return null;
+    const p = at((problem as { offset: number }).offset);
+    return { message: (problem as { message: string }).message, line: p.line, column: p.column };
+  }
+
+  /**
+   * Generate the function body line by line: element N of the result is the code for
+   * source line N (line 1 is the <Define> line itself).
+   *
+   * Every node is placed on the source line it starts on, and a closing tag on the
+   * line of its </tag>, recursively - nested component content and slot bodies
+   * included. Placement follows document order, so concatenating the lines keeps the
+   * statements in source order, and no fragment contains a newline, so generated line
+   * N is always source line N. Each emitted node carries a sourcemap mark (see mark()).
    */
   private generate_function_body_1to1(nodes: ASTNode[]): string[] {
-    // Find the max line number in the template body
+    // The last source line any node reaches: its start, its end (a closing tag, the
+    // %> of a multi-line block) - so a closing tag or code line never falls off the end
     let maxLine = 0;
     const findMaxLine = (node: ASTNode) => {
-      if (node.line && node.line > maxLine) {
-        maxLine = node.line;
-      }
-      // Check various node types for children
+      const last = Math.max(node.line || 0, node.loc ? node.loc.end.line : 0);
+      if (last > maxLine) maxLine = last;
       if ((node as any).body) (node as any).body.forEach(findMaxLine);
       if ((node as any).children) (node as any).children.forEach(findMaxLine);
       if ((node as any).consequent) (node as any).consequent.forEach(findMaxLine);
@@ -410,355 +451,370 @@ export class CodeGenerator {
     };
     nodes.forEach(findMaxLine);
 
-    // Initialize lines array with empty strings for each source line, from
-    // line 1 (the <Define> line itself - markup may sit on it) to the last.
     const lines: string[] = [];
     for (let i = 1; i <= maxLine; i++) {
       lines.push('');
     }
 
-    // Process nodes and build output line by line
-    // We need to handle nodes differently based on their type
-    const processNodeForLine = (node: ASTNode) => {
-      if (!node.line) return;
+    for (const node of nodes) {
+      this.place_node(node, lines);
+    }
 
-      // VALIDATION: Check for content() in <%!= %> blocks - must run before line filtering
-      if (node.type === NodeType.EXPRESSION) {
+    return lines;
+  }
+
+  /** Place one node's code (and its children's) on their source lines. */
+  private place_node(node: ASTNode, lines: string[]): void {
+    if (!node.line) return;
+
+    const at = (line: number, code: string) => {
+      const index = line - 1;
+      if (index >= 0 && index < lines.length) {
+        lines[index] += code;
+      }
+    };
+
+    // VALIDATION: Check for content() in <%!= %> blocks - must run before line filtering
+    if (node.type === NodeType.EXPRESSION) {
+      const expr = node as ExpressionNode;
+      let trimmedCode = expr.code.trim();
+      if (trimmedCode.endsWith(';')) {
+        trimmedCode = trimmedCode.slice(0, -1).trim();
+      }
+      const isContentCall = trimmedCode === 'content()' ||
+        trimmedCode.match(/^content\s*\(/);
+
+      if (isContentCall && !expr.escaped) {
+        const error = new JQHTMLParseError(
+          `Invalid syntax: content() cannot be used in <%!= %> blocks`,
+          expr.line,
+          expr.column || 0,
+          this.sourceContent,
+          this.sourceFile
+        );
+        error.suggestion =
+          `\n\ncontent() is a passthrough function - it passes inner HTML directly to the component.\n` +
+          `The concept of "escaping" or "raw" output doesn't apply here.\n\n` +
+          `Use <%= content() %> instead:\n\n` +
+          `  ✗ Wrong:   <%!= content() %>   ← invalid, makes no sense\n` +
+          `  ✓ Correct: <%= content() %>    ← always use this form\n\n` +
+          `The same applies to named slots:\n` +
+          `  ✓ <%= content('header') %>`;
+        throw error;
+      }
+    }
+
+    const lineIndex = node.line - 1;
+    if (lineIndex < 0 || lineIndex >= lines.length) return;
+
+    switch (node.type) {
+      case NodeType.HTML_TAG: {
+        this.lastOutput = ''; // Reset for non-text output
+        const tag = node as HtmlTagNode;
+
+        // Check if this is a raw content tag (textarea, pre)
+        if (tag.preserveWhitespace && !tag.selfClosing && tag.children && tag.children.length > 0) {
+          // Validate: only TEXT, EXPRESSION, and CODE_BLOCK children allowed in raw content tags
+          // HTML tags and components are not allowed (they would break whitespace preservation)
+          for (const child of tag.children) {
+            if (child.type !== NodeType.TEXT &&
+                child.type !== NodeType.EXPRESSION &&
+                child.type !== NodeType.CODE_BLOCK) {
+              const error = new JQHTMLParseError(
+                `Invalid content in <${tag.name}> tag`,
+                tag.line,
+                tag.column || 0,
+                this.sourceContent,
+                this.sourceFile
+              );
+              error.suggestion =
+                `\n\nThe content of a <textarea> is text, so HTML tags and components\n` +
+                `cannot be nested inside it.\n\n` +
+                `Allowed:\n` +
+                `  <textarea><%= this.data.value %></textarea>  ← expressions OK\n` +
+                `  <textarea>plain text</textarea>              ← plain text OK\n\n` +
+                `Not allowed:\n` +
+                `  <textarea><div>content</div></textarea>      ← HTML tags not OK\n` +
+                `  <textarea><MyComponent /></textarea>         ← components not OK\n\n` +
+                `(<pre> has no such restriction - its content is preserved verbatim.)`;
+              throw error;
+            }
+          }
+
+          // Generate rawtag instruction with raw content
+          const attrs_obj = this.generate_attributes_with_conditionals(tag.attributes, tag.conditionalAttributes);
+          const escapedContent = this.generate_raw_tag_content(tag);
+          at(tag.line, `_output.p(${this.mark_node(tag)}{rawtag: [${js_string(tag.name)}, ${attrs_obj}, ${escapedContent}]});`);
+          break;
+        }
+
+        // Opening tag on its line
+        at(tag.line, this.generate_tag_open(tag));
+
+        // Children on theirs
+        if (tag.children) {
+          tag.children.forEach((child) => this.place_node(child, lines));
+        }
+
+        // Closing tag on the line of the </tag>.
+        // Void elements get NO closing tag - a stray </br> makes browsers
+        // create a second <br> (double line break bug).
+        if (!VOID_ELEMENTS.has(tag.name.toLowerCase())) {
+          at(this.close_line(tag, tag.close_loc), ' ' + `_output.p(${js_string(`</${tag.name}>`)});`);
+        }
+        // A space after the tag is not a repeat of a space inside it: an element can be
+        // its own box (inline-block, flex item), where the browser keeps both
+        this.lastOutput = '';
+        break;
+      }
+      case NodeType.TEXT: {
+        const text = node as TextNode;
+        // Apply padded trim to preserve intentional whitespace. An HTML comment is one
+        // text node (the lexer's scan_html_comment) and is emitted exactly as written.
+        const is_comment = text.content.startsWith('<!--') && text.content.endsWith('-->');
+        const processed = is_comment ? text.content : this.padded_trim(text.content);
+
+        if (processed) {
+          const escaped = this.escape_string(processed);
+          const plain = `_output.p(${escaped});`;
+
+          // Optimization: skip consecutive identical space pushes
+          if (plain === '_output.p(" ");' && this.lastOutput === '_output.p(" ");') {
+            break;
+          }
+
+          this.lastOutput = plain; // Track for next comparison
+          at(text.line, ' ' + `_output.p(${this.mark_node(text)}${escaped});`);
+        } else {
+          // Empty text resets tracking so next space won't be skipped
+          this.lastOutput = '';
+        }
+        break;
+      }
+      case NodeType.CODE_BLOCK: {
+        this.lastOutput = ''; // Reset for non-text output
+        const codeBlock = node as CodeBlockNode;
+        const code = this.generate_code_block(codeBlock);
+        if (code) {
+          // Each line of the code goes on its own source line, starting from the line
+          // the code itself starts on (`<%` may stand alone on the line before it).
+          // With preprocessing, empty lines are already marked with /* empty line */.
+          // A line that starts inside a string, template literal or comment is copied
+          // verbatim - a separator space or a mark would change the literal.
+          const first_line = codeBlock.code_loc ? codeBlock.code_loc.line : codeBlock.line;
+          const codeLines = code.split('\n');
+          const in_code = code_line_starts(code);
+          for (let i = 0; i < codeLines.length; i++) {
+            const codeLine = codeLines[i];
+            if (!in_code[i]) {
+              at(first_line + i, codeLine);
+              continue;
+            }
+            const trimmed = codeLine.trim();
+            if (!trimmed) continue;
+            const indent = codeLine.length - codeLine.trimStart().length;
+            // Line 1 of the code starts at the code's own column; every later line
+            // is a whole source line
+            const column = i === 0 && codeBlock.code_loc ? codeBlock.code_loc.column : indent + 1;
+            const mark = trimmed === '/* empty line */' ? '' : this.mark(first_line + i, column, undefined, true);
+            at(first_line + i, ' ' + codeLine.slice(0, indent) + mark + codeLine.slice(indent));
+          }
+        }
+        break;
+      }
+      case NodeType.EXPRESSION: {
+        this.lastOutput = ''; // Reset for non-text output
         const expr = node as ExpressionNode;
+
+        // Strip trailing semicolon if present (optional in <%= %> blocks)
+        // Note: content() validation happens at the top of place_node()
         let trimmedCode = expr.code.trim();
         if (trimmedCode.endsWith(';')) {
           trimmedCode = trimmedCode.slice(0, -1).trim();
         }
-        const isContentCall = trimmedCode === 'content()' ||
-          trimmedCode.match(/^content\s*\(/);
 
-        if (isContentCall && !expr.escaped) {
-          const error = new JQHTMLParseError(
-            `Invalid syntax: content() cannot be used in <%!= %> blocks`,
-            expr.line,
-            expr.column || 0,
-            this.sourceContent,
-            this.sourceFile
-          );
-          error.suggestion =
-            `\n\ncontent() is a passthrough function - it passes inner HTML directly to the component.\n` +
-            `The concept of "escaping" or "raw" output doesn't apply here.\n\n` +
-            `Use <%= content() %> instead:\n\n` +
-            `  ✗ Wrong:   <%!= content() %>   ← invalid, makes no sense\n` +
-            `  ✓ Correct: <%= content() %>    ← always use this form\n\n` +
-            `The same applies to named slots:\n` +
-            `  ✓ <%= content('header') %>`;
-          throw error;
+        // The same code carrying its sourcemap marks
+        const marked = this.mark_code(expr.code, expr.code_loc, CodeGenerator.expression_name(trimmedCode));
+        let markedTrimmed = marked.trim();
+        if (markedTrimmed.endsWith(';')) {
+          markedTrimmed = markedTrimmed.slice(0, -1).trim();
         }
+
+        // Primitives first: they are nearly every value and print exactly as before.
+        // Of objects, a markup buffer (content(), a slot) is spliced and renders in the
+        // component that wrote it; any other array prints the fixed text "(Array)" -
+        // being a buffer is the only thing that splices, so a data array can never
+        // inject markup; anything else goes to the printer chain.
+        const print = (primitive: string, mode: string) =>
+          `if (result !== undefined && result !== null) { if (typeof result !== 'object') { _output.p(${primitive}); } else if (result instanceof jqhtml.Markup) { _output.p(result); } else if (Array.isArray(result)) { _output.p("(Array)"); } else { _output.p(jqhtml.print_object(result, '${mode}')); } }`;
+        let code: string;
+        if (trimmedCode === 'content()') {
+          // Default slot/content - check _inner_html first
+          code = `(() => { if (this.args._inner_html) { _output.p(this.args._inner_html); } else if (typeof content === 'function') { const result = content.call(this); if (result instanceof jqhtml.Markup) { _output.p(result); } } })();`;
+        } else if (trimmedCode.match(/^content\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*(.+?))?\s*\)$/)) {
+          // Named slot: content('header') or content('header', data) (function call with string parameter and optional data)
+          // Use the standard result pattern for proper handling
+          code = `(() => { const result = ${this.expression_code(markedTrimmed)};; if (result instanceof jqhtml.Markup) { _output.p(result); } else if (Array.isArray(result)) { _output.p("(Array)"); } else { _output.p(jqhtml.escape_html(result)); } })();`;
+        } else if (expr.nl2br) {
+          // <%br= %> - escaped with newlines converted to <br />
+          code = `(() => { const result = ${this.expression_code(marked)}; ${print('jqhtml.escape_html_nl2br(result)', 'nl2br')} })();`;
+        } else if (expr.escaped) {
+          code = `(() => { const result = ${this.expression_code(marked)}; ${print('jqhtml.escape_html(result)', 'escape')} })();`;
+        } else {
+          code = `(() => { const result = ${this.expression_code(marked)}; ${print('result', 'raw')} })();`;
+        }
+
+        // On the line the expression starts on, the wrapper mapped to its <%=
+        at(expr.line, ' ' + this.mark_node(expr) + code);
+        break;
       }
+      case NodeType.COMPONENT_INVOCATION: {
+        this.lastOutput = ''; // Reset for non-text output
+        const comp = node as ComponentInvocationNode;
+        const attrs = this.generate_attributes_with_conditionals(comp.attributes, comp.conditionalAttributes);
+        const open = `_output.p(${this.mark_node(comp)}{comp: [${this.comp_name_code(comp)}, ${attrs}`;
 
-      const lineIndex = node.line - 1; // Adjust for array index (line 1 = index 0)
-      if (lineIndex < 0 || lineIndex >= lines.length) return;
-
-      // Generate code based on node type
-      switch (node.type) {
-        case NodeType.HTML_TAG: {
-          this.lastOutput = ''; // Reset for non-text output
-          const tag = node as HtmlTagNode;
-
-          // Check if this is a raw content tag (textarea, pre)
-          if (tag.preserveWhitespace && !tag.selfClosing && tag.children && tag.children.length > 0) {
-            // Validate: only TEXT, EXPRESSION, and CODE_BLOCK children allowed in raw content tags
-            // HTML tags and components are not allowed (they would break whitespace preservation)
-            for (const child of tag.children) {
-              if (child.type !== NodeType.TEXT &&
-                  child.type !== NodeType.EXPRESSION &&
-                  child.type !== NodeType.CODE_BLOCK) {
-                const error = new JQHTMLParseError(
-                  `Invalid content in <${tag.name}> tag`,
-                  tag.line,
-                  tag.column || 0,
-                  this.sourceContent,
-                  this.sourceFile
-                );
-                error.suggestion =
-                  `\n\nThe content of a <textarea> is text, so HTML tags and components\n` +
-                  `cannot be nested inside it.\n\n` +
-                  `Allowed:\n` +
-                  `  <textarea><%= this.data.value %></textarea>  ← expressions OK\n` +
-                  `  <textarea>plain text</textarea>              ← plain text OK\n\n` +
-                  `Not allowed:\n` +
-                  `  <textarea><div>content</div></textarea>      ← HTML tags not OK\n` +
-                  `  <textarea><MyComponent /></textarea>         ← components not OK\n\n` +
-                  `(<pre> has no such restriction - its content is preserved verbatim.)`;
-                throw error;
-              }
-            }
-
-            // Generate rawtag instruction with raw content
-            const attrs_obj = this.generate_attributes_with_conditionals(tag.attributes, tag.conditionalAttributes);
-
-            const escapedContent = this.generate_raw_tag_content(tag);
-
-            const rawtagInstruction = `_output.push({rawtag: ["${tag.name}", ${attrs_obj}, ${escapedContent}]});`;
-            lines[lineIndex] = (lines[lineIndex] || '') + rawtagInstruction;
-          } else {
-            // Normal HTML tag processing
-            // Opening tag goes on its line
-            const openTag = this.generate_tag_open(tag);
-            if (openTag) {
-              lines[lineIndex] = (lines[lineIndex] || '') + openTag;
-            }
-
-            // Process children
-            if (tag.children) {
-              tag.children.forEach(processNodeForLine);
-            }
-
-            // Closing tag might be on a different line.
-            // Void elements get NO closing tag - a stray </br> makes browsers
-            // create a second <br> (double line break bug).
-            if (!VOID_ELEMENTS.has(tag.name.toLowerCase())) {
-              const closeTag = `_output.push("</${tag.name}>");`;
-              // For simplicity, put closing tag on the last child's line or same line
-              const closeLine = tag.children && tag.children.length > 0
-                ? (tag.children[tag.children.length - 1].line || node.line)
-                : node.line;
-              const closeIndex = closeLine - 1;
-              if (closeIndex >= 0 && closeIndex < lines.length) {
-                lines[closeIndex] = (lines[closeIndex] || '') + ' ' + closeTag;
-              }
+        if (comp.selfClosing || comp.children.length === 0) {
+          // Simple component without children
+          at(comp.line, ` ${open}]});`);
+        } else if (Object.keys(this.extract_slots_from_children(comp.children)).length > 0) {
+          // Component with slots: an object of slot functions, each slot placed on
+          // its own lines. Content outside the slots is whitespace (the parser
+          // rejects anything else) and is not emitted.
+          at(comp.line, ` ${open}, {`);
+          for (const child of comp.children) {
+            if (child.type === NodeType.SLOT) {
+              this.place_node(child, lines);
             }
           }
-          break;
+          at(this.close_line(comp, comp.close_loc), ' }]});');
+          this.lastOutput = '';
+        } else {
+          // Component with regular content (no slots): an inline content function
+          at(comp.line, ` ${open}, function(${this.comp_fn_param(comp)}) { let _output = new jqhtml.Markup(this);`);
+          comp.children.forEach((child) => this.place_node(child, lines));
+          at(this.close_line(comp, comp.close_loc), '  return _output; }.bind(this)]});');
+          this.lastOutput = ''; // the content was another buffer
         }
-        case NodeType.TEXT: {
-          const text = node as TextNode;
-          // Apply padded trim to preserve intentional whitespace
-          const processed = this.padded_trim(text.content);
-
-          if (processed) {
-            const code = `_output.push(${this.escape_string(processed)});`;
-
-            // Optimization: skip consecutive identical space pushes
-            if (code === '_output.push(" ");' && this.lastOutput === '_output.push(" ");') {
-              // Skip duplicate - don't add to output
-              break;
-            }
-
-            this.lastOutput = code; // Track for next comparison
-            lines[lineIndex] = (lines[lineIndex] || '') + ' ' + code;
-          } else {
-            // Empty text resets tracking so next space won't be skipped
-            this.lastOutput = '';
-          }
-          // Empty after processing: skip (no code generated)
-          break;
-        }
-        case NodeType.CODE_BLOCK: {
-          this.lastOutput = ''; // Reset for non-text output
-          const codeBlock = node as CodeBlockNode;
-          const code = this.generate_code_block(codeBlock);
-          if (code) {
-            // With preprocessing, empty lines are already marked with /* empty line */
-            // So we can just add the code as-is, line by line
-            const codeLines = code.split('\n');
-            for (let i = 0; i < codeLines.length; i++) {
-              const targetIndex = lineIndex + i;
-              if (targetIndex < lines.length) {
-                // Add all lines including comment placeholders
-                const codeLine = codeLines[i].trim();
-                if (codeLine) {
-                  lines[targetIndex] = (lines[targetIndex] || '') + ' ' + codeLines[i];
-                }
-              }
-            }
-          }
-          break;
-        }
-        case NodeType.EXPRESSION: {
-          this.lastOutput = ''; // Reset for non-text output
-          const expr = node as ExpressionNode;
-
-          // Generate the expression wrapper on a single line
-          let code: string;
-
-          // Special handling for content() calls
-          // Strip trailing semicolon if present (optional in <%= %> blocks)
-          // Note: content() validation happens at the top of processNodeForLine()
-          let trimmedCode = expr.code.trim();
-          if (trimmedCode.endsWith(';')) {
-            trimmedCode = trimmedCode.slice(0, -1).trim();
-          }
-
-          if (trimmedCode === 'content()') {
-            // Default slot/content - check _inner_html first
-            code = `(() => { if (this.args._inner_html) { _output.push(this.args._inner_html); } else if (typeof content === 'function') { const [contentInstructions, contentContext] = content.call(this); _output.push(['_content', contentInstructions, contentContext]); } })();`;
-          } else if (trimmedCode.match(/^content\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*(.+?))?\s*\)$/)) {
-            // Named slot: content('header') or content('header', data) (function call with string parameter and optional data)
-            // Use the standard result pattern for proper handling
-            code = `(() => { const result = ${trimmedCode};; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })();`;
-          } else if (expr.nl2br) {
-            // <%br= %> - escaped with newlines converted to <br />
-            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(typeof result === 'object' ? jqhtml.print_object(result, 'nl2br') : jqhtml.escape_html_nl2br(result)); } })();`;
-          } else if (expr.escaped) {
-            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(typeof result === 'object' ? jqhtml.print_object(result, 'escape') : jqhtml.escape_html(result)); } })();`;
-          } else {
-            code = `(() => { const result = ${expr.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(typeof result === 'object' ? jqhtml.print_object(result, 'raw') : result); } })();`;
-          }
-
-          // Put the code on the starting line
-          if (code) {
-            lines[lineIndex] = (lines[lineIndex] || '') + ' ' + code;
-          }
-          break;
-        }
-        case NodeType.COMPONENT_INVOCATION: {
-          this.lastOutput = ''; // Reset for non-text output
-          const comp = node as ComponentInvocationNode;
-          // For 1:1 mapping, generate compact component invocations
-          const attrs = this.generate_attributes_with_conditionals(comp.attributes, comp.conditionalAttributes);
-
-          if (comp.selfClosing || comp.children.length === 0) {
-            // Simple component without children
-            const code = `_output.push({comp: [${this.comp_name_code(comp)}, ${attrs}]});`;
-            lines[lineIndex] = (lines[lineIndex] || '') + ' ' + code;
-          } else {
-            // Check if children contain slots
-            const slots = this.extract_slots_from_children(comp.children);
-
-            if (Object.keys(slots).length > 0) {
-              // Component with slots - use generate_component_invocation for proper slot handling
-              const code = this.generate_component_invocation(comp);
-              lines[lineIndex] = (lines[lineIndex] || '') + ' ' + code;
-            } else {
-              // Component with regular content (no slots)
-              // Generate inline content function
-              // Always include let _output = []; inside the function
-              lines[lineIndex] = (lines[lineIndex] || '') + ` _output.push({comp: [${this.comp_name_code(comp)}, ${attrs}, function(${this.comp_fn_param(comp)}) { let _output = [];`;
-
-              // Process children
-              if (comp.children && comp.children.length > 0) {
-                // Check if all children are simple text/inline nodes that can go on one line
-                const allInline = comp.children.every(child =>
-                  child.type === NodeType.TEXT ||
-                  (child.type === NodeType.COMPONENT_INVOCATION && (child as ComponentInvocationNode).selfClosing)
-                );
-
-                if (allInline) {
-                  // Put all inline children on the same line as the component
-                  comp.children.forEach(child => {
-                    const childCode = this.generate_node(child);
-                    if (childCode) {
-                      lines[lineIndex] = (lines[lineIndex] || '') + ' ' + childCode;
-                    }
-                  });
-                  // Close on same line
-                  lines[lineIndex] = (lines[lineIndex] || '') + ' return [_output, this]; }.bind(this)]});';
-                } else {
-                  // Multi-line children - process on their respective lines
-                  comp.children.forEach(child => {
-                    const origLine = child.line;
-                    if (origLine && origLine >= 1) {
-                      const childIndex = origLine - 1;
-                      if (childIndex >= 0 && childIndex < lines.length) {
-                        const childCode = this.generate_node(child);
-                        if (childCode) {
-                          lines[childIndex] = (lines[childIndex] || '') + '  ' + childCode;
-                        }
-                      }
-                    }
-                  });
-
-                  // Return statement and closing on the last child's line
-                  const returnLine = comp.children[comp.children.length - 1].line || node.line;
-                  const returnIndex = returnLine - 1;
-                  if (returnIndex >= 0 && returnIndex < lines.length) {
-                    lines[returnIndex] = (lines[returnIndex] || '') + '  return [_output, this]; }.bind(this)]});';
-                  }
-                }
-              } else {
-                // No children - close on same line
-                lines[lineIndex] = (lines[lineIndex] || '') + ' return [_output, this]; }.bind(this)]});';
-              }
-            }
-          }
-          break;
-        }
-        case NodeType.SLOT: {
-          // Generate slot function definition with line mapping
-          const slot = node as SlotNode;
-          const slotName = slot.name;
-
-          // Start slot function on this line
-          lines[lineIndex] = (lines[lineIndex] || '') + ` ${slotName}: function(${this.slot_params(slot)}) { const _output = [];`;
-
-          // Process slot children on their respective lines
-          if (slot.children && slot.children.length > 0) {
-            slot.children.forEach(child => {
-              const childLine = child.line;
-              if (childLine && childLine >= 1) {
-                const childIndex = childLine - 1;
-                if (childIndex >= 0 && childIndex < lines.length) {
-                  const childCode = this.generate_node(child);
-                  if (childCode) {
-                    lines[childIndex] = (lines[childIndex] || '') + ' ' + childCode;
-                  }
-                }
-              }
-            });
-
-            // Close slot function on the last child's line
-            const lastChild = slot.children[slot.children.length - 1];
-            const closeLine = lastChild.line || node.line;
-            const closeIndex = closeLine - 1;
-            if (closeIndex >= 0 && closeIndex < lines.length) {
-              lines[closeIndex] = (lines[closeIndex] || '') + ' return [_output, this]; }.bind(this),';
-            }
-          } else {
-            // Empty slot - close on same line
-            lines[lineIndex] = (lines[lineIndex] || '') + ' return [_output, this]; }.bind(this),';
-          }
-          break;
-        }
-        default: {
-          // For other node types, use the standard generator
-          const code = this.generate_node(node);
-          if (code) {
-            lines[lineIndex] = (lines[lineIndex] || '') + ' ' + code;
-          }
-        }
+        break;
       }
-    };
-
-    // Process all top-level nodes
-    for (const node of nodes) {
-      processNodeForLine(node);
-    }
-
-    // For true 1:1 mapping, we must preserve ALL lines, even empty ones
-    // Each source line from 2 to maxLine should produce exactly one output line
-    // Don't remove any empty lines - they're essential for maintaining line positions
-    return lines;
-  }
-  
-  private generate_node(node: ASTNode): string {
-    switch (node.type) {
-      case NodeType.TEXT:
-        return this.generate_text(node as TextNode);
-      case NodeType.EXPRESSION:
-        return this.generate_expression(node as ExpressionNode);
-      case NodeType.HTML_TAG:
-        return this.generate_html_tag(node as HtmlTagNode);
-      case NodeType.COMPONENT_INVOCATION:
-        return this.generate_component_invocation(node as ComponentInvocationNode);
-      case NodeType.IF_STATEMENT:
-        return this.generate_if(node as IfStatementNode);
-      case NodeType.FOR_STATEMENT:
-        return this.generate_for(node as ForStatementNode);
-      case NodeType.CODE_BLOCK:
-        return this.generate_code_block(node as CodeBlockNode);
+      case NodeType.SLOT: {
+        // A slot function: an entry of the slots object (a slot-only template's, or
+        // the one passed to a component invocation)
+        const slot = node as SlotNode;
+        const separator = lines[lineIndex].endsWith('{') ? '' : ' '; // `{row: ...`, not `{ row: ...`
+        at(slot.line, `${separator}${this.mark_node(slot)}${slot.name}: function(${this.slot_params(slot)}) { const _output = new jqhtml.Markup(this);`);
+        this.lastOutput = ''; // a slot is its own buffer
+        if (slot.children) {
+          slot.children.forEach((child) => this.place_node(child, lines));
+        }
+        at(this.close_line(slot, slot.close_loc), ' return _output; }.bind(this),');
+        this.lastOutput = '';
+        break;
+      }
       default:
         console.warn(`Unknown node type: ${node.type}`);
-        return '';
     }
   }
-  
+
+  /** The line a node's closing code goes on: its closing tag, else its last child's line. */
+  private close_line(node: ASTNode & { children?: ASTNode[] }, close: ClosePosition | undefined): number {
+    if (close) return close.line;
+    const children = node.children;
+    return children && children.length > 0 ? (children[children.length - 1].line || node.line) : node.line;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Sourcemap marks
+  //
+  // A mark is an inline comment dropped into the generated code at the position of an
+  // emitted node, naming the source position it came from. Codegen keeps building
+  // plain strings (merge_output_pushes rewrites whole lines); a mark travels with the
+  // code it precedes, and finish_render() reads every mark's final column and removes
+  // it. A block comment is transparent to the JS scanner (brackets, statement ends,
+  // regex detection), and marks are only ever placed in generated code or at a point
+  // of author code that is top-level code - never inside a string, template literal,
+  // regex or comment.
+
+  /** A mark for 1-based source `line` and `column`. */
+  private mark(line: number, column: number, name?: string, code?: boolean): string {
+    this.marks.push({ line, column: Math.max(0, column - 1), name, code });
+    return `/*\u0000${this.marks.length - 1}\u0000*/`;
+  }
+
+  /** A mark for where a node starts. */
+  private mark_node(node: ASTNode): string {
+    return this.mark(node.line, node.column);
+  }
+
+  /**
+   * `code` with a mark before its first character and before the first character of
+   * each later source line it was joined from (join_lines_mapped), so a position
+   * inside a multi-line expression maps to its own source line. `name` goes on the
+   * first mark.
+   */
+  private mark_code(code: string, loc: CodeLocation | undefined, name?: string): string {
+    if (!loc) return code;
+
+    const starts = [0, ...(loc.line_starts || [])];
+    const inserts: Array<{ index: number, mark: string }> = [];
+    for (let k = 0; k < starts.length; k++) {
+      const start = starts[k];
+      if (start < 0) continue; // this line starts inside a literal or comment
+      let end = code.length;
+      for (let j = k + 1; j < starts.length; j++) {
+        if (starts[j] >= 0) { end = starts[j]; break; }
+      }
+      let index = start;
+      while (index < end && /[ \t\n\r\f]/.test(code[index])) index++;
+      if (index >= end) continue; // nothing on this line
+      const line = loc.line + k;
+      const column = k === 0 ? loc.column + index : index - start + 1;
+      inserts.push({ index, mark: this.mark(line, column, inserts.length === 0 ? name : undefined, true) });
+    }
+
+    let result = code;
+    for (let i = inserts.length - 1; i >= 0; i--) {
+      result = result.slice(0, inserts[i].index) + inserts[i].mark + result.slice(inserts[i].index);
+    }
+    return result;
+  }
+
+  /** The `names` entry for an expression: an identifier or member path, else none. */
+  private static expression_name(code: string): string | undefined {
+    return /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*$/.test(code) ? code : undefined;
+  }
+
+  /**
+   * Merge each line's pushes, then read out and remove the marks: the render
+   * function's text and its sourcemap segments (1-based generated line, 0-based
+   * column within the render function).
+   */
+  private finish_render(lines: string[]): { render_function: string, source_mappings: RenderMapping[] } {
+    const source_mappings: RenderMapping[] = [];
+    const MARK = /\/\*\u0000(\d+)\u0000\*\//g;
+    const output = lines.map((line, i) => {
+      const merged = this.merge_output_pushes(line || '');
+      let result = '';
+      let last = 0;
+      let match: RegExpExecArray | null;
+      MARK.lastIndex = 0;
+      while ((match = MARK.exec(merged)) !== null) {
+        result += merged.slice(last, match.index);
+        last = match.index + match[0].length;
+        const mark = this.marks[Number(match[1])];
+        source_mappings.push({
+          generated: { line: i + 1, column: result.length },
+          original: { line: mark.line, column: mark.column },
+          name: mark.name,
+          ...(mark.code ? { code: true } : {})
+        });
+      }
+      return result + merged.slice(last);
+    });
+    return { render_function: output.join('\n'), source_mappings };
+  }
+
   /**
    * Padded trim: Collapse internal whitespace but preserve leading/trailing space
    * Examples:
@@ -768,153 +824,22 @@ export class CodeGenerator {
    *   "\n\n  \n" → " "
    */
   private padded_trim(text: string): string {
-    const has_leading_space = /^\s/.test(text);
-    const has_trailing_space = /\s$/.test(text);
+    // HTML whitespace only. \s and String.trim() also match U+00A0, which would
+    // collapse an author's non-breaking spaces (&nbsp; typed as the character).
+    const has_leading_space = /^[ \t\n\r\f]/.test(text);
+    const has_trailing_space = /[ \t\n\r\f]$/.test(text);
 
     // Trim the text
-    let result = text.trim();
+    let result = text.replace(/^[ \t\n\r\f]+|[ \t\n\r\f]+$/g, '');
 
     // Add back single space if original had leading/trailing whitespace
     if (has_leading_space) result = ' ' + result;
     if (has_trailing_space) result = result + ' ';
 
     // Final pass: collapse all whitespace sequences to single space
-    return result.replace(/\s+/g, ' ');
+    return result.replace(/[ \t\n\r\f]+/g, ' ');
   }
 
-  private generate_text(node: TextNode): string {
-    const content = node.content;
-
-    // Apply padded trim to preserve intentional whitespace
-    const processed = this.padded_trim(content);
-
-    // Skip if empty after processing
-    if (!processed) {
-      return '';
-    }
-
-    // Generate output code
-    const escaped = this.escape_string(processed);
-    const output = `_output.push(${escaped});`;
-
-    // Optimization: skip consecutive identical space pushes (but never skip newlines)
-    if (output === '_output.push(" ");' && this.lastOutput === '_output.push(" ");') {
-      return ''; // Skip duplicate space push
-    }
-
-    // Track this output for next comparison
-    this.lastOutput = output;
-
-    return output;
-  }
-
-
-  private generate_expression(node: ExpressionNode): string {
-    this.lastOutput = ''; // Reset for non-text output
-    let output: string;
-
-    // Special handling for content() calls
-    // Strip trailing semicolon if present (optional in <%= %> blocks)
-    let trimmedCode = node.code.trim();
-    if (trimmedCode.endsWith(';')) {
-      trimmedCode = trimmedCode.slice(0, -1).trim();
-    }
-
-    // VALIDATION: content() must be used with <%= %>, not <%!= %>
-    // content() is a passthrough function - its output is already HTML, not a string that needs escaping
-    const isContentCall = trimmedCode === 'content()' ||
-      trimmedCode.match(/^content\s*\(/);
-
-    if (isContentCall && !node.escaped) {
-      const error = new JQHTMLParseError(
-        `Invalid syntax: content() cannot be used in <%!= %> blocks`,
-        node.line,
-        node.column || 0,
-        this.sourceContent,
-        this.sourceFile
-      );
-      error.suggestion =
-        `\n\ncontent() is a passthrough function - it passes inner HTML directly to the component.\n` +
-        `The concept of "escaping" or "raw" output doesn't apply here.\n\n` +
-        `Use <%= content() %> instead:\n\n` +
-        `  ✗ Wrong:   <%!= content() %>   ← invalid, makes no sense\n` +
-        `  ✓ Correct: <%= content() %>    ← always use this form\n\n` +
-        `The same applies to named slots:\n` +
-        `  ✓ <%= content('header') %>`;
-      throw error;
-    }
-
-    if (trimmedCode === 'content()') {
-      // Default slot/content - check _inner_html first
-      output = `(() => { if (this.args._inner_html) { _output.push(this.args._inner_html); } else if (typeof content === 'function') { const [contentInstructions, contentContext] = content.call(this); _output.push(['_content', contentInstructions, contentContext]); } })();`;
-    } else if (trimmedCode.match(/^content\s*\(\s*['"]([^'"]+)['"]\s*(?:,\s*(.+?))?\s*\)$/)) {
-      // Named slot: content('header') or content('header', data) (function call with string parameter and optional data)
-      // Use the standard result pattern for proper handling
-      output = `(() => { const result = ${trimmedCode};; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else { _output.push(jqhtml.escape_html(result)); } })();`;
-    } else if (node.nl2br) {
-      // <%br= %> - escaped with newlines converted to <br />
-      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(typeof result === 'object' ? jqhtml.print_object(result, 'nl2br') : jqhtml.escape_html_nl2br(result)); } })();`;
-    } else if (node.escaped) {
-      // Single-line expression handler for escaped output
-      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(typeof result === 'object' ? jqhtml.print_object(result, 'escape') : jqhtml.escape_html(result)); } })();`;
-    } else {
-      // Single-line expression handler for unescaped output
-      output = `(() => { const result = ${node.code}; if (Array.isArray(result)) { if (result.length === 2 && Array.isArray(result[0])) { _output.push(['_content', result[0], result[1]]); } else { _output.push(...result); } } else if (result !== undefined && result !== null) { _output.push(typeof result === 'object' ? jqhtml.print_object(result, 'raw') : result); } })();`;
-    }
-
-    return output;
-  }
-  
-  private generate_if(node: IfStatementNode): string {
-    // Clean up condition - remove trailing opening brace
-    let condition = node.condition.trim();
-    condition = condition.replace(/\s*{\s*$/, ''); // Remove trailing brace
-
-    // Generate consequent body inline
-    const consequent_parts: string[] = [];
-    for (const child of node.consequent) {
-      const child_code = this.generate_node(child);
-      if (child_code) {
-        consequent_parts.push(child_code);
-      }
-    }
-
-    // Generate if statement - keep on single line for line preservation
-    let code = `if (${condition}) { ${consequent_parts.join(' ')} }`;
-
-    // Add else clause if present
-    if (node.alternate && node.alternate.length > 0) {
-      const alternate_parts: string[] = [];
-      for (const child of node.alternate) {
-        const child_code = this.generate_node(child);
-        if (child_code) {
-          alternate_parts.push(child_code);
-        }
-      }
-      code += ` else { ${alternate_parts.join(' ')} }`;
-    }
-
-    return code;
-  }
-  
-  private generate_for(node: ForStatementNode): string {
-    const iterator = node.iterator.trim();
-
-    // Generate body inline
-    const body_parts: string[] = [];
-    for (const child of node.body) {
-      const child_code = this.generate_node(child);
-      if (child_code) {
-        body_parts.push(child_code);
-      }
-    }
-
-    // Generate for loop - keep on single line for line preservation
-    const code = `for ${iterator} { ${body_parts.join(' ')} }`;
-
-    return code;
-  }
-  
   private generate_code_block(node: CodeBlockNode): string {
     // Handle legacy code property for backward compatibility
     if (node.code !== undefined) {
@@ -926,90 +851,9 @@ export class CodeGenerator {
       return '';
     }
     
-    const result: string[] = [];
-    
-    for (let i = 0; i < node.tokens.length; i++) {
-      const token = node.tokens[i];
-      const nextToken = node.tokens[i + 1];
-      
-      switch (token.type) {
-        case 'IF':
-          result.push('if');
-          break;
-          
-        case 'ELSE':
-          // Check if next token is IF for "else if"  
-          if (nextToken && nextToken.type === 'IF') {
-            result.push('} else');
-            // Don't skip the IF token, it will be processed next
-          } else if (nextToken && nextToken.type === 'JAVASCRIPT') {
-            // Check if this is "else if" in the JavaScript token
-            if (nextToken.value.trim().startsWith('if ')) {
-              result.push('} else');
-              // The 'if' is part of the JAVASCRIPT token, will be handled there
-            } else if (nextToken.value.trim() === ':') {
-              // Regular else with colon in next token
-              result.push('} else {');
-              i++; // Skip the colon token
-            } else {
-              // else with other JavaScript code
-              result.push('} else {');
-            }
-          } else {
-            // else without anything after (shouldn't happen in valid JQHTML)
-            result.push('} else {');
-          }
-          break;
-          
-        case 'ELSEIF':
-          result.push('} else if');
-          break;
-          
-        case 'ENDIF':
-          result.push('}');
-          // Skip optional semicolon in next JAVASCRIPT token
-          if (nextToken && nextToken.type === 'JAVASCRIPT' && nextToken.value.trim() === ';') {
-            i++; // Skip the semicolon token
-          }
-          break;
-          
-        case 'FOR':
-          result.push('for');
-          break;
-          
-        case 'ENDFOR':
-          result.push('}');
-          // Skip optional semicolon in next JAVASCRIPT token
-          if (nextToken && nextToken.type === 'JAVASCRIPT' && nextToken.value.trim() === ';') {
-            i++; // Skip the semicolon token
-          }
-          break;
-          
-        case 'JAVASCRIPT':
-          // Transform colons to opening braces after conditions
-          let jsCode = token.value;
-          
-          // Check if this is a condition ending with colon
-          const prevToken = i > 0 ? node.tokens[i - 1] : null;
-          if (jsCode.endsWith(':') && 
-              prevToken && 
-              (prevToken.type === 'IF' || prevToken.type === 'FOR' || prevToken.type === 'ELSEIF' ||
-               (prevToken.type === 'ELSE' && jsCode.startsWith('if ')))) {
-            jsCode = jsCode.slice(0, -1) + ' {';
-          }
-          
-          result.push(jsCode);
-          break;
-          
-        default:
-          // Pass through any other token types
-          result.push(token.value);
-      }
-    }
-    
-    const code = result.join(' ');
-
-    return code;
+    // A code block holds the JAVASCRIPT token of its <% %>: the lexer emits nothing else
+    // between CODE_START and TAG_END
+    return node.tokens.map(token => token.value).join(' ');
   }
   
   /**
@@ -1022,14 +866,13 @@ export class CodeGenerator {
    * rather than the string "undefined".
    */
   /**
-   * Merge consecutive _output.push() calls on a single line into one call.
+   * Merge consecutive _output.p() calls on a single line into one call.
    *
-   *   _output.push(" ");_output.push({tag:[..]});_output.push("A");
-   *   -> _output.push(" ", {tag:[..]}, "A");
+   *   _output.p(" ");_output.p({tag:[..]});_output.p("A");
+   *   -> _output.p(" ", {tag:[..]}, "A");
    *
-   * Array.prototype.push takes varargs and evaluates its arguments left to right,
-   * so this is behaviour-preserving; it just trims call overhead and shortens the
-   * instruction array the runtime walks.
+   * Markup.p() takes varargs and its arguments are evaluated left to right, so
+   * this is behaviour-preserving; it just trims call overhead.
    *
    * Strictly within one line. Codegen is line-based so that generated line N maps to
    * source line N; moving a statement across a newline would silently invalidate
@@ -1037,13 +880,13 @@ export class CodeGenerator {
    *
    * Merging happens only at bracket depth 0, which is what keeps nested closures
    * safe: a component's children are emitted inline as
-   * `function(C) { let _output = []; ... }`, and those inner pushes belong to a
-   * different _output binding. They sit inside parentheses, so they are never
-   * candidates here. Anything that is not a plain _output.push(...) statement -
+   * `function(C) { let _output = new jqhtml.Markup(this); ... }`, and those inner
+   * pushes belong to a different _output binding. They sit inside parentheses, so
+   * they are never candidates here. Anything that is not a plain _output.p(...) statement -
    * control flow, an IIFE, a return - ends the run and is emitted untouched.
    */
   private merge_output_pushes(line: string): string {
-    const PUSH = '_output.push(';
+    const PUSH = '_output.p(';
     if (line.indexOf(PUSH) === -1) {
       return line;
     }
@@ -1054,7 +897,7 @@ export class CodeGenerator {
 
     const flush = () => {
       if (pending.length > 0) {
-        result += `_output.push(${pending.join(', ')});`;
+        result += `_output.p(${pending.join(', ')});`;
         pending = [];
       }
     };
@@ -1070,9 +913,9 @@ export class CodeGenerator {
 
       if (line.startsWith(PUSH, i)) {
         const args_start = i + PUSH.length;
-        const args_end = this.find_matching_paren(line, args_start - 1);
+        const args_end = find_matching_bracket(line, args_start - 1);
 
-        // A complete `_output.push(...);` statement, and nothing else on its tail
+        // A complete `_output.p(...);` statement, and nothing else on its tail
         if (args_end !== -1 && line[args_end + 1] === ';') {
           if (pending.length === 0) {
             result += gap;   // whitespace belongs before the merged call
@@ -1089,67 +932,13 @@ export class CodeGenerator {
       result += gap;
       gap = '';
 
-      const stmt_end = this.find_statement_end(line, i);
+      const stmt_end = find_statement_end(line, i);
       result += line.slice(i, stmt_end);
       i = stmt_end;
     }
 
     flush();
     return result + gap;
-  }
-
-  /**
-   * Index of the ')' matching the '(' at open_index, or -1. String, template and
-   * comment aware, so a ')' inside "a)b" does not close the call.
-   */
-  private find_matching_paren(text: string, open_index: number): number {
-    let depth = 0;
-    let quote: string | null = null;
-
-    for (let i = open_index; i < text.length; i++) {
-      const ch = text[i];
-
-      if (quote) {
-        if (ch === '\\') { i++; continue; }
-        if (ch === quote) { quote = null; }
-        continue;
-      }
-
-      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
-      if (ch === '(') { depth++; continue; }
-      if (ch === ')') {
-        depth--;
-        if (depth === 0) { return i; }
-      }
-    }
-
-    return -1;
-  }
-
-  /**
-   * End of the statement starting at index (one past its ';', or end of line),
-   * skipping over strings and any bracketed regions.
-   */
-  private find_statement_end(text: string, start: number): number {
-    let depth = 0;
-    let quote: string | null = null;
-
-    for (let i = start; i < text.length; i++) {
-      const ch = text[i];
-
-      if (quote) {
-        if (ch === '\\') { i++; continue; }
-        if (ch === quote) { quote = null; }
-        continue;
-      }
-
-      if (ch === '"' || ch === "'" || ch === '`') { quote = ch; continue; }
-      if (ch === '(' || ch === '[' || ch === '{') { depth++; continue; }
-      if (ch === ')' || ch === ']' || ch === '}') { depth--; continue; }
-      if (ch === ';' && depth <= 0) { return i + 1; }
-    }
-
-    return text.length;
   }
 
   private generate_raw_tag_content(node: HtmlTagNode): string {
@@ -1160,7 +949,7 @@ export class CodeGenerator {
         parts.push(this.escape_string((child as TextNode).content));
       } else if (child.type === NodeType.EXPRESSION) {
         const expr = child as ExpressionNode;
-        const value = `(${expr.code.trim().replace(/;$/, '')})`;
+        const value = this.expression_value(this.mark_code(expr.code, expr.code_loc));
         if (expr.nl2br) {
           parts.push(`jqhtml.escape_html_nl2br(${value} ?? '')`);
         } else if (expr.escaped) {
@@ -1197,86 +986,19 @@ export class CodeGenerator {
   private generate_tag_open(node: HtmlTagNode): string {
     // Generate just the opening tag
     const attrs = this.generate_attributes_with_conditionals(node.attributes, node.conditionalAttributes);
-    return `_output.push({tag: ["${node.name}", ${attrs}, ${node.selfClosing || false}]});`;
+    return `_output.p(${this.mark_node(node)}{tag: [${js_string(node.name)}, ${attrs}, ${node.selfClosing || false}]});`;
   }
 
-  private generate_html_tag(node: HtmlTagNode): string {
-    this.lastOutput = ''; // Reset for non-text output
-    // Check if this tag needs raw content preservation
-    if (node.preserveWhitespace && !node.selfClosing && node.children.length > 0) {
-      // Validate: only TEXT, EXPRESSION, and CODE_BLOCK children allowed in raw content tags
-      // HTML tags and components are not allowed (they would break whitespace preservation)
-      for (const child of node.children) {
-        if (child.type !== NodeType.TEXT &&
-            child.type !== NodeType.EXPRESSION &&
-            child.type !== NodeType.CODE_BLOCK) {
-          const error = new JQHTMLParseError(
-            `Invalid content in <${node.name}> tag`,
-            node.line,
-            node.column || 0,
-            this.sourceContent,
-            this.sourceFile
-          );
-          error.suggestion =
-            `\n\nThe content of a <textarea> is text, so HTML tags and components\n` +
-            `cannot be nested inside it.\n\n` +
-            `Allowed:\n` +
-            `  <textarea><%= this.data.value %></textarea>  ← expressions OK\n` +
-            `  <textarea>plain text</textarea>              ← plain text OK\n\n` +
-            `Not allowed:\n` +
-            `  <textarea><div>content</div></textarea>      ← HTML tags not OK\n` +
-            `  <textarea><MyComponent /></textarea>         ← components not OK\n\n` +
-            `(<pre> has no such restriction - its content is preserved verbatim.)`;
-          throw error;
-        }
-      }
-
-      // Generate rawtag instruction with raw content
-      const attrs_obj = this.generate_attributes_with_conditionals(node.attributes, node.conditionalAttributes);
-
-      const escapedContent = this.generate_raw_tag_content(node);
-
-      return `_output.push({rawtag: ["${node.name}", ${attrs_obj}, ${escapedContent}]});`;
-    }
-
-    // Normal tag generation
-    const parts: string[] = [];
-
-    // Generate opening tag instruction
-    const attrs_obj = this.generate_attributes_with_conditionals(node.attributes, node.conditionalAttributes);
-    parts.push(`_output.push({tag: ["${node.name}", ${attrs_obj}, ${node.selfClosing}]});`);
-
-    if (!node.selfClosing) {
-      // Generate children inline
-      if (node.children.length > 0) {
-        for (const child of node.children) {
-          const child_code = this.generate_node(child);
-          if (child_code) {
-            // Skip empty text nodes
-            if (!child_code.match(/^_output\.push\(""\);?$/)) {
-              parts.push(child_code);
-            }
-          }
-        }
-      }
-
-      // Generate closing tag
-      parts.push(`_output.push("</${node.name}>");`);
-    }
-
-    // Join parts with space for single-line tags, but this will be split later
-    return parts.join(' ');
-  }
-  
   /**
    * The component name as it appears in a {comp: [...]} instruction: a string
    * literal for <Name>, or a render-time call for <{expression}> that
    * validates the value with the same rule as a literal tag and throws otherwise.
    */
   private comp_name_code(node: ComponentInvocationNode): string {
+    // Parenthesised so <{a, b}> passes ONE argument (the comma expression's value)
     return node.dynamic
-      ? `jqhtml.dynamic_component_name(${node.expression!.trim()})`
-      : `"${node.name}"`;
+      ? `jqhtml.dynamic_component_name(${this.expression_code(this.mark_code(node.expression!, node.expression_loc).trim())})`
+      : js_string(node.name);
   }
 
   /** Parameter name of the inline content function; a dynamic tag has no literal name to use. */
@@ -1284,66 +1006,6 @@ export class CodeGenerator {
     return node.dynamic ? '_dynamic_component' : node.name;
   }
 
-  private generate_component_invocation(node: ComponentInvocationNode): string {
-    this.lastOutput = ''; // Reset for non-text output
-    const instructions: string[] = [];
-    const attrs_obj = this.generate_attributes_with_conditionals(node.attributes, node.conditionalAttributes);
-
-    if (node.selfClosing || node.children.length === 0) {
-      // Simple component without children
-      const componentCall = `_output.push({comp: [${this.comp_name_code(node)}, ${attrs_obj}]});`;
-      instructions.push(componentCall);
-    } else {
-      // Check if children contain slots
-      const slots = this.extract_slots_from_children(node.children);
-
-      if (Object.keys(slots).length > 0) {
-        // Component with slots - generate content as object with slot functions ON A SINGLE LINE
-        const slotEntries: string[] = [];
-        for (const [slotName, slotNode] of Object.entries(slots)) {
-          const slot_code = slotNode.children.length > 0
-            ? this.generate_function_body(slotNode.children)
-            : '';
-
-          slotEntries.push(`${slotName}: function(${this.slot_params(slotNode)}) { const _output = []; ${slot_code} return [_output, this]; }.bind(this)`);
-        }
-
-        // Everything on one line
-        instructions.push(`_output.push({comp: [${this.comp_name_code(node)}, ${attrs_obj}, {${slotEntries.join(', ')}}]});`);
-      } else {
-        // Component with regular content (no slots)
-        instructions.push(`_output.push({comp: [${this.comp_name_code(node)}, ${attrs_obj}, function(${this.comp_fn_param(node)}) {`);
-        instructions.push(`  const _output = [];`);
-
-        const children_code = this.generate_function_body(node.children);
-        if (children_code) {
-          instructions.push(this.indent(children_code, 1));
-        }
-
-        instructions.push(`  return [_output, this];`);
-        instructions.push(`}.bind(this)]});`);
-      }
-    }
-    
-    return instructions.join('\n');
-  }
-  
-  private parse_attributes(attrs_string: string): Record<string, string> {
-    const attrs: Record<string, string> = {};
-    
-    // Simple attribute parser - handles key="value" and key=value
-    const attr_regex = /([a-zA-Z$][a-zA-Z0-9-]*)\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/g;
-    let match;
-    
-    while ((match = attr_regex.exec(attrs_string)) !== null) {
-      const [, name, value] = match;
-      // Remove quotes if present
-      attrs[name] = value.replace(/^["']|["']$/g, '');
-    }
-    
-    return attrs;
-  }
-  
   // Generate attribute object including conditional attributes
   private generate_attributes_with_conditionals(
     attrs: Record<string, any>,
@@ -1363,7 +1025,7 @@ export class CodeGenerator {
     for (const condAttr of conditionalAttrs) {
       const condAttrsObj = this.generate_attributes_object(condAttr.attributes);
       // Use Object.assign to merge conditional attributes
-      result = `Object.assign({}, ${result}, (${condAttr.condition}) ? ${condAttrsObj} : {})`;
+      result = `Object.assign({}, ${result}, (${this.mark_node(condAttr)}${condAttr.condition}) ? ${condAttrsObj} : {})`;
     }
 
     return result;
@@ -1391,7 +1053,9 @@ export class CodeGenerator {
             if (part.type === 'text') {
               return this.escape_string(part.value);
             } else {
-              return part.value;
+              // Parenthesise to preserve operator precedence:
+              // "row_" + (i > 0 ? 'pos' : 'neg'), not "row_" + i > 0 ? 'pos' : 'neg'
+              return this.expression_value(this.mark_code(part.value, part.loc));
             }
           });
           const base_id = parts.join(' + ');
@@ -1412,16 +1076,10 @@ export class CodeGenerator {
         return id_entries;
       }
 
-      // Regular id attribute - pass through unchanged
-      // id="foo" remains id="foo" (no scoping)
-      if (key === 'id') {
-        if (value && typeof value === 'object' && value.quoted) {
-          return `"id": ${this.escape_string(value.value)}`;
-        } else {
-          return `"id": ${this.escape_string(String(value))}`;
-        }
-      }
-      
+      // A hand-written id is emitted exactly as written - no cid scoping (only $sid
+      // is scoped, above). It takes the same paths as any other attribute, so an
+      // interpolated id="x_<%= a || b %>" concatenates its parts like class="" does.
+
       // Check if this is an interpolated attribute value
       if (value && typeof value === 'object' && value.interpolated) {
         // Build concatenation expression
@@ -1431,28 +1089,28 @@ export class CodeGenerator {
           } else {
             // Expression - wrap in parentheses to preserve operator precedence
             // This ensures "a" + (x ? 'b' : 'c') instead of "a" + x ? 'b' : 'c'
-            return `(${part.value})`;
+            return this.expression_value(this.mark_code(part.value, part.loc));
           }
         });
-        return `"${attrKey}": ${parts.join(' + ')}`;
+        return `${js_string(attrKey)}: ${parts.join(' + ')}`;
       }
 
       // Check if value is marked as quoted
       if (value && typeof value === 'object' && value.quoted) {
         // This was a quoted string in the source - always treat as string
-        return `"${attrKey}": ${this.escape_string(value.value)}`;
+        return `${js_string(attrKey)}: ${this.escape_string(value.value)}`;
       }
 
       // Check if it's a parenthesized expression: $attr=(expr)
       if (value && typeof value === 'object' && value.expression) {
         // It's an expression - output without quotes
-        return `"${attrKey}": ${value.value}`;
+        return `${js_string(attrKey)}: ${this.mark_code(value.value, value.loc)}`;
       }
 
       // Check if it's a bare identifier: $attr=identifier
       if (value && typeof value === 'object' && value.identifier) {
         // It's an identifier - output as JavaScript expression
-        return `"${attrKey}": ${value.value}`;
+        return `${js_string(attrKey)}: ${this.mark_code(value.value, value.loc)}`;
       }
       
       // Check if it's an event handler binding (data-__-on-*)
@@ -1461,17 +1119,14 @@ export class CodeGenerator {
         if (typeof value === 'object' && value !== null) {
           if (value.quoted) {
             // Was quoted: @click="handler" -> string literal
-            return `"${key}": ${this.escape_string(value.value)}`;
+            return `${js_string(key)}: ${this.escape_string(value.value)}`;
           } else if (value.identifier || value.expression) {
             // Was unquoted: @click=this.handler -> JavaScript expression
-            return `"${key}": ${value.value}`;
-          } else if (value.interpolated) {
-            // Has interpolation - needs special handling
-            return `"${key}": ${this.compile_interpolated_value(value)}`;
+            return `${js_string(key)}: ${value.value}`;
           }
         } else if (typeof value === 'string') {
           // Fallback for simple strings (backwards compatibility)
-          return `"${key}": ${this.escape_string(value)}`;
+          return `${js_string(key)}: ${this.escape_string(value)}`;
         }
       }
       
@@ -1481,17 +1136,14 @@ export class CodeGenerator {
         if (typeof value === 'object' && value !== null) {
           if (value.quoted) {
             // Was quoted: $foo="bar" -> string literal
-            return `"${key}": ${this.escape_string(value.value)}`;
+            return `${js_string(key)}: ${this.escape_string(value.value)}`;
           } else if (value.identifier || value.expression) {
             // Was unquoted: $foo=this.data.bar -> JavaScript expression
-            return `"${key}": ${value.value}`;
-          } else if (value.interpolated) {
-            // Has interpolation - needs special handling
-            return `"${key}": ${this.compile_interpolated_value(value)}`;
+            return `${js_string(key)}: ${value.value}`;
           }
         } else if (typeof value === 'string') {
           // Fallback for simple strings
-          return `"${key}": ${this.escape_string(value)}`;
+          return `${js_string(key)}: ${this.escape_string(value)}`;
         }
       }
       
@@ -1499,66 +1151,44 @@ export class CodeGenerator {
       if (typeof value === 'object' && value !== null) {
         if (value.quoted) {
           // Explicitly quoted value
-          return `"${attrKey}": ${this.escape_string(value.value)}`;
+          return `${js_string(attrKey)}: ${this.escape_string(value.value)}`;
         } else if (value.identifier || value.expression) {
           // Unquoted JavaScript expression
-          return `"${attrKey}": ${value.value}`;
-        } else if (value.interpolated) {
-          // Has interpolation
-          return `"${attrKey}": ${this.compile_interpolated_value(value)}`;
+          return `${js_string(attrKey)}: ${value.value}`;
         }
       }
       // Default: treat as string
-      return `"${attrKey}": ${this.escape_string(String(value))}`;
+      return `${js_string(attrKey)}: ${this.escape_string(String(value))}`;
     });
     
     return `{${entries.join(', ')}}`;
   }
   
-  private is_self_closing_tag(tag_name: string): boolean {
-    const self_closing = [
-      'area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input',
-      'link', 'meta', 'param', 'source', 'track', 'wbr'
-    ];
-    return self_closing.includes(tag_name.toLowerCase());
+  /**
+   * An interpolated expression's code as one parenthesised JavaScript expression,
+   * for a position where an operator follows or precedes it (attribute and raw-tag
+   * concatenation). A trailing `;` - accepted after any interpolated expression -
+   * is dropped.
+   */
+  private expression_value(code: string): string {
+    return `(${strip_trailing_semicolons(code).trim()})`;
   }
-  
-  private compile_interpolated_value(value: any): string {
-    // Handle interpolated values with embedded expressions
-    if (!value.parts || !Array.isArray(value.parts)) {
-      return this.escape_string(String(value));
-    }
 
-    // Build template literal from parts
-    const parts = value.parts.map((part: any) => {
-      if (part.type === 'text') {
-        // Escape text parts for template literal
-        const escaped = part.value
-          .replace(/\\/g, '\\\\')
-          .replace(/`/g, '\\`')
-          .replace(/\${/g, '\\${');
-        return escaped;
-      } else if (part.type === 'expression') {
-        // Embed expression
-        return `\${${part.value}}`;
-      }
-      return part.value;
-    });
-
-    // Return as template literal
-    return '`' + parts.join('') + '`';
+  /**
+   * An interpolated expression's code as a single expression where it stands alone
+   * (an initializer or a call's only argument): parenthesised when it is a comma
+   * expression, so `<%= a, b %>` is the value of `a, b` (b) rather than
+   * `const result = a, b;` and `<{a, b}>` passes ONE argument. A trailing `;` is
+   * dropped.
+   */
+  private expression_code(code: string): string {
+    const stripped = strip_trailing_semicolons(code);
+    return has_top_level_comma(stripped) ? `(${stripped})` : stripped;
   }
 
   private escape_string(str: string): string {
-    // Escape for JavaScript string literal
-    const escaped = str
-      .replace(/\\/g, '\\\\')
-      .replace(/"/g, '\\"')
-      .replace(/\n/g, '\\n')
-      .replace(/\r/g, '\\r')
-      .replace(/\t/g, '\\t');
-
-    return `"${escaped}"`;
+    // A JavaScript string literal whose runtime value is exactly `str` (js_literal.ts)
+    return js_string(str);
   }
   
   private indent(code: string, level: number): string {
@@ -1602,13 +1232,13 @@ export class CodeGenerator {
       // Check if value is a parsed attribute object with type info
       if (value && typeof value === 'object' && (value.identifier || value.expression)) {
         // Identifier or expression - output as raw JavaScript (no quotes)
-        entries.push(`"${key}": ${value.value}`);
+        entries.push(`${js_string(key)}: ${value.value}`);
       } else if (value && typeof value === 'object' && value.quoted) {
         // Quoted string - output as string literal
-        entries.push(`"${key}": ${JSON.stringify(value.value)}`);
+        entries.push(`${js_string(key)}: ${js_string(value.value)}`);
       } else {
         // Simple value - output as-is via JSON.stringify
-        entries.push(`"${key}": ${JSON.stringify(value)}`);
+        entries.push(`${js_string(key)}: ${typeof value === 'string' ? js_string(value) : JSON.stringify(value)}`);
       }
     }
 
@@ -1629,10 +1259,10 @@ export class CodeGenerator {
     // Add each component
     for (const [name, component] of this.components) {
       code += `// Component: ${name}\n`;
-      code += `jqhtml_components.set('${name}', {\n`;
+      code += `jqhtml_components.set(${js_string_single(name)}, {\n`;
       code += `  _jqhtml_version: '__PARSER_VERSION__',\n`;  // Version will be replaced during build
-      code += `  name: '${name}',\n`;
-      code += `  tag: '${component.tagName}',\n`;
+      code += `  name: ${js_string_single(name)},\n`;
+      code += `  tag: ${js_string_single(component.tagName)},\n`;
       code += `  defaultAttributes: ${this.serializeAttributeObject(component.defaultAttributes)},\n`;
 
       // Add defineArgs if present ($ attributes on Define tag)
@@ -1642,11 +1272,11 @@ export class CodeGenerator {
 
       // Add extends if present (template inheritance)
       if (component.extends) {
-        code += `  extends: '${component.extends}',\n`;
+        code += `  extends: ${js_string_single(component.extends)},\n`;
       }
 
       code += `  render: ${this.indent(component.render_function, 1).trim()},\n`;
-      code += `  dependencies: [${component.dependencies.map(d => `'${d}'`).join(', ')}]\n`;
+      code += `  dependencies: [${component.dependencies.map(d => js_string_single(d)).join(', ')}]\n`;
       code += '});\n\n';
     }
     
@@ -1661,4 +1291,54 @@ export class CodeGenerator {
 export function generate(ast: ProgramNode, sourceFile?: string, sourceContent?: string): GeneratedCode {
   const generator = new CodeGenerator();
   return generator.generate(ast, sourceFile, sourceContent);
+}
+
+/**
+ * Add a component's sourcemap segments to `map`, for its render function placed at
+ * generated line `render_line` (1-based), starting at column `render_column` of that
+ * line. Every render line gets a segment at column 0 - render line N is source line N,
+ * so that is (N, 0), and line 1, the function header, maps to the <Define> tag -
+ * followed by the segment of each node emitted on it.
+ */
+export function add_render_mappings(
+  map: SourceMapGenerator,
+  component: ComponentCode,
+  source: string,
+  render_line: number,
+  render_column: number
+): void {
+  const line_count = component.render_function.split('\n').length;
+  const by_line = new Map<number, RenderMapping[]>();
+  for (const m of component.source_mappings) {
+    const list = by_line.get(m.generated.line);
+    if (list) list.push(m); else by_line.set(m.generated.line, [m]);
+  }
+
+  for (let line = 1; line <= line_count; line++) {
+    const offset = line === 1 ? render_column : 0;
+    const marks = by_line.get(line) || [];
+    let previous: { line: number, column: number } | null = null;
+    if (!marks.some((m) => m.generated.column + offset === 0)) {
+      previous = line === 1 ? component.define_position : { line, column: 0 };
+      map.addMapping({
+        generated: { line: render_line + line - 1, column: 0 },
+        source,
+        original: previous
+      });
+    }
+    for (const m of marks) {
+      // A segment naming the same source position as the one before it on this line
+      // adds nothing (lookups resolve to the earlier one anyway)
+      if (!m.name && previous && previous.line === m.original.line && previous.column === m.original.column) {
+        continue;
+      }
+      previous = m.original;
+      map.addMapping({
+        generated: { line: render_line + line - 1, column: m.generated.column + offset },
+        source,
+        original: m.original,
+        name: m.name
+      });
+    }
+  }
 }

@@ -1,0 +1,17 @@
+<%--
+This_Data_Freeze_Holes - every mutation route is closed while this.data is frozen
+
+Backlog "this.data freeze holes": the freeze proxies had no defineProperty /
+setPrototypeOf / preventExtensions traps, a property descriptor handed out the raw
+nested object, and components kept on_create()'s raw objects in this.data, so
+`this.state.list = this.data.list = []` let this.state.list.push() change frozen data.
+--%>
+<Define:This_Data_Freeze_Holes>
+  <div>
+    <h1>this.data freeze holes</h1>
+    <Holes_Target $sid="holes" />
+    <Alias_Loader $sid="loader" />
+    <Warn_Target $sid="warn" />
+    <div $sid="results"></div>
+  </div>
+</Define:This_Data_Freeze_Holes>

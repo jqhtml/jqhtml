@@ -5,12 +5,19 @@ class Base_Component extends Jqhtml_Component {
     // Create component completely off-DOM
     const $offDomElement = $('<div>').component('Second_Component');
 
-    console.log('[Base_Component] Waiting 100ms before attaching to DOM...');
+    console.log('[Base_Component] Waiting for the off-DOM boot before attaching to DOM...');
 
-    // Wait 100ms to simulate delay before DOM attachment
-    await new Promise(resolve => setTimeout(resolve, 100));
+    // Wait until the whole off-DOM subtree is ready. Awaited, not a fixed delay, so
+    // the order holds however loaded the machine is.
+    await $offDomElement.component().ready();
 
     console.log('[Base_Component] Attaching Second_Component to DOM...');
+    window.__off_dom_log.push('attach');
+    window.__off_dom_before_attach = {
+      connected: $offDomElement[0].isConnected,
+      ready: $offDomElement.component()._ready_state === 4,
+      text: $offDomElement.find('.Fourth_Level_Child').text().trim()
+    };
 
     // Attach to DOM after component has fully initialized off-DOM
     this.$sid('off_dom_target').append($offDomElement);

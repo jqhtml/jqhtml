@@ -1,0 +1,5 @@
+<Define:Test_Render_Sid_Lookup>
+  <h1>render(sid) lookup</h1>
+  <div $sid="plain">not a component</div>
+  <div $redrawable $sid="counter">Count: <%= this.state.count || 0 %></div>
+</Define:Test_Render_Sid_Lookup>

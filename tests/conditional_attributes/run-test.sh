@@ -12,6 +12,7 @@ echo ""
 
 # Run the test
 node ../../jqhtml-render-harness/test-runner.js "$TEST_DIR/test.jqhtml"
+HARNESS_STATUS=$?
 
 echo ""
 echo "=================================================="
@@ -29,3 +30,6 @@ echo ""
 echo "Key validation: Object.assign() should be used for conditional merging"
 echo "Each conditional: (condition) ? {attr: value} : {}"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

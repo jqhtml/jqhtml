@@ -1,0 +1,6 @@
+<Define:Es_Row>
+  <% const _note = content('note'); %>
+  <div class="value"><%= content('value') %></div>
+  <% if (_note) { %><div class="note"><%= _note %></div><% } %>
+  <div class="unconditional"><%= content('note') %></div>
+</Define:Es_Row>

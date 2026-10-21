@@ -18,6 +18,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/my_form.js" \
   "$SCRIPT_DIR/tester.jqhtml" \
   --delay=1
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -51,3 +52,6 @@ echo "  ✅ Base class methods work (get_data, validate)"
 echo "  ✅ Form_Base template used"
 echo "  ✅ Template content correct"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

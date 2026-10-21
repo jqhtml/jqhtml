@@ -10,5 +10,6 @@ class Third_Level_Child extends Jqhtml_Component {
 
   async on_ready() {
     console.log('[Third_Level_Child] on_ready: All children ready');
+    (window.__off_dom_log = window.__off_dom_log || []).push('Third_Level_Child.on_ready');
   }
 }

@@ -1,0 +1,7 @@
+<%--
+Ia_Base - the farthest <Define> of the extends= chains. Its $ arg defaults compile to
+defineArgs and must reach every descendant that does not set the same arg.
+--%>
+<Define:Ia_Base $size="base size" $level="base" $flag="base flag">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Base>

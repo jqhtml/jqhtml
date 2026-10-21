@@ -1,0 +1,8 @@
+<%--
+Dn_Parent - the middle <Define>. Overrides Dn_Grand's title/tabindex/data-mode and the
+color style property, adds padding, and appends its own classes. data-kind is overridden
+by Dn_Child's $kind (a defineArgs default), which must still win.
+--%>
+<Define:Dn_Parent extends="Dn_Grand" title="parent" tabindex="-2" data-mode="parent"
+    data-kind="parent kind" style="color: green; padding: 2px" class="p1 shared">
+</Define:Dn_Parent>

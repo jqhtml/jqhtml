@@ -1,0 +1,4 @@
+<Define:Viewport_Resize_Override_Filter_Test>
+  <h2>on_viewport_resize() registry dispatch</h2>
+  <div $sid="arena"></div>
+</Define:Viewport_Resize_Override_Filter_Test>

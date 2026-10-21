@@ -1,0 +1,4 @@
+<%-- Ejc_Conflict - slot-only, extends="Ejc_Grid_A" while the class extends Ejc_Grid_B. CONFLICT. --%>
+<Define:Ejc_Conflict extends="Ejc_Grid_A">
+  <Slot:body><span class="ejc-slot">Ejc_Conflict</span></Slot:body>
+</Define:Ejc_Conflict>

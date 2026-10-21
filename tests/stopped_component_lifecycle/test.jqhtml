@@ -1,0 +1,6 @@
+<Define:Stopped_Component_Lifecycle>
+  <div>
+    <h1>A stopped component never runs on_ready() or on_loaded()</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Stopped_Component_Lifecycle>

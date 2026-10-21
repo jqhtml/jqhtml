@@ -28,7 +28,7 @@ import {
 const make_template = (name, extra = {}) => ({
   name,
   tag: 'div',
-  render: function () { return [[], this]; },
+  render: function (data, args, content, jqhtml) { return new jqhtml.Markup(this); },
   ...extra,
 });
 

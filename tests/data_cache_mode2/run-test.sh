@@ -20,6 +20,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/cached_component.jqhtml" \
   "$SCRIPT_DIR/contact_model.js" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -32,3 +33,6 @@ echo "3. Second instance IMMEDIATELY has Contact_Model restored from cache"
 echo "4. Contact should be instanceof Contact_Model, not plain object"
 echo "5. Contact should have get_display_name() method available"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

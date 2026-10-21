@@ -53,5 +53,6 @@ class Test_Container extends Jqhtml_Component {
     }
 
     console.log('\n' + (allPassed ? '✅ ALL TESTS PASSED' : '❌ SOME TESTS FAILED'));
+    window.testPassed = allPassed;
   }
 }

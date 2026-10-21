@@ -1,0 +1,4 @@
+<%-- Ejc_Grid_B - a second, unrelated templated parent. --%>
+<Define:Ejc_Grid_B class="ejc-grid-b">
+  <div class="ejc-b-marker">B:<%= content('body') %></div>
+</Define:Ejc_Grid_B>

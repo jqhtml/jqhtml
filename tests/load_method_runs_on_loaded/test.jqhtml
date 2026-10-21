@@ -1,0 +1,4 @@
+<Define:Test_Load_Runs_On_Loaded>
+  <h1>load() runs on_loaded() and fires 'loaded'</h1>
+  <Load_Hooks_Probe $sid="probe" />
+</Define:Test_Load_Runs_On_Loaded>

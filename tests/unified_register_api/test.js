@@ -60,12 +60,12 @@ class Unified_Register_Api_Test extends Jqhtml_Component {
       name: 'Register_Api_Template_Test',
       tag: 'div',
       defaultAttributes: {},
-      render: function(data, args, content) {
-        const _output = [];
-        _output.push({ tag: ['span', { class: 'template-marker' }, false] });
-        _output.push('registered-via-template-object');
-        _output.push('</span>');
-        return [_output, this];
+      render: function(data, args, content, jqhtml) {
+        const _output = new jqhtml.Markup(this);
+        _output.p({ tag: ['span', { class: 'template-marker' }, false] });
+        _output.p('registered-via-template-object');
+        _output.p('</span>');
+        return _output;
       },
       dependencies: []
     };

@@ -1,0 +1,4 @@
+<%-- Ejc_Helper_Between - a template-less helper sits between the class and Ejc_Grid_B; extends="Ejc_Grid_B" agrees. --%>
+<Define:Ejc_Helper_Between extends="Ejc_Grid_B">
+  <Slot:body><span class="ejc-slot">Ejc_Helper_Between</span></Slot:body>
+</Define:Ejc_Helper_Between>

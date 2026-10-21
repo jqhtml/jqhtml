@@ -1,0 +1,6 @@
+<Define:On_Load_Reload_Cache_Paths>
+  <div>
+    <h1>reload() / refresh() decisions for a component with on_load()</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:On_Load_Reload_Cache_Paths>

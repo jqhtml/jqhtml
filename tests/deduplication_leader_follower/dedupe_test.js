@@ -107,6 +107,7 @@ class Dedupe_Test extends Jqhtml_Component {
     // Final result
     console.log('========================================');
     const all_passed = tests.every(t => t);
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log('✅ ALL TESTS PASSED');
       this.$sid('results').html('<span style="color: green;">✅ All tests passed</span>');

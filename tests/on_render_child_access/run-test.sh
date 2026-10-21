@@ -18,6 +18,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/component_c.jqhtml" \
   "$SCRIPT_DIR/component_d.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -40,3 +41,6 @@ echo "  In Component A's on_render (after loading=false render),"
 echo "  this.sid('component_d') should find Component D"
 echo "  and component_d.hello() should return 'Hello from Component D!'"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

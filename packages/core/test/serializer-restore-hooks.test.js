@@ -5,7 +5,7 @@
  *   path A - normalize_for_cache(): every on_load() result becomes this.data
  *            through it, and it is what the localStorage cache stores/returns.
  *   path B - Load_Coordinator: a deduplicated follower's copy of its leader's
- *            data (serialize() in _complete_coordination, deserialize() in
+ *            data (serialize() by the leader, deserialize() in
  *            get_leader_data).
  *
  * Before this, path B was a plain JSON.stringify/JSON.parse round trip. That
@@ -26,7 +26,9 @@ function through_coordinator(value, key) {
   expect(Load_Coordinator.should_execute_on_load(leader, key)).toBe(true);
   const complete = Load_Coordinator.register_leader(leader, key);
   expect(Load_Coordinator.should_execute_on_load(follower, key)).toBe(false);
-  complete(value);
+  // The leader hands over its data already serialized - the text it holds as its
+  // data snapshot, which is Jqhtml_Local_Storage.serialize() output.
+  complete(Jqhtml_Local_Storage.serialize(value));
   return Load_Coordinator.get_leader_data(follower, key);
 }
 

@@ -16,6 +16,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/emitter.jqhtml" \
   "$SCRIPT_DIR/receiver.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -38,3 +39,6 @@ echo "  ✅ trigger(event, data) passes data to callbacks"
 echo "  ✅ Late subscribers receive stored data"
 echo "  ✅ Multiple triggers update stored data"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

@@ -1,0 +1,7 @@
+<Define:Set_Loader>
+  <ul class="tags">
+    <% for (const tag of this.data.tags) { %>
+      <li class="tag"><%= tag %></li>
+    <% } %>
+  </ul>
+</Define:Set_Loader>

@@ -16,6 +16,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/plain_box.jqhtml" \
   "$SCRIPT_DIR/plain_marker.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -29,3 +30,6 @@ echo "4. register_component('_Foo', cls), \$(el).component('_Foo') and closest('
 echo "5. Replacing a component strips the _Foo class like any component class"
 echo "6. __Foo and _foo are rejected by register_component with the naming rule"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

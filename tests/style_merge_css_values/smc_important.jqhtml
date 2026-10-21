@@ -1,0 +1,7 @@
+<%--
+Smc_Important - a Define default marked !important. CSS keeps an !important
+declaration over a later normal one, so the invocation's plain color does not
+replace it; its margin still wins.
+--%>
+<Define:Smc_Important style="color: red !important; margin: 1px">
+</Define:Smc_Important>

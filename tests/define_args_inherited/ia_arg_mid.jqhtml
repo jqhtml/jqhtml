@@ -1,0 +1,6 @@
+<%--
+Ia_Arg_Mid extends Ia_Data_Top. Its $size must beat Ia_Data_Top's data-size.
+--%>
+<Define:Ia_Arg_Mid extends="Ia_Data_Top" $size="mid arg">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Arg_Mid>

@@ -1,0 +1,6 @@
+<%--
+Ia_Sized extends Ia_Base and sets its own $size, which must beat the parent's.
+--%>
+<Define:Ia_Sized extends="Ia_Base" $size="sized size">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Sized>

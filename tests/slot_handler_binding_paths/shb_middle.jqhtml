@@ -1,0 +1,7 @@
+<Define:Shb_Middle>
+  <Shb_Leaf $sid="leaf">
+    <Slot:item>
+      <%= content('item', item) %>
+    </Slot:item>
+  </Shb_Leaf>
+</Define:Shb_Middle>

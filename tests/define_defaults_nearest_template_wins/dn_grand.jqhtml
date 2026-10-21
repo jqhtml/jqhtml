@@ -1,0 +1,13 @@
+<%--
+Dn_Grand - the farthest <Define> in a three-level extends= chain
+(Dn_Child extends Dn_Parent extends Dn_Grand). Every non-class key it sets is also set by
+a nearer <Define>, which must override it.
+
+data-mode is the arg case: a data- attribute on a <Define> lands in defaultAttributes and
+so in this.args. ($mode on a <Define> compiles to defineArgs instead - see README and
+tests/define_args_inherited.)
+--%>
+<Define:Dn_Grand title="grand" tabindex="-3" data-mode="grand"
+    style="color: red; margin: 1px" class="g1 shared">
+  <div class="dn-body">grand body</div>
+</Define:Dn_Grand>

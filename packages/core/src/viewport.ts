@@ -9,6 +9,10 @@
  * stops being found by the dispatcher.
  */
 
+// Read at dispatch time only, never during module evaluation, so the import cycle
+// with component.ts (which imports get_viewport_width) is harmless.
+import { base_on_viewport_resize } from './component.js';
+
 /** Trailing-edge debounce applied to the window resize listener. */
 export const VIEWPORT_RESIZE_DEBOUNCE_MS = 30;
 
@@ -31,7 +35,8 @@ export function get_viewport_width(): number {
  * Call on_viewport_resize(width) on every component currently in the document.
  *
  * Walks $('.Component') in document order (parents before children). Elements
- * with no component instance and stopped components are skipped. A component
+ * with no component instance, stopped components, and components whose hook is
+ * still the base no-op (no override on the class or the instance) are skipped. A component
  * that throws is logged and the walk continues - one bad handler must not stop
  * the rest of the page from resizing.
  */
@@ -41,10 +46,11 @@ export function dispatch_viewport_resize(jQuery: any): void {
   jQuery('.Component').each(function(this: HTMLElement) {
     const component = jQuery(this).data('_component');
     if (!component || component._stopped) return;
-    if (typeof component.on_viewport_resize !== 'function') return;
+    const hook = component.on_viewport_resize;
+    if (hook === base_on_viewport_resize || typeof hook !== 'function') return;
 
     try {
-      component.on_viewport_resize(viewport_width);
+      hook.call(component, viewport_width);
     } catch (error) {
       console.error(
         `[JQHTML] Error in on_viewport_resize() for ${component.component_name?.() || 'component'}:`,

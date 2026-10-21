@@ -20,6 +20,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/card_widget_header.jqhtml" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -32,3 +33,6 @@ echo "2. 'Static Title (PLACEHOLDER)' - space before ("
 echo "3. 'Prefix Dynamic Title' - space between words"
 echo "4. 'Dynamic Title    (MULTIPLE SPACES)' - multiple spaces"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

@@ -160,6 +160,37 @@ const component = $('<div>')
 - `.component()` with no args → Returns **component instance**
 - `.component('Name', args)` → Returns **jQuery object** (for chaining)
 
+### Multiple Matched Elements
+
+**Setter:** `.component('Name', args)` creates one component on **every** element in the
+set and returns the same jQuery object:
+
+```javascript
+// Three .card elements → three independent Card instances
+$('.card').component('Card', {theme: 'dark'});
+```
+
+- Each element follows the single-element rules: an element that already holds a
+  component has it stopped and replaced (see below).
+- Each instance receives its own shallow copy of `args`. One instance changing a
+  top-level `this.args` key does not affect the others; nested objects are shared, as
+  with any args.
+- An element whose tag is swapped for the template's tag is represented in the returned
+  set by its replacement element.
+
+**Getter:** `.component()` returns the component of the **first** matched element (or
+`null`). Reading from several elements is ambiguous, so when the set holds more than one
+element the getter also logs a console warning (once per call) naming the element
+count. Be explicit instead:
+
+```javascript
+const first = $('.card').first().component();
+
+$('.card').each(function() {
+  $(this).component().reload();
+});
+```
+
 ### Component Replacement Behavior
 
 **When calling `.component('Name', args)` on an element that already has a component, the existing component is automatically replaced:**

@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/void_elements_component.jqhtml" \
   "$SCRIPT_DIR/void_elements_component.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -32,3 +33,6 @@ echo "3. COMPILATION:"
 echo "   - Template should compile without errors"
 echo "   - No warnings about unclosed tags"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

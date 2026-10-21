@@ -1,0 +1,7 @@
+<Define:Stopped_Component_Waiters_Settle>
+  <div>
+    <h1>ready() and rendered() settle when the component is stopped</h1>
+    <div $sid="stage"></div>
+    <div $sid="boot_stage"></div>
+  </div>
+</Define:Stopped_Component_Waiters_Settle>

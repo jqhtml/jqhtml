@@ -1,0 +1,3 @@
+# inner.jqhtml must keep its Windows (CRLF) line endings - they are what this test tests.
+# -text: git never normalizes this file, whatever core.autocrlf says.
+inner.jqhtml -text

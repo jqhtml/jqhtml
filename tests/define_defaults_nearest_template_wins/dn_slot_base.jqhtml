@@ -1,0 +1,8 @@
+<%--
+Dn_Slot_Base - parent of a slot-only JS subclass (class Dn_Slot_Child extends
+Dn_Slot_Base, no extends=). resolve_parent_template() finds it through the prototype
+chain; its defaults must still lose to Dn_Slot_Child's own.
+--%>
+<Define:Dn_Slot_Base title="slot base" data-mode="slot base" style="color: red; margin: 1px">
+  <div class="dn-slot-body"><%= content('body') %></div>
+</Define:Dn_Slot_Base>

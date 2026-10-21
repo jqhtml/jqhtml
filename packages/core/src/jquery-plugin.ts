@@ -40,11 +40,21 @@ declare global {
   }
 }
 
+// jQuery.fn -> the .html() wrapper this runtime installed on it. init() runs once
+// automatically when a global jQuery exists and again for every documented
+// jqhtml.init($, config) call; without this every call wrapped html/on/find/val and
+// cleanData once more, so each removal and lookup went through every layer. Keyed by
+// fn (shared by the original jQuery and the $ wrapper installed below) and compared
+// against the live .html, so a jQuery whose methods were restored to the originals
+// (the benchmark page does this between runtimes) is set up again.
+const installed_on = new WeakMap<object, Function>();
+
 // Function to initialize jQuery plugin with the correct jQuery instance
 export function init_jquery_plugin(jQuery: any): void {
   if (!jQuery || !jQuery.fn) {
     throw new Error('jQuery is required for JQHTML. Please ensure jQuery is loaded before initializing JQHTML.');
   }
+  if (installed_on.get(jQuery.fn) === jQuery.fn.html) return;
   
   // Check if jQuery is from global scope (recommended)
   if (typeof window !== 'undefined' && (window as any).$ !== jQuery && !jQuery.__jqhtml_checked) {
@@ -140,25 +150,56 @@ export function init_jquery_plugin(jQuery: any): void {
   };
   
   // Component instance method
+  //
+  // Getter (no arguments): returns the FIRST matched element's component, or null.
+  // A getter on several elements is ambiguous, so it warns (once per call) and still
+  // returns the first one. Framework code never calls it on a multi-element set.
+  //
+  // Setter (name or class): creates one instance on EVERY matched element, each with
+  // its own shallow copy of args, and returns the set for chaining.
   jQuery.fn.component = function(
     this: any,
     componentOrName?: ComponentConstructor | string,
     args: Record<string, any> = {}
-  ): Jqhtml_Component | null {
-    const element = this.first ? this.first() : this;
-
+  ): any {
     if (!componentOrName) {
-      // Getter mode - return existing component or null
-      // Handle empty selector (no elements matched)
-      if (element.length === 0) {
+      if (this.length === 0) {
         return null;
       }
-
-      const comp = element.data('_component');
+      if (this.length > 1) {
+        // jQuery 3 no longer records the selector string, so the count identifies the set.
+        console.warn(
+          `[JQHTML] .component() getter called on a jQuery set of ${this.length} elements; ` +
+          `returning the first element's component. Use .first().component() or ` +
+          `.each() to read one component per element.`
+        );
+      }
       // Return null if no component found (instead of throwing)
-      return comp || null;
+      return this.first().data('_component') || null;
     }
 
+    // Setter mode. Each element keeps its own result: an element whose tag did not
+    // match the template is replaced, and the chain must continue on the live element.
+    const targets: HTMLElement[] = [];
+    let replaced = false;
+    this.each(function(this: HTMLElement) {
+      const target = create_component_on(jQuery(this), componentOrName, { ...args });
+      if (target[0] !== this) replaced = true;
+      targets.push(target[0]);
+    });
+
+    // The original set, unless an element was swapped for its template tag.
+    return replaced ? jQuery(targets) : this;
+  };
+
+  // Create one component on one element (the per-element half of the setter).
+  // Returns the element the component lives on: the given one, or its replacement
+  // when the template asked for a different tag.
+  const create_component_on = function(
+    element: any,
+    componentOrName: ComponentConstructor | string,
+    args: Record<string, any>
+  ): any {
     // Check if component already exists on this element
     const existingComponent = element.data('_component');
     if (existingComponent) {
@@ -294,7 +335,6 @@ export function init_jquery_plugin(jQuery: any): void {
     // Apply debug delay after component creation
     applyDebugDelay('component');
 
-    // Return the jQuery element to enable chaining (fluent interface pattern)
     return targetElement;
   };
 
@@ -579,6 +619,8 @@ export function init_jquery_plugin(jQuery: any): void {
   // Install the single debounced window resize listener that drives
   // on_viewport_resize() on every component. Idempotent.
   init_viewport_resize(jQuery);
+
+  installed_on.set(jQuery.fn, jQuery.fn.html);
 }
 
 // Try to auto-initialize if global jQuery exists

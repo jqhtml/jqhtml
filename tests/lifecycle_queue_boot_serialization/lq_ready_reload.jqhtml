@@ -1,0 +1,4 @@
+<%-- Lq_Ready_Reload - on_ready() calls this.reload() WITHOUT awaiting it, once. --%>
+<Define:Lq_Ready_Reload class="lq-ready-reload">
+  <span $sid="run"><%= this.data.run %></span>
+</Define:Lq_Ready_Reload>

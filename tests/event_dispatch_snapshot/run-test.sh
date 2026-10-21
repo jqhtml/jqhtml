@@ -14,6 +14,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test_dispatch_child.jqhtml" \
   "$SCRIPT_DIR/test_dispatch_child.js" \
   --delay=6
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -28,3 +29,6 @@ echo "5.  .once() still fires exactly once across repeated triggers"
 echo "6.  A handler registered during dispatch is not in that dispatch's snapshot"
 echo "7.  Two independent 'await once(ready)' promises both resolve"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

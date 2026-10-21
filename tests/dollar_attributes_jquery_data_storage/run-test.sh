@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/data_storage_component.jqhtml" \
   "$SCRIPT_DIR/data_storage_component.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -33,3 +34,6 @@ echo "3. IN-MEMORY STORAGE ONLY:"
 echo "   Values stored in jQuery's internal cache"
 echo "   Not visible in rendered markup"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

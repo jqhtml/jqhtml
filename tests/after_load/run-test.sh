@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/after_load_test_component.jqhtml" \
   "$SCRIPT_DIR/after_load_test_component.js" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -27,3 +28,6 @@ echo "5. Primary use case: clone this.data to this.state"
 echo "6. on_loaded() fires again on reload()"
 echo "7. 'loaded' event triggered via this.trigger()"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

@@ -1,0 +1,5 @@
+<Define:Interpolated_Sid_Precedence_Main>
+  <div>
+    <Interpolated_Sid_Precedence_Test $i=1 />
+  </div>
+</Define:Interpolated_Sid_Precedence_Main>

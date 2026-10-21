@@ -4,6 +4,10 @@
  * Extracted from component.ts - handles lifecycle event registration,
  * triggering, and state tracking.
  *
+ * Every handler runs with `this` bound to the component and the component as its first
+ * argument, whether it fires from trigger(), as a once() handler, or immediately on
+ * registration (sticky replay).
+ *
  * EVERY event is "sticky", not just the lifecycle ones: trigger() records the event
  * name and its payload, and a handler registered afterwards fires immediately with that
  * last payload. This is deliberate and applies to custom events too - a subscriber that
@@ -26,7 +30,7 @@
  * @param event_name - Name of the event
  * @param callback - Callback: (component, data?) => void
  */
-export function event_on(component: any, event_name: string, callback: (comp: any, data?: any) => void): any {
+export function event_on(component: any, event_name: string, callback: (this: any, comp: any, data?: any) => void): any {
   // Initialize callback array for this event if needed
   if (!component._lifecycle_callbacks.has(event_name)) {
     component._lifecycle_callbacks.set(event_name, []);
@@ -40,7 +44,7 @@ export function event_on(component: any, event_name: string, callback: (comp: an
   if (component._lifecycle_states.has(event_name)) {
     try {
       const stored_data = component._lifecycle_states.get(event_name);
-      callback(component, stored_data);
+      callback.call(component, component, stored_data);
     } catch (error) {
       console.error(`[JQHTML] Error in ${event_name} callback:`, error);
     }
@@ -59,27 +63,34 @@ export function event_on(component: any, event_name: string, callback: (comp: an
  * @param event_name - Name of the event
  * @param callback - Callback: (component, data?) => void
  */
-export function event_once(component: any, event_name: string, callback: (comp: any, data?: any) => void): any {
+export function event_once(component: any, event_name: string, callback: (this: any, comp: any, data?: any) => void): any {
   // If event already occurred, fire immediately and we're done
   if (component._lifecycle_states.has(event_name)) {
     try {
       const stored_data = component._lifecycle_states.get(event_name);
-      callback(component, stored_data);
+      callback.call(component, component, stored_data);
     } catch (error) {
       console.error(`[JQHTML] Error in ${event_name} once callback:`, error);
     }
     return component;
   }
 
-  // Wrap callback to auto-deregister after first fire
+  // Wrap callback to auto-deregister after first fire.
+  // The fired guard is what makes it "once": removing the wrapper from the live array
+  // does not remove it from a dispatch snapshot already taken. If an earlier handler
+  // re-triggers this event, the nested dispatch fires the wrapper, and the outer
+  // dispatch would then fire it again from its snapshot.
+  let fired = false;
   const wrapper = (comp: any, data?: any) => {
+    if (fired) return;
+    fired = true;
     // Remove ourselves from the callback list
     const callbacks = component._lifecycle_callbacks.get(event_name);
     if (callbacks) {
       const idx = callbacks.indexOf(wrapper);
       if (idx !== -1) callbacks.splice(idx, 1);
     }
-    callback(comp, data);
+    callback.call(comp, comp, data);
   };
 
   // Initialize callback array for this event if needed
@@ -105,16 +116,18 @@ export function event_trigger(component: any, event_name: string, data?: any): v
   component._lifecycle_states.set(event_name, data);
 
   // Fire all registered callbacks for this event.
-  // Iterate a SNAPSHOT: handlers registered via once() splice themselves out of the
-  // live array while it is being iterated, which would shift later handlers into
-  // already-visited slots and skip them. The snapshot also means a handler
-  // registered during dispatch does not fire in this dispatch (event_on's sticky
-  // immediate-fire already delivered it).
+  // Iterate a SNAPSHOT: handlers registered via once() (and the internal settling
+  // waiters) splice themselves out of the live array while it is being iterated,
+  // which would shift later handlers into already-visited slots and skip them. The
+  // snapshot also means a handler registered during dispatch does not fire in this
+  // dispatch (event_on's sticky immediate-fire already delivered it). A handler
+  // removed during dispatch still runs from the snapshot; once() wrappers and the
+  // settling waiters guard against that themselves.
   const callbacks = component._lifecycle_callbacks.get(event_name);
   if (callbacks) {
-    for (const callback of [...callbacks]) {
+    for (const callback of callbacks.slice()) {
       try {
-        callback.bind(component)(component, data);
+        callback.call(component, component, data);
       } catch (error) {
         console.error(`[JQHTML] Error in ${event_name} callback:`, error);
       }

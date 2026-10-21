@@ -18,11 +18,12 @@ else
 
   # Check error message
   ERROR_MSG=$(node "$SCRIPT_DIR/../../packages/parser/bin/jqhtml-compile" "$SCRIPT_DIR/bad_slot_function.jqhtml" 2>&1 || true)
-  if echo "$ERROR_MSG" | grep -qi "reserved"; then
-    echo "  ✅ Error message mentions 'reserved'"
+  if echo "$ERROR_MSG" | grep -q 'Slot name "function" is a JavaScript reserved word'; then
+    echo "  ✅ Error message names the reserved slot"
   else
-    echo "  ⚠️  Error message doesn't mention 'reserved'"
+    echo "  ❌ FAIL: error is not the reserved-word rejection"
     echo "  Error: $ERROR_MSG"
+    TEST1=false
   fi
 fi
 echo ""
@@ -44,16 +45,25 @@ echo ""
 echo "TEST 3: Testing other reserved words"
 RESERVED_WORDS=("if" "for" "class" "return" "while")
 ALL_RESERVED_FAIL=true
+# A private directory: the suite runs this script three times at once (one per cache
+# mode), and a shared fixed /tmp path let one run delete the file another was compiling -
+# which then "failed to compile" and counted as the expected rejection.
+TMP_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_DIR"' EXIT
 
 for word in "${RESERVED_WORDS[@]}"; do
-  TMP_FILE="/tmp/test_slot_$word.jqhtml"
-  echo "<Define:Test_$word><#$word>content</#$word></Define:Test_$word>" > "$TMP_FILE"
+  TMP_FILE="$TMP_DIR/test_slot_$word.jqhtml"
+  echo "<Define:Test_$word><Slot:$word>content</Slot:$word></Define:Test_$word>" > "$TMP_FILE"
 
-  if node "$SCRIPT_DIR/../../packages/parser/bin/jqhtml-compile" "$TMP_FILE" > /dev/null 2>&1; then
-    echo "  ⚠️  Slot name '$word' compiled (should fail)"
+  # Must fail with THE reserved-word error - any other compile error is not a pass.
+  if ERROR_MSG=$(node "$SCRIPT_DIR/../../packages/parser/bin/jqhtml-compile" "$TMP_FILE" 2>&1); then
+    echo "  ❌ Slot name '$word' compiled (should fail)"
     ALL_RESERVED_FAIL=false
+  elif echo "$ERROR_MSG" | grep -q "Slot name \"$word\" is a JavaScript reserved word"; then
+    echo "  ✅ Slot name '$word' rejected as a reserved word (expected)"
   else
-    echo "  ✅ Slot name '$word' failed to compile (expected)"
+    echo "  ❌ Slot name '$word' failed with a different error: $ERROR_MSG"
+    ALL_RESERVED_FAIL=false
   fi
   rm -f "$TMP_FILE"
 done
@@ -71,8 +81,19 @@ echo ""
 echo "========================================"
 if [ "$TEST1" = true ] && [ "$TEST2" = true ] && [ "$TEST3" = true ]; then
   echo "✅ ALL TESTS PASSED"
+  STATUS=0
 else
   echo "❌ SOME TESTS FAILED"
+  STATUS=1
 fi
 echo "========================================"
 echo ""
+
+# This script tests the compiler directly (no harness), so it prints the verdict line
+# the suite runner requires itself.
+if [ $STATUS -eq 0 ]; then
+  echo "VERDICT: PASS"
+else
+  echo "VERDICT: FAIL (TEST1=$TEST1 TEST2=$TEST2 TEST3=$TEST3)"
+fi
+exit $STATUS

@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/event_binding_component.jqhtml" \
   "$SCRIPT_DIR/event_binding_component.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -36,3 +37,6 @@ echo ""
 echo "NOTE: This test requires manual interaction in browser."
 echo "For automated testing, check console output for event logs."
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

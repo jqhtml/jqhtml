@@ -143,16 +143,17 @@ Template comments are stripped from output:
 </Define:Example>
 ```
 
-Inside a `<% %>` code block, a `//` that starts the line (first non-whitespace content) works as a JavaScript line comment too:
+Inside `<% %>` and `<%= %>`, `//` works as a JavaScript line comment too. It always runs to the end of the line, so a `%>` after it does not close the tag - close it on the next line, or use `/* */`:
 
 ```jqhtml
 <%
 // stripped before parsing
-let x = 5;
+let x = 5; // trailing comments are fine
 %>
+<b><%= x /* label */ %></b>
 ```
 
-`//` only works inside code blocks; `<%-- --%>` works anywhere in markup.
+`//` only works inside `<% %>` and `<%= %>`; `<%-- --%>` works anywhere in markup.
 
 ## Event Binding
 

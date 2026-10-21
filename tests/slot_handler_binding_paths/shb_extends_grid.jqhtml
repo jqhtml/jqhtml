@@ -1,0 +1,9 @@
+<Define:Shb_Extends_Grid extends="Shb_Grid_Base">
+  <Slot:header>
+    <button $sid="hdr_btn" @click=this.on_header_click>header</button>
+    <Shb_Marker $sid="hdr_marker" />
+  </Slot:header>
+  <Slot:row>
+    <li><button class="row-btn" @click=this.on_row_click><%= row.name %></button></li>
+  </Slot:row>
+</Define:Shb_Extends_Grid>

@@ -1,0 +1,21 @@
+<Define:Js_Regions_Probe>
+  <div $sid="trailing"><% let x = 1; // note %> <b>still a comment</b>
+  %> <b>hi</b></div>
+  <span $sid="closing"><% if (x) { %>a<% } // end %></span>
+  %></span><i $sid="after_span">after</i>
+  <p $sid="label"><%= this.args.label // label %> still a comment
+  %></p>
+  <p $sid="raw"><%!= this.args.label // raw %>
+  %></p>
+  <% let opened = 'o'; // <% blahadf %>
+  %><p $sid="opened"><%= opened %></p>
+  <%
+    // never put <% %> control-flow in a comment line
+    let leading = 'l';
+  %><p $sid="leading"><%= leading %></p>
+  <p $sid="url"><%= 'http://a' + "//b %> c" %></p>
+  <p $sid="regex_slash"><%= 'a/b/c'.replace(/\//g, ' > ') %></p>
+  <p $sid="regex_quotes"><%= `it's "q"`.replace(/['"]/g, '') %></p>
+  <% const hides = /%>/.test('%>') ? 'yes' : 'no'; // don't %>
+  %><p $sid="regex_close"><%= hides %></p>
+</Define:Js_Regions_Probe>

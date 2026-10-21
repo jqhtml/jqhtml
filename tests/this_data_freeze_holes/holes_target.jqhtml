@@ -1,0 +1,3 @@
+<Define:Holes_Target class="card">
+  <div>holes: <%= this.data.user.name %> / <%= this.data.list.length %> listed</div>
+</Define:Holes_Target>

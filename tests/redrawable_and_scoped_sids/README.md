@@ -136,7 +136,7 @@ class Parent_Component extends Jqhtml_Component {
     this.$sid('child_element').text('Updated');
 
     // Get component instance by scoped ID
-    const childComponent = this.id('child_component');
+    const childComponent = this.sid('child_component');
 
     // Regular jQuery still works for non-scoped IDs
     $('#regular_section_id').addClass('active');
@@ -171,7 +171,7 @@ All elements should render with correct ID attributes:
 - **Parser**: `/packages/parser/src/parser.ts` - Converts `$sid` → `data-sid`
 - **Codegen**: `/packages/parser/src/codegen.ts` - Generates scoped ID attributes in compiled output
 - **Runtime**: `/packages/core/src/instruction-processor.ts` - Applies scoped IDs during HTML generation
-- **Component API**: `/packages/core/src/component.ts` - `$sid()` and `id()` methods
+- **Component API**: `/packages/core/src/component.ts` - `$sid()` and `sid()` methods
 
 ## Related Documentation
 

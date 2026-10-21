@@ -1,0 +1,11 @@
+<Define:Plain_Counter>
+  <span class="label"><%= this.args.label %></span>
+  <span class="value"><%= this.data.value %></span>
+  <% if (this.args.rows) { %>
+    <ul class="rows">
+      <% for (const row of this.args.rows) { %>
+        <Plain_Row $row=row />
+      <% } %>
+    </ul>
+  <% } %>
+</Define:Plain_Counter>

@@ -1,0 +1,8 @@
+<%--
+Stop_Wait_Child - no on_load(); its ready phase waits on its slow Stop_Wait_Grand.
+--%>
+<Define:Stop_Wait_Child>
+  <div>
+    <Stop_Wait_Grand />
+  </div>
+</Define:Stop_Wait_Child>

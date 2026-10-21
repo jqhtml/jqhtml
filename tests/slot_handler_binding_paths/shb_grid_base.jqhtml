@@ -1,0 +1,8 @@
+<Define:Shb_Grid_Base>
+  <div class="grid-header"><%= content('header') %></div>
+  <ul class="grid-rows">
+    <% for (let row of [{name: 'r1'}]) { %>
+      <%= content('row', row) %>
+    <% } %>
+  </ul>
+</Define:Shb_Grid_Base>

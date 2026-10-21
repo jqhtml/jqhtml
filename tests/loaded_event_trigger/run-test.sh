@@ -16,6 +16,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/with_on_load.jqhtml" \
   "$SCRIPT_DIR/without_on_load.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -30,3 +31,6 @@ echo "  ✅ 'loaded' event fires for component WITH on_load"
 echo "  ✅ 'loaded' event fires for component WITHOUT on_load"
 echo "  ✅ Event fires AFTER on_load() completes (not before)"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

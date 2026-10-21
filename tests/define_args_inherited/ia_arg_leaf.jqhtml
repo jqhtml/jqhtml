@@ -1,0 +1,7 @@
+<%--
+Ia_Arg_Leaf extends Ia_Arg_Mid and sets nothing: Ia_Arg_Mid's $size is nearer than
+Ia_Data_Top's data-size and must win.
+--%>
+<Define:Ia_Arg_Leaf extends="Ia_Arg_Mid">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Arg_Leaf>

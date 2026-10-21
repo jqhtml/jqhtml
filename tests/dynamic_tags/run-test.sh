@@ -14,7 +14,8 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/dt_wysiwyg_input.jqhtml" \
   "$SCRIPT_DIR/dt_panel.jqhtml" \
   "$SCRIPT_DIR/dt_dynamic_probe.jqhtml" \
-  --delay=3
+  --delay=3 --expect-boot-errors
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -28,3 +29,6 @@ echo "4. Inside a form the component lands in the real DOM position with no wrap
 echo "5. When the expression's value changes between renders, a different component mounts"
 echo "6. Empty, lowercase-initial, disallowed-character and undefined names throw at render"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

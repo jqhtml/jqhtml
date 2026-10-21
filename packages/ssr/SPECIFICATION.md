@@ -1,5 +1,11 @@
 # JQHTML Server-Side Rendering (SSR) Specification
 
+> **Not production ready.** `@jqhtml/ssr` in its current form is not safe to deploy: it
+> runs code supplied by requests, does not isolate concurrent renders from each other, and
+> does not restrict which servers a render may call. Do not use it in production or expose
+> it to any network. A redesigned, hardened SSR is planned for a future jqhtml release;
+> check the CHANGELOG for the version that announces it.
+
 > **Document Status:** Active specification for `@jqhtml/ssr` package development.
 
 ## Overview

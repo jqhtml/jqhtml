@@ -102,6 +102,7 @@ class Data_Restore_Test extends Jqhtml_Component {
       console.log('========================================');
 
       const all_passed = this.state.test_results.every(r => r.status === 'PASS');
+      window.testPassed = all_passed;
 
       this.state.test_results.forEach(result => {
         const icon = result.status === 'PASS' ? '✅' : '❌';

@@ -1,0 +1,50 @@
+{
+  "name": "@jqhtml/webpack-loader",
+  "version": "2.3.76",
+  "description": "webpack and Rspack loader for JQHTML templates",
+  "type": "module",
+  "main": "src/index.js",
+  "exports": {
+    ".": "./src/index.js"
+  },
+  "scripts": {
+    "test": "node --test test/loader.test.js"
+  },
+  "dependencies": {
+    "@jqhtml/parser": "2.3.76"
+  },
+  "devDependencies": {
+    "webpack": "^5.96.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "browser": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "jqhtml",
+    "webpack",
+    "rspack",
+    "loader",
+    "jquery",
+    "template"
+  ],
+  "author": "JQHTML Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jqhtml/jqhtml.git",
+    "directory": "packages/webpack-loader"
+  },
+  "bugs": {
+    "url": "https://github.com/jqhtml/jqhtml/issues"
+  },
+  "homepage": "https://github.com/jqhtml/jqhtml#readme"
+}

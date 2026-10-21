@@ -30,9 +30,13 @@ node /var/www/html/jqhtml/jqhtml-render-harness/test-runner.js \
   inner.jqhtml \
   outer.js \
   inner.js
+HARNESS_STATUS=$?
 
 echo ""
 echo "================================================"
 echo "Expected: 'Hello world!' should appear in <main> tag"
 echo "Bug was: CRLF caused empty <main> tag"
 echo "================================================"
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

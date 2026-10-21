@@ -64,6 +64,7 @@ class Parent_With_Render extends Jqhtml_Component {
     const order_correct = first_is_parent_render && has_child_ready && has_parent_ready &&
                          render_before_child && parent_ready_last;
 
+    window.testPassed = order_correct;
     if (order_correct) {
       console.log('✅ PASS: Lifecycle order correct');
       console.log('   - on_render() fires BEFORE children boot');

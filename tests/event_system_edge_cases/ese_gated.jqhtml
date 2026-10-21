@@ -1,0 +1,7 @@
+<%--
+Ese_Gated - on_load() waits for window.__ese_gate, so the test decides when (and
+whether) the component reaches ready.
+--%>
+<Define:Ese_Gated class="ese-gated">
+  <span><%= this.data.label %></span>
+</Define:Ese_Gated>

@@ -290,7 +290,7 @@ class SSREnvironment {
 
         const $el = $(selector);
         if ($el.length > 0) {
-          const component = $el.component ? $el.component() : null;
+          const component = $el.component ? $el.first().component() : null;
           if (component) {
             resolve(component);
             return;

@@ -128,6 +128,11 @@ class UserCard extends Jqhtml_Component {
 - **String arguments supported** - Single or double quotes work inside function calls: `$val=func('arg')` or `$val=func("arg")`
 - **Synchronous only** - Expressions evaluate during template rendering. No `await` or async operations.
 
+**Plain attributes (no `$` or `@`) take quoted values only**, on every tag - HTML elements,
+components and `<Define:>`. `title=x` and `title=(x)` are compile errors
+(`Regular HTML attributes must have quoted values.`); write `title="<%= x %>"` (not on
+`<Define:>`, whose attributes are static). Only `$` and `@` attributes take a JavaScript value.
+
 **Example Usage**:
 ```jqhtml
 <UserList>
@@ -265,6 +270,13 @@ Like `class`, the `style` attribute has **special merging behavior** - but it me
 
 **How it merges**: Both Define's and invocation's `style` strings are parsed into individual `property: value` declarations. Invocation wins only on properties that appear in BOTH; any Define property that does NOT conflict with an invocation property is preserved in the merged output.
 
+The merged string reads as the browser would read the Define style followed by the invocation style:
+- The Define's remaining declarations come first and the invocation's after them, so a Define shorthand (`background: ...`) cannot reset an invocation longhand (`background-image: ...`).
+- A normal declaration does not replace an `!important` one, as in CSS.
+- Declarations are split the way the CSS parser splits them: a `;` inside a quoted string, a comment or brackets (`url(...)`, `var(...)`) does not end a declaration, and each declaration splits at its first `:`, so `url(http://...)`, data URIs and `font-family: 'A;B'` stay whole.
+- Property names match regardless of case (`COLOR` overrides `color`); custom properties (`--x`) are case-sensitive.
+- The same rules apply when a nearer `<Define>` overrides a farther one in an `extends` chain.
+
 **Example (conflicting property)**:
 ```jqhtml
 <Define:Alert style="color: red; font-size: 14px;">
@@ -277,7 +289,7 @@ Like `class`, the `style` attribute has **special merging behavior** - but it me
 
 **Rendered** (merged, invocation wins only on `color`):
 ```html
-<div style="color: blue; margin: 10px; font-size: 14px">
+<div style="font-size: 14px; color: blue; margin: 10px">
 ```
 
 **Example (fully non-overlapping properties)**:
@@ -292,7 +304,7 @@ Like `class`, the `style` attribute has **special merging behavior** - but it me
 
 **Rendered** (all four properties preserved):
 ```html
-<div style="color: green; margin: 20px; padding: 5px; border: 1px solid black">
+<div style="padding: 5px; border: 1px solid black; color: green; margin: 20px">
 ```
 
 **Use for**: Setting default inline styles at Define that invocation can selectively override property-by-property, without needing to repeat the whole style string.

@@ -11,6 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { SourceMapConsumer } from 'source-map';
 import { compileTemplate } from '../dist/compiler.js';
+import { SOURCEMAP_CASES, check_case } from './sourcemap-cases.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -89,10 +90,9 @@ function validateStructure(sourcemap) {
     issues.push(`Too many empty mappings: ${emptyCount}/${totalCount} (${Math.round(emptyCount/totalCount*100)}%)`);
   }
 
-  // NOTE: jqhtml's mappings are deliberately line-level - generated line N maps to
-  // source line N, which is why only the 'AAAA' and 'AACA' patterns appear. Codegen is
-  // built around that 1:1 property. A small number of distinct patterns is therefore
-  // the design working, not a defect, and is not reported as an issue.
+  // NOTE: render line N is source line N (codegen places every node on the line it is
+  // written on), and each emitted node adds a segment for its own column. Exact
+  // positions are asserted per construct in the "Exact positions" section below.
 
   return issues;
 }
@@ -243,6 +243,38 @@ is enough
 
     console.log('');
   }
+
+  // Exact positions: every probe of every shared case must map to its template line
+  // and column (expected positions come from the template text, not from codegen)
+  console.log(colors.bold('Exact positions (line and column)'));
+  for (const c of SOURCEMAP_CASES) {
+    let results;
+    try {
+      results = await check_case(c);
+    } catch (error) {
+      console.log(colors.red(`  ❌ ${c.name}: ${error.message}`));
+      allPassed = false;
+      continue;
+    }
+    const failures = results.filter((r) =>
+      r.actual.line !== r.expected.line || r.actual.column !== r.expected.column ||
+      !r.name_ok || !r.generated_line_ok);
+    if (failures.length === 0) {
+      console.log(colors.green(`  ✅ ${c.name}: ${results.length} probes exact`));
+      continue;
+    }
+    allPassed = false;
+    console.log(colors.red(`  ❌ ${c.name}`));
+    for (const r of failures) {
+      console.log(colors.red(
+        `     ${JSON.stringify(r.probe.gen)}: expected ${r.expected.line}:${r.expected.column}, ` +
+        `got ${r.actual.line}:${r.actual.column}` +
+        (r.name_ok ? '' : ', wrong names entry') +
+        (r.generated_line_ok ? '' : `, generated on render line ${r.generated_line}`)
+      ));
+    }
+  }
+  console.log('');
 
   // Summary
   console.log('='.repeat(60));

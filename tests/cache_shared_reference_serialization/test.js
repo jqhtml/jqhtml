@@ -108,7 +108,7 @@ class Cache_Shared_Reference_Serialization_Test extends Jqhtml_Component {
 
     let raw = null;
     if (has_cache_key) {
-      const storage_key = `jqhtml::${cache_key}::${CACHE_SCOPE_KEY}`;
+      const storage_key = `jqhtml::${cache_key}::${window.jqhtml.version()}::${CACHE_SCOPE_KEY}`;
       raw = window.localStorage.getItem(storage_key);
       console.log('localStorage key:', storage_key);
       console.log('localStorage raw value:', raw);

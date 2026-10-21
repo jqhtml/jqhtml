@@ -95,9 +95,12 @@ run_suite "parser: regression corpus" packages/parser npm run test:regression
 run_suite "parser: sourcemap"        packages/parser npm run validate:sourcemap
 run_suite "core: unit (jest)"        packages/core   npm test
 run_suite "ssr: protocol + render"   packages/ssr    npm test
+run_suite "webpack-loader: unit"     packages/webpack-loader npm test
 run_suite "vscode: extension"        packages/vscode-extension npm test
 
 run_suite "docs: example compilation" . npm run validate:docs
+run_suite "release: lockfile stamp"   . node --test scripts/test/stamp_lockfile_versions.test.js
+run_suite "benchmark: method"        . node --test tests_benchmark/test/method.test.cjs
 
 if [ "$WITH_BROWSER" -eq 1 ]; then
   echo

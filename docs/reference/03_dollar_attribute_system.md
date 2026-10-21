@@ -184,6 +184,9 @@ class ProductCard extends Jqhtml_Component {
 ```jqhtml
 <UserCard $title="User Profile" />
 <!-- this.args.title = "User Profile" -->
+
+<UserCard $title="Tom &amp; Jerry" />
+<!-- this.args.title = "Tom & Jerry": character references are resolved as in HTML -->
 ```
 
 ### String Interpolation
@@ -192,6 +195,9 @@ class ProductCard extends Jqhtml_Component {
 <UserCard $title="User: <%= this.data.user_name %>" />
 <!-- this.args.title = "User: " + this.data.user_name (raw JS string, NOT HTML-escaped) -->
 ```
+
+A `<%= %>` inside a quoted `$` value must stay on one line. For a value that spans lines,
+use the parenthesized form below: `$options=(JSON.stringify([ ... ]))`.
 
 **Important:** Unlike `<%= %>` inside template content, interpolation inside a `$attr="..."` value is built as a plain JavaScript string concatenation - it is **not** passed through `escape_html()`. If the interpolated value is later rendered into the DOM via `<%= %>` in a template body, it is escaped at that point, not when it was assigned to `this.args`.
 
@@ -239,7 +245,7 @@ Unquoted values are **not** arbitrary JavaScript expressions - they are restrict
 <Card $total=(this.data.a + this.data.b) />
 ```
 
-This form is unquoted (no surrounding `"..."`) but everything between the outer parentheses is parsed and emitted as-is, so ordinary spaces and operators inside it are fine.
+This form is unquoted (no surrounding `"..."`) but everything between the outer parentheses is parsed and emitted as-is, so ordinary spaces and operators inside it are fine, and it may span lines.
 
 ## @ Event Binding
 

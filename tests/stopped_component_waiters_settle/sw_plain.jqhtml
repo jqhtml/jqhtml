@@ -1,0 +1,4 @@
+<%-- Sw_Plain - a healthy placeholder booted next to the failing one. --%>
+<Define:Sw_Plain class="sw-plain">
+  <span>plain</span>
+</Define:Sw_Plain>

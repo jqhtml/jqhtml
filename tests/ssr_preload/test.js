@@ -101,18 +101,18 @@ class Test_SSR_Preload extends Jqhtml_Component {
       }
     ]);
 
-    const start_time = Date.now();
+    const loads_before = window.__preload_child_on_load_calls || 0;
 
     const $pre1 = $('<div>').appendTo(this.$);
     $pre1.component('Preload_Child', {});
     const pre1 = $pre1.component();
     await pre1.ready();
 
-    const elapsed = Date.now() - start_time;
+    const loads_during = (window.__preload_child_on_load_calls || 0) - loads_before;
 
     assert('Preloaded component has SSR data (value)', pre1.data.value === 'from_ssr');
     assert('Preloaded component has SSR data (source)', pre1.data.source === 'preloaded');
-    assert('Preload was fast (on_load skipped, < 200ms)', elapsed < 200);
+    assert('Preload skipped on_load() (0 calls) -> ' + loads_during, loads_during === 0);
 
     // The component's rendered content should show preloaded data
     const rendered_text = $pre1.find('span').text();
@@ -269,15 +269,15 @@ class Test_SSR_Preload extends Jqhtml_Component {
     // Simulate client: inject captured data as preload
     jqhtml.set_preload_data(rt_captured);
 
-    const start_rt = Date.now();
+    const loads_before_rt = window.__preload_child_on_load_calls || 0;
     const $rt2 = $('<div>').appendTo(this.$);
     $rt2.component('Preload_Child', { id: 'roundtrip' });
     const rt2 = $rt2.component();
     await rt2.ready();
-    const elapsed_rt = Date.now() - start_rt;
+    const loads_during_rt = (window.__preload_child_on_load_calls || 0) - loads_before_rt;
 
     assert('Round-trip: preloaded component has correct data', rt2.data.value === 'from_on_load');
-    assert('Round-trip: preload was fast (< 200ms)', elapsed_rt < 200);
+    assert('Round-trip: preload skipped on_load() (0 calls) -> ' + loads_during_rt, loads_during_rt === 0);
 
     // Clean up
     rt2.stop();

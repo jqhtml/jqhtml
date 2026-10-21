@@ -17,6 +17,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/sibling.jqhtml" \
   "$SCRIPT_DIR/root.jqhtml" \
   --delay=5
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -44,9 +45,12 @@ echo "  5. Level 0 (root): START after siblings complete"
 echo "  6. Level 0 (root): END ~1s later"
 echo ""
 echo "Validation:"
-echo "  ✅ All children complete BEFORE any sibling starts"
+echo "  ✅ Each sibling starts after its own children complete"
 echo "  ✅ All siblings complete BEFORE root starts"
-echo "  ✅ Siblings execute in parallel (start times within ~10ms)"
-echo "  ✅ Children execute in parallel (start times within ~10ms)"
-echo "  ✅ Total duration ≈ 3 seconds (3 levels × 1 second each)"
+echo "  ✅ Siblings execute in parallel (all start before any ends)"
+echo "  ✅ Children execute in parallel (all start before any ends)"
+echo "  (test.js asserts the order only, not the timing)"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

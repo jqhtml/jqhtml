@@ -1,0 +1,4 @@
+<%-- Nl_Probe - no on_load(); records every hook and the 'loaded' event in order --%>
+<Define:Nl_Probe>
+  <span $sid="label"><%= this.data.label %></span>
+</Define:Nl_Probe>

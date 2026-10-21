@@ -8,6 +8,7 @@
 
 import { Lexer, Parser, CodeGenerator } from '../dist/index.js';
 import assert from 'assert';
+import { Markup } from './markup-stub.js';
 
 function compile(template) {
   const lexer = new Lexer(template);
@@ -23,8 +24,9 @@ function compile(template) {
 function runExpressionWrapper(generatedCode, value) {
   // The wrappers reference `jqhtml.escape_html` / `jqhtml.escape_html_nl2br`.
   // Capture every push so we can assert exactly what would have rendered.
-  const _output = [];
+  const _output = new Markup(null);
   const jqhtml = {
+    Markup,
     escape_html: (s) => `ESC:${s}`,
     escape_html_nl2br: (s) => `ESC_BR:${s}`,
   };
@@ -37,7 +39,7 @@ function runExpressionWrapper(generatedCode, value) {
   wrapper = wrapper.replace(/const result = [^;]+;/, `const result = __INJECTED__;`);
   const fn = new Function('_output', 'jqhtml', '__INJECTED__', wrapper);
   fn(_output, jqhtml, value);
-  return _output;
+  return _output.instructions;
 }
 
 describe('Undefined/null expression output', () => {
@@ -59,7 +61,7 @@ describe('Undefined/null expression output', () => {
       const result = compile(`<Define:Test>\n  <div><%!= this.data.html %></div>\n</Define:Test>`);
       // unescaped path pushes result directly; ensure the guard is in front of it
       assert.ok(
-        /result !== undefined && result !== null\) \{ _output\.push\(typeof result === 'object' \? jqhtml\.print_object\(result, 'raw'\) : result\)/.test(result.code),
+        /result !== undefined && result !== null\) \{ if \(typeof result !== 'object'\) \{ _output\.p\(result\); \}.*jqhtml\.print_object\(result, 'raw'\)/.test(result.code),
         'unescaped output wrapper should guard the raw push'
       );
     });
@@ -67,7 +69,7 @@ describe('Undefined/null expression output', () => {
     it('guards nl2br <%br= %> against undefined and null', () => {
       const result = compile(`<Define:Test>\n  <div><%br= this.data.text %></div>\n</Define:Test>`);
       assert.ok(
-        /result !== undefined && result !== null\) \{ _output\.push\(typeof result === 'object' \? jqhtml\.print_object\(result, 'nl2br'\) : jqhtml\.escape_html_nl2br/.test(result.code),
+        /result !== undefined && result !== null\) \{ if \(typeof result !== 'object'\) \{ _output\.p\(jqhtml\.escape_html_nl2br\(result\)\); \}.*jqhtml\.print_object\(result, 'nl2br'\)/.test(result.code),
         'nl2br output wrapper should guard the escape_html_nl2br push'
       );
     });
@@ -137,21 +139,27 @@ describe('Undefined/null expression output', () => {
     });
   });
 
-  describe('Arrays still flow through unchanged', () => {
-    it('escaped path: array result is spread into output', () => {
+  describe('Arrays print "(Array)"; a markup buffer is spliced', () => {
+    it('escaped path: array result prints the fixed text (Array)', () => {
       const code = compile(`<Define:Test>\n  <div><%= this.data.parts %></div>\n</Define:Test>`).code;
-      assert.deepStrictEqual(runExpressionWrapper(code, ['a', 'b']), ['a', 'b']);
+      assert.deepStrictEqual(runExpressionWrapper(code, ['<img src=x onerror=alert(1)>', 'b']), ['(Array)']);
     });
 
-    it('escaped path: [instructions, ctx] tuple is wrapped as content in its own context', () => {
-      // A tuple is the shape a template or slot function returns. It is not
-      // spread flat: the runtime renders its instructions in ctx, the
-      // component that wrote them, so handler `this` matches <%= %> and $sid.
+    it('escaped path: an array shaped like the old [instructions, ctx] tuple prints (Array)', () => {
       const code = compile(`<Define:Test>\n  <div><%= this.data.parts %></div>\n</Define:Test>`).code;
-      assert.deepStrictEqual(
-        runExpressionWrapper(code, [['x', 'y'], { ctx: true }]),
-        [['_content', ['x', 'y'], { ctx: true }]]
-      );
+      assert.deepStrictEqual(runExpressionWrapper(code, [['x', 'y'], { ctx: true }]), ['(Array)']);
+    });
+
+    it('escaped path: a markup buffer is pushed as itself, to render in its definer', () => {
+      // A buffer is what a template, content or slot function returns. It is
+      // not spread flat: the runtime renders its instructions in its definer,
+      // the component that wrote them, so handler `this` matches <%= %> and $sid.
+      const code = compile(`<Define:Test>\n  <div><%= this.data.parts %></div>\n</Define:Test>`).code;
+      const markup = new Markup({ ctx: true });
+      markup.p('x', 'y');
+      const output = runExpressionWrapper(code, markup);
+      assert.strictEqual(output.length, 1);
+      assert.strictEqual(output[0], markup);
     });
   });
 });

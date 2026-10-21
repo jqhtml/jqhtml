@@ -12,6 +12,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/simple_component.jqhtml" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -23,3 +24,6 @@ echo "2. on_load() receives this.args.myval = \"hello\""
 echo "3. on_load() sets this.data.myval = \"hello\""
 echo "4. Template renders: \"Value from args: hello\""
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

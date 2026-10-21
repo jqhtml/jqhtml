@@ -1,0 +1,13 @@
+<!--
+Test case: a <%= %> expression in a quoted attribute value spanning lines
+This should fail: an expression in an attribute value must stay on one line, and
+the error points a $ attribute at the bracketed form.
+-->
+<Define:Test_Multiline_Quoted>
+  <div class="mb-3">
+    <Select_Input $options="<%= JSON.stringify([
+      {value: 3, label: 'Member'},
+      {value: 2, label: 'Admin'}
+    ]) %>" />
+  </div>
+</Define:Test_Multiline_Quoted>

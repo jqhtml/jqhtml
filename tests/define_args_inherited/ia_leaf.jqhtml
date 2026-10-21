@@ -1,0 +1,8 @@
+<%--
+Ia_Leaf extends Ia_Mid extends Ia_Base - the three-level chain. $level is set at all
+three levels (the nearest wins); $mid_only only on Ia_Mid; $size and $flag only on
+Ia_Base.
+--%>
+<Define:Ia_Leaf extends="Ia_Mid" $level="leaf">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Leaf>

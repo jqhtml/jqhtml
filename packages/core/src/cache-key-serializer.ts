@@ -40,18 +40,24 @@ interface Walk_State {
   /** Ancestor path only - added on descent, removed on ascent, so a shared (non-circular) reference is fine. */
   seen: WeakSet<object>;
   size: number;
+  /** Why the walk declined; set together with a null return, which unwinds every level. */
+  reason: string | null;
 }
 
-class Decline extends Error {
-  constructor(public reason: string) {
-    super(reason);
-  }
+/**
+ * Every step returns its text, or null once the walk has declined (state.reason says
+ * why). A decline is an ordinary outcome - any callback arg produces one - so it is
+ * returned, not thrown: a thrown Error captured a stack trace on every such render.
+ */
+function decline(state: Walk_State, reason: string): null {
+  state.reason = reason;
+  return null;
 }
 
-function push(state: Walk_State, text: string): string {
+function push(state: Walk_State, text: string): string | null {
   state.size += text.length;
   if (state.size > MAX_KEY_BYTES) {
-    throw new Decline('too-large');
+    return decline(state, 'too-large');
   }
   return text;
 }
@@ -60,11 +66,11 @@ function push(state: Walk_State, text: string): string {
  * Length-prefix strings so that no combination of separators can make two
  * different structures produce the same text.
  */
-function encode_string(state: Walk_State, prefix: string, value: string): string {
+function encode_string(state: Walk_State, prefix: string, value: string): string | null {
   return push(state, `${prefix}${value.length}:${value}`);
 }
 
-function walk(value: any, state: Walk_State): string {
+function walk(value: any, state: Walk_State): string | null {
   // --- primitives, each tagged so shapes cannot collide ---
   if (value === null) return push(state, 'n');
   if (value === undefined) return push(state, 'u');
@@ -75,33 +81,35 @@ function walk(value: any, state: Walk_State): string {
   if (type === 'number') return push(state, `d${String(value)}`);
   if (type === 'string') return encode_string(state, 's', value);
 
-  if (type === 'function') throw new Decline('function');
-  if (type === 'symbol') throw new Decline('symbol');
-  if (type === 'bigint') throw new Decline('bigint');
-  if (type !== 'object') throw new Decline(type);
+  if (type === 'function') return decline(state, 'function');
+  if (type === 'symbol') return decline(state, 'symbol');
+  if (type === 'bigint') return decline(state, 'bigint');
+  if (type !== 'object') return decline(state, type);
 
   // --- objects: reject the impostors before treating anything as data ---
-  if (typeof value.nodeType === 'number') throw new Decline('dom-node');
-  if (value.jquery) throw new Decline('jquery');
+  if (typeof value.nodeType === 'number') return decline(state, 'dom-node');
+  if (value.jquery) return decline(state, 'jquery');
 
-  if (state.seen.has(value)) throw new Decline('circular');
+  if (state.seen.has(value)) return decline(state, 'circular');
   state.seen.add(value);
 
   try {
     if (value instanceof Date) {
       const time = value.getTime();
-      if (Number.isNaN(time)) throw new Decline('invalid-date');
+      if (Number.isNaN(time)) return decline(state, 'invalid-date');
       return push(state, `t${value.toISOString()}`);
     }
 
     if (Array.isArray(value)) {
       // Order is meaningful - never sorted.
       const parts: string[] = [];
-      push(state, 'a[');
+      if (push(state, 'a[') === null) return null;
       for (let i = 0; i < value.length; i++) {
-        parts.push(walk(value[i], state));
+        const part = walk(value[i], state);
+        if (part === null) return null;
+        parts.push(part);
       }
-      push(state, ']');
+      if (push(state, ']') === null) return null;
       return `a[${parts.join(',')}]`;
     }
 
@@ -110,18 +118,21 @@ function walk(value: any, state: Walk_State): string {
     // serialize the same and collide.
     const proto = Object.getPrototypeOf(value);
     if (proto !== Object.prototype && proto !== null) {
-      throw new Decline('non-plain-object');
+      return decline(state, 'non-plain-object');
     }
 
     // Recursive key sort - the existing top-level sort is not enough for nesting.
     const keys = Object.keys(value).sort();
     const parts: string[] = [];
-    push(state, 'o{');
+    if (push(state, 'o{') === null) return null;
     for (const key of keys) {
       const encoded_key = encode_string(state, 'k', key);
-      parts.push(`${encoded_key}=${walk(value[key], state)}`);
+      if (encoded_key === null) return null;
+      const encoded_value = walk(value[key], state);
+      if (encoded_value === null) return null;
+      parts.push(`${encoded_key}=${encoded_value}`);
     }
-    push(state, '}');
+    if (push(state, '}') === null) return null;
     return `o{${parts.join(',')}}`;
   } finally {
     state.seen.delete(value);
@@ -135,13 +146,11 @@ function walk(value: any, state: Walk_State): string {
  *          `{ok: false, reason}` naming why it is not. Never throws.
  */
 export function serialize_for_cache_key(value: any): Serialize_Result {
-  const state: Walk_State = { seen: new WeakSet<object>(), size: 0 };
+  const state: Walk_State = { seen: new WeakSet<object>(), size: 0, reason: null };
   try {
-    return { ok: true, text: walk(value, state) };
+    const text = walk(value, state);
+    return text === null ? { ok: false, reason: state.reason! } : { ok: true, text };
   } catch (error) {
-    if (error instanceof Decline) {
-      return { ok: false, reason: error.reason };
-    }
     // A throwing getter or exotic proxy trap - decline rather than guess.
     return { ok: false, reason: 'unserializable' };
   }

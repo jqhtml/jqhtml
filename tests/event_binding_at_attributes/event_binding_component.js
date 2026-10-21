@@ -100,6 +100,7 @@ class Event_Binding_Component extends Jqhtml_Component {
     console.log('FINAL RESULT:');
     console.log('========================================');
 
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log('✅ ALL EVENT BINDING TESTS PASSED');
       console.log('   - All @ attributes bound correctly');

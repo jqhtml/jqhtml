@@ -1,0 +1,4 @@
+<Define:Shb_Box>
+  <div class="box-header"><%= content('header') %></div>
+  <div class="box-default"><%= content() %></div>
+</Define:Shb_Box>

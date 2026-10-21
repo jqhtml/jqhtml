@@ -1,0 +1,4 @@
+<Define:Test_Sid_Guard>
+  <h1>Hand-written data-sid guard</h1>
+  <div $sid="root"></div>
+</Define:Test_Sid_Guard>

@@ -308,3 +308,11 @@ This test serves as a regression guard. If the implementation breaks:
 4. **Test 5** - Whitespace variations cause parse errors
 
 The test immediately reveals any regression in conditional attribute handling.
+
+## Assertions
+
+The harness mounts `Test_Conditional_Attributes` with `{}`, so every condition is false
+(the "off" variant). `test.js` then mounts a second instance with every condition true (the
+"on" variant, including `min: 0` - falsy, but `!== undefined`) and asserts both: each
+attribute is present exactly when its condition holds, with the interpolated value, and the
+static attributes beside it are kept.

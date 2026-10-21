@@ -165,15 +165,6 @@ vsce publish
 2. Check language mode is set to "JQHTML" (bottom right)
 3. Try disabling other HTML/template extensions
 
-## Future Enhancements
-
-Planned features for future versions:
-
-- IntelliSense for component names and props
-- Validation and error squiggles
-- Rename refactoring
-- Find all references to components
-
 ## License
 
 MIT - See LICENSE file

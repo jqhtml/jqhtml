@@ -1,0 +1,6 @@
+<Define:On_Load_Error_Hook>
+  <div>
+    <h1>on_load_error(error): recovery from a failed on_load()</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:On_Load_Error_Hook>

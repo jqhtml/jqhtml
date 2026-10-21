@@ -49,9 +49,9 @@ clone if needed, then hands off to `parallel-test-runner.js`, which:
 5. Determines pass/fail from the **process exit code** of each `run-test.sh`
    (`passed: code === 0`), and exits non-zero overall if anything failed
 
-This is genuinely automated, machine-checkable pass/fail testing — it is not
-currently wired into `.github/workflows/ci.yml`, but running it is not merely
-a manual/visual exercise (see Test Philosophy below).
+This is genuinely automated, machine-checkable pass/fail testing, not merely a
+manual/visual exercise (see Test Philosophy below). There is no hosted CI: the
+release gate is `./run-all-suites.sh`, which `publish_internal_npm.sh` runs.
 
 ### Running a Single Test
 
@@ -96,8 +96,8 @@ console output still reads that way, but the suite as a whole is run through
 - ✅ Debugging aids (run individually via `run-test.sh` when iterating)
 - ✅ Automated pass/fail via `run-all-tests.sh` — exit codes are aggregated
   and the runner exits non-zero if any test fails (see above)
-- ❌ NOT part of CI/CD — `.github/workflows/ci.yml` only runs the
-  `packages/parser` and `packages/core` unit tests below, not this suite
+- ✅ Part of the release gate — `./run-all-suites.sh` runs it with every other
+  suite, and `publish_internal_npm.sh` runs that before a release
 
 Pass/fail is driven by each `run-test.sh`'s process exit code (a compile
 error or an uncaught crash in the browser fails the run). Older tests mostly
@@ -116,16 +116,13 @@ npm run test:parser   # cd packages/parser && npm test
 npm run test:core     # cd packages/core && npm test
 ```
 
-These are genuine unit tests (e.g. `packages/parser/test/*.test.js`) and are
-the tests actually run in `.github/workflows/ci.yml`.
+These are genuine unit tests (e.g. `packages/parser/test/*.test.js`), also run
+by `./run-all-suites.sh`.
 
 ### Reference Tests
 
 - **lifecycle_bottom_up_timing/** - Tests bottom-up on_ready() execution order
 - **redrawable_and_scoped_sids/** - Tests $redrawable and $sid behavior
 - **js_class_support/** - Tests JavaScript class integration
-- **session_storage/** - Standalone browser page exercising session storage
-  scoping directly; has no `run-test.sh`, so it is excluded from
-  `run-all-tests.sh` and must be opened manually in a browser
 
 See `/var/www/html/jqhtml/tests/CLAUDE.md` for complete test directory documentation.

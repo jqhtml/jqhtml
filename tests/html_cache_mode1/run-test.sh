@@ -19,6 +19,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$TEST_FILE" \
   "$SCRIPT_DIR/cached_component.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -30,3 +31,6 @@ echo "2. First instance is removed"
 echo "3. Second instance IMMEDIATELY shows 'Loaded Title' (from cache)"
 echo "4. Second instance loads fresh data and updates"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

@@ -6,6 +6,10 @@ Compiles `.jqhtml` templates into JavaScript for the JQHTML component framework.
 npx jqhtml-compile component.jqhtml -o bundle.js --sourcemap
 ```
 
+`--sourcemap` embeds the map inline. `--sourcemap=external` writes it to `bundle.js.map`
+instead; from the API, `compileTemplate(source, filename, { format, sourcemap: 'external' })`
+returns it as `map` alongside `code`.
+
 Templates look like HTML with embedded JavaScript:
 
 ```html

@@ -21,14 +21,14 @@ const render_line = (code) => code.split('\n').find((l) => l.includes('render: f
 describe('content on the <Define> line', () => {
   it('a one-line text component keeps its text', () => {
     const line = render_line(compile('<Define:Badge tag="span" class="badge">new</Define:Badge>'));
-    assert.ok(line.includes('_output.push("new")'), line);
+    assert.ok(line.includes('_output.p("new")'), line);
   });
 
   it('a one-line component with tags, interpolation and a child component', () => {
     const line = render_line(compile(`<Define:Row><td><%= this.args.v %></td><Cell $x=1 /></Define:Row>`));
     assert.ok(line.includes('{tag: ["td", {}, false]}'), line);
     assert.ok(line.includes('this.args.v'), line);
-    assert.ok(line.includes('_output.push("</td>")'), line);
+    assert.ok(line.includes('_output.p("</td>")'), line);
     assert.ok(line.includes('{comp: ["Cell", {"$x": 1}]}'), line);
   });
 
@@ -36,15 +36,15 @@ describe('content on the <Define> line', () => {
     const line = render_line(compile(`<Define:Grid_Users><Slot:row><td><%= row.id %></td></Slot:row></Define:Grid_Users>`));
     assert.ok(line.includes('row: function(row)'), line);
     assert.ok(line.includes('row.id'), line);
-    assert.ok(line.includes('return [_output, this]; }.bind(this)'), line);
+    assert.ok(line.includes('return _output; }.bind(this)'), line);
   });
 
   it('markup on the Define line followed by more lines keeps every line in place', () => {
     const code = compile(`<Define:Two><b>one</b>\n<i>two</i>\n</Define:Two>`);
     const lines = code.split('\n');
     const first = lines.findIndex((l) => l.includes('render: function render('));
-    assert.ok(lines[first].includes('_output.push("one")'), lines[first]);
-    assert.ok(lines[first + 1].includes('_output.push(" ", {tag: ["i", {}, false]}, "two", "</i>")'), lines[first + 1]);
+    assert.ok(lines[first].includes('_output.p("one")'), lines[first]);
+    assert.ok(lines[first + 1].includes('_output.p(" ", {tag: ["i", {}, false]}, "two", "</i>")'), lines[first + 1]);
   });
 
   it('a multi-line component is unchanged: the header line carries no body', () => {

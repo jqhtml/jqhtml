@@ -1,0 +1,7 @@
+<%--
+Ia_Mid extends Ia_Base. Sets $level (beats Ia_Base) and $mid_only; does not set $size,
+so Ia_Base's $size must arrive.
+--%>
+<Define:Ia_Mid extends="Ia_Base" $level="mid" $mid_only="mid only">
+  <span class="ia-size"><%= this.args.size %></span>
+</Define:Ia_Mid>

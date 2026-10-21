@@ -1,0 +1,20 @@
+<%--
+Apply_Fail_Card - a card whose FIRST load for a given $key fails AFTER on_load()
+has returned: either on_loaded() throws, or on_load() leaves this.data = null.
+Drives the load coordinator's leader-failure path for the apply step.
+
+ARGS:
+    $key   - forms the deduplication key, and selects the per-key counters
+    $mode  - 'throw_loaded' (first on_loaded() throws) or 'null_data' (first
+             on_load() sets this.data = null)
+
+DATA:
+    this.data = {label, loaded}
+--%>
+<Define:Apply_Fail_Card class="apply-fail-card">
+  <% if (this.data.loaded) { %>
+    <span class="label"><%= this.data.label %></span>
+  <% } else { %>
+    <span class="loading">loading</span>
+  <% } %>
+</Define:Apply_Fail_Card>

@@ -133,6 +133,7 @@ class Data_Storage_Component extends Jqhtml_Component {
     console.log('FINAL RESULT:');
     console.log('========================================');
 
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log('✅ ALL STORAGE TESTS PASSED');
       console.log('   - Values accessible via this.args');

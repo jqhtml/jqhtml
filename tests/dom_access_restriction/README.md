@@ -10,14 +10,14 @@ Validates that the Proxy-based DOM access restriction works correctly during `on
 
 1. **`this.$` access** - jQuery element reference
 2. **`this.$sid()` access** - Scoped ID lookup
-3. **`this.id()` access** - Component instance lookup
+3. **`this.sid()` access** - Component instance lookup
 4. **`this.custom_prop = value`** - Setting properties other than `this.data`
+5. **`this.component_name()`** - Component methods (CLAUDE.md lists it as blocked)
 
 ### Allowed Operations (Should Work)
 
 1. **`this.data = {...}`** - Setting data property
 2. **`this.args.user_id`** - Reading component arguments
-3. **`this.component_name()`** - Calling component methods
 
 ## Why This Matters
 
@@ -36,7 +36,7 @@ Uses a JavaScript Proxy that wraps `this` during `on_load()` execution:
 ```typescript
 const restricted_this = new Proxy(this, {
   get(target, prop) {
-    if (prop === '$' || prop === 'id' || prop === '$sid') {
+    if (prop === '$' || prop === 'sid' || prop === '$sid') {
       throw new Error(`Cannot access this.${prop} during on_load()`);
     }
     return target[prop];
@@ -60,10 +60,14 @@ All 7 tests should **PASS**:
 - ✅ Test 1: Valid component sets this.data successfully
 - ✅ Test 2: Error thrown when accessing this.$
 - ✅ Test 3: Error thrown when accessing this.$sid()
-- ✅ Test 4: Error thrown when accessing this.id()
+- ✅ Test 4: Error thrown when accessing this.sid()
 - ✅ Test 5: Error thrown when setting this.custom_prop
 - ✅ Test 6: Can access this.args.user_id
-- ✅ Test 7: Can call this.component_name()
+- ✅ Test 7: Error thrown when calling this.component_name()
+
+`test.js` (the root component) asserts all seven once every child is ready - each
+child records in `this.data` whether its access threw and with which message - and sets
+`window.testPassed`.
 
 ## Running the Test
 

@@ -10,6 +10,8 @@ declare const $: any;
 import { Jqhtml_Component } from './component.js';
 import { debug_attributes_enabled } from './config.js';
 import { get_component_class, get_template } from './component-registry.js';
+import { Jqhtml_Markup } from './markup.js';
+import { merge_style } from './style-merge.js';
 
 // Instruction types from parser
 export interface TagInstruction {
@@ -21,22 +23,20 @@ export interface RawTagInstruction {
 }
 
 export interface ComponentInstruction {
-  comp: [string, Record<string, any>] | [string, Record<string, any>, ((context: any) => [any[], Jqhtml_Component]) | Record<string, (context: any) => [any[], Jqhtml_Component]>]; // [name, props, contentFn? | slots?]
+  comp: [string, Record<string, any>] | [string, Record<string, any>, ((context: any) => Jqhtml_Markup) | Record<string, (context: any) => Jqhtml_Markup>]; // [name, props, contentFn? | slots?]
 }
 
 export interface SlotInstruction {
-  slot: [string, Record<string, any>, (context: any) => [any[], Jqhtml_Component]]; // [name, props, contentFn]
+  slot: [string, Record<string, any>, (context: any) => Jqhtml_Markup]; // [name, props, contentFn]
 }
 
-// ['_content', instructions, definer] - instructions written in another
-// component's template (a slot body, or default content between a component's
-// tags) and spliced in by content(). They render in `definer`, the component
-// whose template contains the markup, so this in handler attributes, id=
-// scoping and instantiator() agree with <%= %> and $sid, which are closures
-// over the definer already. `definer` is absent only for legacy callers.
-export type ContentInstruction = ['_content', Instruction[], Jqhtml_Component?];
-
-export type Instruction = TagInstruction | RawTagInstruction | ComponentInstruction | SlotInstruction | ContentInstruction | string;
+// A Jqhtml_Markup instruction is markup written in another component's
+// template (a slot body, or default content between a component's tags) and
+// spliced in by content(). It renders in its `definer`, the component whose
+// template contains the markup, so this in handler attributes, id= scoping and
+// instantiator() agree with <%= %> and $sid, which are closures over the
+// definer already.
+export type Instruction = TagInstruction | RawTagInstruction | ComponentInstruction | SlotInstruction | Jqhtml_Markup | string;
 
 // Tracking data for second pass initialization
 interface TagData {
@@ -47,8 +47,8 @@ interface TagData {
 interface ComponentData {
   name: string;
   props: Record<string, any>;
-  contentFn?: (context: any) => [any[], Jqhtml_Component];
-  slots?: Record<string, (context: any) => [any[], Jqhtml_Component]>;
+  contentFn?: (context: any) => Jqhtml_Markup;
+  slots?: Record<string, (context: any) => Jqhtml_Markup>;
   context: Jqhtml_Component;
 }
 
@@ -171,21 +171,18 @@ function process_instruction_to_html(
   if (typeof instruction === 'string') {
     // Raw HTML/text - no escaping, as requested
     html.push(instruction);
-  } else if (Array.isArray(instruction)) {
-    if (instruction[0] !== '_content' || !Array.isArray(instruction[1])) {
-      return;
-    }
-    // Content written in another template renders in that template's component.
-    const definer = instruction[2] || context;
-    for (const item of instruction[1]) {
-      process_instruction_to_html(item, html, tagElements, components, definer, slots);
-    }
   } else if ('tag' in instruction) {
     // HTML tag
     process_tag_to_html(instruction, html, tagElements, components, context);
   } else if ('comp' in instruction) {
     // Component
     process_component_to_html(instruction, html, components, context);
+  } else if (instruction instanceof Jqhtml_Markup) {
+    // Content written in another template renders in that template's component.
+    const definer = instruction.definer || context;
+    for (const item of instruction.instructions) {
+      process_instruction_to_html(item, html, tagElements, components, definer, slots);
+    }
   } else if ('slot' in instruction) {
     // Slot content
     process_slot_to_html(instruction, html, tagElements, components, context, slots);
@@ -252,15 +249,19 @@ function process_tag_to_html(
 }
 
 /**
- * A double quote inside an attribute value would end the attribute in the
- * HTML string this pass builds; an interpolated value can never legitimately
- * do that, so it is encoded. Nothing else is touched - the value is otherwise
- * emitted exactly as the template produced it.
+ * An attribute value as HTML text in a double-quoted attribute. Values arrive as the
+ * literal strings they stand for - the compiler resolves character references in
+ * template text (`title="a &amp; b"` is `a & b`), and an interpolated value is taken
+ * as written - so `&` and `"` are encoded, and the browser's parse gives back exactly
+ * the value: the same string a tag with @event/$sid gets from .attr().
  */
 function escape_attribute(value: string | number): string {
   const s = typeof value === 'string' ? value : String(value);
-  return s.indexOf('"') === -1 ? s : s.replace(/"/g, '&quot;');
+  return ATTRIBUTE_SPECIAL.test(s) ? s.replace(ATTRIBUTE_SPECIAL_ALL, to_attribute_entity) : s;
 }
+const ATTRIBUTE_SPECIAL = /[&"]/;
+const ATTRIBUTE_SPECIAL_ALL = /[&"]/g;
+const to_attribute_entity = (c: string) => (c === '&' ? '&amp;' : '&quot;');
 
 
 /**
@@ -308,8 +309,8 @@ function process_component_to_html(
   }
 
   // Determine if third parameter is a function (default content) or object (named slots)
-  let contentFn: ((context: any) => [any[], Jqhtml_Component]) | undefined;
-  let slots: Record<string, (context: any) => [any[], Jqhtml_Component]> | undefined;
+  let contentFn: ((context: any) => Jqhtml_Markup) | undefined;
+  let slots: Record<string, (context: any) => Jqhtml_Markup> | undefined;
 
   if (contentOrSlots) {
     if (typeof contentOrSlots === 'function') {
@@ -344,13 +345,13 @@ function process_component_to_html(
     // data-sid is debug-only: $sid() resolves via the scoped id, never this.
     html.push(
       debug_attributes_enabled()
-        ? ` id="${props['id']}" data-sid="${baseId}"`
-        : ` id="${props['id']}"`
+        ? ` id="${escape_attribute(props['id'])}" data-sid="${escape_attribute(baseId)}"`
+        : ` id="${escape_attribute(props['id'])}"`
     );
   }
   // Regular id passes through unchanged
   else if (props['id']) {
-    html.push(` id="${props['id']}"`);
+    html.push(` id="${escape_attribute(props['id'])}"`);
   }
 
   // Close tag - other attributes will be added during initialization
@@ -385,17 +386,17 @@ function process_slot_to_html(
     const [, slotProps, contentFn] = parentSlot.slot;
     
     // Execute slot content function with props
-    const [content] = contentFn.call(context, slotProps);
+    const content = contentFn.call(context, slotProps);
     
     // Process the content to HTML
-    for (const item of content) {
+    for (const item of content.instructions) {
       process_instruction_to_html(item, html, tagElements, components, context);
     }
   } else if (slotName === 'default' && instruction.slot[2]) {
     // Use default slot content
     const [, , defaultFn] = instruction.slot;
-    const [content] = defaultFn.call(context, {});
-    for (const item of content) {
+    const content = defaultFn.call(context, {});
+    for (const item of content.instructions) {
       process_instruction_to_html(item, html, tagElements, components, context);
     }
   }
@@ -419,8 +420,7 @@ function process_rawtag_to_html(
   // Add attributes
   for (const [key, value] of Object.entries(attrs)) {
     if (typeof value === 'string' || typeof value === 'number') {
-      const escaped_value = String(value).replace(/"/g, '&quot;');
-      html.push(` ${key}="${escaped_value}"`);
+      html.push(` ${key}="${escape_attribute(value)}"`);
     } else if (typeof value === 'boolean' && value) {
       // Boolean attribute (e.g., disabled, readonly)
       html.push(` ${key}`);
@@ -454,6 +454,19 @@ function process_rawtag_to_html(
 }
 
 /**
+ * Queue one apply_attributes() .data() write. A key written twice ($foo, then data-foo)
+ * is moved to the end, so the one .data(object) call applies the writes in the order
+ * the per-key calls did: jQuery camelCases keys, so 'foo-bar' and 'fooBar' are one
+ * entry and the later write must stay later.
+ */
+function queue_data_write(writes: Record<string, any> | null, key: string, value: any): Record<string, any> {
+  if (writes === null) writes = Object.create(null);  // no inherited keys to collide with
+  else if (key in writes) delete writes[key];
+  writes[key] = value;
+  return writes;
+}
+
+/**
  * Apply attributes with special handling to a DOM element
  *
  * This function processes various attribute types and applies them to the element:
@@ -478,136 +491,123 @@ function apply_attributes(
   attrs: Record<string, any>,
   context: Jqhtml_Component
 ): void {
-  for (const [key, value] of Object.entries(attrs)) {
-    if (key === '$sid' || key === 'id') {
-      // Already handled in HTML generation
-      continue;
-    } else if (key.startsWith('$')) {
-      // $ attributes: store via jQuery .data() only
-      // Does NOT create data-* attributes on the DOM element
-      const dataKey = key.substring(1);
-      element.data(dataKey, value);
-    // } else if (key.startsWith('@')) {
-    //   // Event handler with @ prefix (e.g., @click)
-    //   const eventName = key.substring(1);  // Remove @ to get 'click'
-    //   if (typeof value === 'function') {
-    //     element.on(eventName, function(e: any) {
-    //       e.preventDefault();  // Auto-preventDefault as per JQHTML design
-    //       // Bind 'this' to the component context and call the function
-    //       value.bind(context)(e, element);
-    //     });
-    //   } else {
-    //     console.warn("(JQHTML) Tried to assign a non function to @ event handler "+key)
-    //   }
-    } else if (key.startsWith('data-__-on-')) {
-      // Event handler
-      const eventName = key.substring(11); // 'data-__-on-'.length = 11
-      if (typeof value === 'function') {
-        element.on(eventName, function(e: any) {
-          value.bind(context)(e, element);
-        });
-      } else {
-        console.warn("(JQHTML) Tried to assign a non function to on event handler "+key)
-      }
-    } else if (key.startsWith('on')) {
-      // Event handler
-      const eventName = key.substring(2);
-      if (typeof value === 'function') {
-        element.on(eventName, function(e: any) {
-          value.bind(context)(e, element);
-        });
-      } else {
-        console.warn("(JQHTML) Tried to assign a non function to on event handler "+key)
-      }
-    } else if (key.startsWith('data-')) {
-      // data-sid is debug-only - suppressed entirely in production
-      if (key === 'data-sid' && !debug_attributes_enabled()) {
+  // $foo and data-foo values, written to jQuery's data store in ONE .data() call after
+  // the loop. Nothing in the loop reads that store. A value of undefined is left out:
+  // .data(key, undefined) is a read, not a write, so it never stored anything.
+  let data_writes: Record<string, any> | null = null;
+
+  try {
+    for (const [key, value] of Object.entries(attrs)) {
+      if (key === '$sid' || key === 'id') {
+        // Already handled in HTML generation
         continue;
-      }
-      // Data attributes - go into DOM
-      const attrValue = typeof value === "string" ? value.trim() : value;
-      element.attr(key, attrValue);
-      // Get version without 'data-' prefix
-      const dataKey = key.substring(5);
-      // Always set element.data
-      element.data(dataKey, value);
-    } else if (key === 'class') {
-      // Handle class attribute with merge logic
-      const existingClasses = element.attr('class');
-
-      // Debug logging
-      if ((window as any).jqhtml?.debug?.enabled) {
-        console.log(`[InstructionProcessor] Merging class attribute:`, {
-          existing: existingClasses,
-          new: value
-        });
-      }
-
-      if (!existingClasses) {
-        // No existing classes - set directly
-        const attrValue = typeof value === "string" ? value.trim() : value;
-        element.attr('class', attrValue);
-      } else {
-        // Merge classes - split and add if not present
-        const existing = existingClasses.split(/\s+/).filter(c => c);
-        const newClasses = String(value).split(/\s+/).filter(c => c);
-        for (const newClass of newClasses) {
-          if (!existing.includes(newClass)) {
-            existing.push(newClass);
-          }
+      } else if (key.startsWith('$')) {
+        // $ attributes: store via jQuery .data() only
+        // Does NOT create data-* attributes on the DOM element
+        if (value !== undefined) data_writes = queue_data_write(data_writes, key.substring(1), value);
+      // } else if (key.startsWith('@')) {
+      //   // Event handler with @ prefix (e.g., @click)
+      //   const eventName = key.substring(1);  // Remove @ to get 'click'
+      //   if (typeof value === 'function') {
+      //     element.on(eventName, function(e: any) {
+      //       e.preventDefault();  // Auto-preventDefault as per JQHTML design
+      //       // Bind 'this' to the component context and call the function
+      //       value.bind(context)(e, element);
+      //     });
+      //   } else {
+      //     console.warn("(JQHTML) Tried to assign a non function to @ event handler "+key)
+      //   }
+      } else if (key.startsWith('data-__-on-')) {
+        // Event handler
+        const eventName = key.substring(11); // 'data-__-on-'.length = 11
+        if (typeof value === 'function') {
+          element.on(eventName, function(e: any) {
+            value.call(context, e, element);
+          });
+        } else {
+          console.warn("(JQHTML) Tried to assign a non function to on event handler "+key)
         }
-        element.attr('class', existing.join(' '));
-      }
-
-      // Debug logging result
-      if ((window as any).jqhtml?.debug?.enabled) {
-        console.log(`[InstructionProcessor] Class after merge:`, element.attr('class'));
-      }
-    } else if (key === 'style') {
-      // Handle style attribute with merge logic
-      const existingStyle = element.attr('style');
-      if (!existingStyle) {
-        // No existing style - set directly
+      } else if (key.startsWith('on')) {
+        // Event handler
+        const eventName = key.substring(2);
+        if (typeof value === 'function') {
+          element.on(eventName, function(e: any) {
+            value.call(context, e, element);
+          });
+        } else {
+          console.warn("(JQHTML) Tried to assign a non function to on event handler "+key)
+        }
+      } else if (key.startsWith('data-')) {
+        // data-sid is debug-only - suppressed entirely in production
+        if (key === 'data-sid' && !debug_attributes_enabled()) {
+          continue;
+        }
+        // Data attributes - go into DOM
         const attrValue = typeof value === "string" ? value.trim() : value;
-        element.attr('style', attrValue);
-      } else {
-        // Merge styles rule by rule
-        // Parse existing styles into map
-        const styleMap: Record<string, string> = {};
-        existingStyle.split(';').forEach(rule => {
-          const [prop, val] = rule.split(':').map(s => s.trim());
-          if (prop && val) {
-            styleMap[prop] = val;
-          }
-        });
-
-        // Parse and merge new styles
-        String(value).split(';').forEach(rule => {
-          const [prop, val] = rule.split(':').map(s => s.trim());
-          if (prop && val) {
-            styleMap[prop] = val;  // Override existing or add new
-          }
-        });
-
-        // Rebuild style string
-        const mergedStyle = Object.entries(styleMap)
-          .map(([prop, val]) => `${prop}: ${val}`)
-          .join('; ');
-        element.attr('style', mergedStyle);
-      }
-    } else {
-      // Regular HTML attributes - apply directly to the element
-      // These do NOT become data attributes or go into context.args
-      // Examples: href, title, role, aria-*, tabindex, etc.
-      if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
-        const attrValue = typeof value === "string" ? value.trim() : String(value);
         element.attr(key, attrValue);
-      } else if (typeof value === 'object') {
-        // Complex values can't be DOM attributes, store as jQuery data only
-        console.warn(`(JQHTML) Unexpected value for '${key}' on`, element);
-        // element.data(key, value);
+        // Always set element.data, under the key without the 'data-' prefix
+        if (value !== undefined) data_writes = queue_data_write(data_writes, key.substring(5), value);
+      } else if (key === 'class') {
+        // Handle class attribute with merge logic
+        const existingClasses = element.attr('class');
+
+        // Debug logging
+        if ((window as any).jqhtml?.debug?.enabled) {
+          console.log(`[InstructionProcessor] Merging class attribute:`, {
+            existing: existingClasses,
+            new: value
+          });
+        }
+
+        if (!existingClasses) {
+          // No existing classes - set directly
+          const attrValue = typeof value === "string" ? value.trim() : value;
+          element.attr('class', attrValue);
+        } else {
+          // Merge classes - split and add if not present
+          const existing = existingClasses.split(/\s+/).filter(c => c);
+          const newClasses = String(value).split(/\s+/).filter(c => c);
+          for (const newClass of newClasses) {
+            if (!existing.includes(newClass)) {
+              existing.push(newClass);
+            }
+          }
+          element.attr('class', existing.join(' '));
+        }
+
+        // Debug logging result
+        if ((window as any).jqhtml?.debug?.enabled) {
+          console.log(`[InstructionProcessor] Class after merge:`, element.attr('class'));
+        }
+      } else if (key === 'style') {
+        // Handle style attribute with merge logic
+        const existingStyle = element.attr('style');
+        if (!existingStyle) {
+          // No existing style - set directly
+          const attrValue = typeof value === "string" ? value.trim() : value;
+          element.attr('style', attrValue);
+        } else {
+          // Merge styles rule by rule; the new value wins
+          element.attr('style', merge_style(existingStyle, String(value), true));
+        }
+      } else {
+        // Regular HTML attributes - apply directly to the element
+        // These do NOT become data attributes or go into context.args
+        // Examples: href, title, role, aria-*, tabindex, etc.
+        if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+          const attrValue = typeof value === "string" ? value.trim() : String(value);
+          element.attr(key, attrValue);
+        } else if (typeof value === 'object') {
+          // Complex values can't be DOM attributes, store as jQuery data only
+          console.warn(`(JQHTML) Unexpected value for '${key}' on`, element);
+          // element.data(key, value);
+        }
       }
     }
+  } finally {
+    // In finally, so a throwing attribute leaves the earlier values stored, as the
+    // per-key writes did.
+    if (data_writes !== null) element.data(data_writes);
   }
 }
 

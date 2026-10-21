@@ -1,0 +1,11 @@
+<%--
+Event_System_Edge_Cases - once() re-entrancy, handlers left behind by child-ready
+waits, and the `this`/arguments every handler receives.
+--%>
+<Define:Event_System_Edge_Cases>
+  <div>
+    <h1>Event system edge cases</h1>
+    <Ese_Plain $sid="target" />
+    <div $sid="stage"></div>
+  </div>
+</Define:Event_System_Edge_Cases>

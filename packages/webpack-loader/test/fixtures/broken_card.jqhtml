@@ -1,0 +1,5 @@
+<Define:Broken_Card>
+  <div class="body">
+    <p><%= this.args.title %></p>
+  </span>
+</Define:Broken_Card>

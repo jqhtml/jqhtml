@@ -259,6 +259,33 @@ template resolves, or the parent template throws while rendering, the component 
 rather than rendering an empty element: the error is logged naming the component and the
 parent template, the component is stopped, and any ancestor waiting on it is released.
 
+**`extends=""` must agree with the JavaScript class.** List the component class's JS
+ancestors up to `Jqhtml_Component` that have a template of their own:
+
+- **None** (the class extends `Jqhtml_Component` directly, only template-less helper classes
+  sit in between, or the component has no JS class at all): `extends=""` may name any
+  template.
+- **One or more**: `extends=""` must name one of them. Any ancestor is accepted, not only the
+  direct parent, so a template may deliberately skip an intermediate layer.
+
+Anything else throws: the error is logged naming the component, the `extends=""` target and
+the templated ancestors, the component is stopped, and any ancestor waiting on it is
+released.
+
+```javascript
+class GridMid extends GridB {}        // GridA, GridB and GridMid all have templates
+class UsersGrid extends GridMid {}
+
+// <Define:UsersGrid extends="GridMid">  OK: the direct templated parent
+// <Define:UsersGrid extends="GridB">    OK: a further templated ancestor (skips GridMid)
+// <Define:UsersGrid extends="GridA">    throws: GridA is not an ancestor of UsersGrid
+// <Define:UsersGrid extends="Missing">  OK: no such template, the prototype chain decides
+```
+
+An `extends=""` naming a template that is not registered is not a conflict; resolution falls
+back to the prototype chain. The check also applies to a template with markup of its own,
+because `extends=""` still decides which parent `<Define>`'s attributes are inherited.
+
 ### Combined Example
 
 ```javascript
@@ -332,6 +359,34 @@ Set default values for `$` attributes directly on the Define tag:
 - Attributes starting with `$` on Define tag set default values for `this.args`
 - Component invocations can override these defaults
 - Enables template-only components with sensible defaults
+- Inherited: a child `<Define>` (through `extends=""` or the JS class chain, slot-only
+  subclasses included) gets every `$` default of its ancestors that it does not set itself
+
+**Precedence**, lowest to highest:
+
+1. The farthest ancestor `<Define>`'s `$` defaults
+2. Nearer ancestors' `$` defaults
+3. The component's own `<Define>` `$` defaults
+4. `data-` attributes at the invocation
+5. `$` args at the invocation
+
+A `data-foo` attribute on a `<Define>` sets the same arg as `$foo`; across `<Define>`s the
+nearer one wins whichever spelling each uses (within one `<Define>`, `$foo` wins).
+
+```jqhtml
+<Define:Base_Grid $per_page=25 $sortable=true>
+  <div>Showing <%= this.args.per_page %> items</div>
+</Define:Base_Grid>
+```
+
+```jqhtml
+<Define:Small_Grid extends="Base_Grid" $per_page=10>
+  <div>Showing <%= this.args.per_page %> items</div>
+</Define:Small_Grid>
+```
+
+`<Small_Grid />` has `per_page === 10` and `sortable === true` (inherited);
+`<Small_Grid $per_page=5 />` has `per_page === 5`.
 
 **Syntax**:
 - **Quoted values**: `$endpoint="http://api.com"` → String literal
@@ -385,7 +440,7 @@ class UserCard extends Jqhtml_Component {
     // Can modify this.args after on_load()
     this.$sid('filter_btn').on('click', () => {
       this.args.filter = 'active';
-      this.reload();  // Re-runs on_load() with new args (debounced automatically)
+      this.reload();  // Re-runs on_load() with new args (queued if the component is busy)
     });
   }
 }
@@ -583,9 +638,38 @@ Build-tool and framework integrations live in the [jqhtml GitHub organization](h
 
 - **Vite**: [`@jqhtml/vite-plugin`](https://github.com/jqhtml/jqhtml-vite) — import `.jqhtml` files directly in Vite builds
 - **esbuild**: [`@jqhtml/esbuild-plugin`](https://github.com/jqhtml/jqhtml-esbuild) — same for esbuild
+- **webpack / Rspack**: [`@jqhtml/webpack-loader`](https://github.com/jqhtml/jqhtml/tree/master/packages/webpack-loader) — a loader for `.jqhtml` imports (see below)
 - **Laravel/Blade**: [`jqhtml/laravel`](https://github.com/jqhtml/jqhtml-laravel) composer package — a Blade precompiler for component syntax like `<UserCard $user_id="123" />` in server templates (in development; installs via `dev-main`)
 
 For server-side rendering, `@jqhtml/ssr` provides the SEO/hydration path.
+
+### webpack and Rspack
+
+[`@jqhtml/webpack-loader`](https://github.com/jqhtml/jqhtml/tree/master/packages/webpack-loader) compiles `.jqhtml` imports in webpack 5. It uses only the standard loader API, so the same rule works in Rspack.
+
+```bash
+npm install --save-dev @jqhtml/webpack-loader
+```
+
+```javascript
+// webpack.config.js (or rspack.config.js)
+module.exports = {
+  module: {
+    rules: [{ test: /\.jqhtml$/, loader: '@jqhtml/webpack-loader' }]
+  }
+};
+```
+
+Each `.jqhtml` file becomes an ES module whose default export is the compiled template of its first `<Define:>`. Register it like any compiled template:
+
+```javascript
+import jqhtml from '@jqhtml/core';
+import User_Card_Template from './user_card.jqhtml';
+
+jqhtml.register(User_Card_Template);
+```
+
+The loader has no options. Source maps follow webpack's `devtool` setting and map back to the `.jqhtml` lines, and a template that fails to compile fails the build with an error naming the file, line and column.
 
 ## Component Properties
 

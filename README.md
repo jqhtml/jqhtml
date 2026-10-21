@@ -52,7 +52,7 @@ That's a complete component. Undefined components render immediately as placehol
 
 9. **Composition is built in:** `<%= content() %>` renders inner content, `<Slot:name>` provides named slots, and templates inherit via `extends=""`, the JS prototype chain, or automatically when a template contains only slots.
 
-10. **Updating is one method call:** `this.reload()` re-fetches data and re-renders (debounced); `this.refresh()` does the same but skips the re-render when data hasn't changed (perfect for polling); `this.render('sid')` redraws a single `$redrawable` element. Opt-in stale-while-revalidate caching via `jqhtml.set_cache_key()` makes repeat visits render instantly from localStorage.
+10. **Updating is one method call:** `this.reload()` re-fetches data and re-renders (queued per component, so calls never overlap); `this.refresh()` does the same but skips the re-render when data hasn't changed (perfect for polling); `this.render('sid')` redraws a single `$redrawable` element. Opt-in stale-while-revalidate caching via `jqhtml.set_cache_key()` makes repeat visits render instantly from localStorage.
 
 ---
 
@@ -66,7 +66,8 @@ This repository (the core monorepo):
 |---|---|
 | [`@jqhtml/core`](./packages/core) | Runtime: component system, lifecycle, jQuery integration (peer dep: jQuery ^3.7) |
 | [`@jqhtml/parser`](./packages/parser) | Compiler: `.jqhtml` → JavaScript, with sourcemaps; ships the `jqhtml-compile` CLI |
-| [`@jqhtml/ssr`](./packages/ssr) | Server-side rendering for SEO and hydration |
+| [`@jqhtml/ssr`](./packages/ssr) | Server-side rendering for SEO and hydration. **Not production ready** - see its README |
+| [`@jqhtml/webpack-loader`](./packages/webpack-loader) | webpack and Rspack loader: import `.jqhtml` files in webpack builds |
 | [VS Code extension](https://github.com/jqhtml/jqhtml-vscode) | Syntax highlighting & language support for `.jqhtml` files (separate repo) |
 
 Companion repos in the organization:
@@ -83,7 +84,7 @@ Companion repos in the organization:
 npm install @jqhtml/core @jqhtml/parser
 ```
 
-**With a bundler**, use the first-party plugin for your tool — [`@jqhtml/vite-plugin`](https://github.com/jqhtml/jqhtml-vite) or [`@jqhtml/esbuild-plugin`](https://github.com/jqhtml/jqhtml-esbuild) — and `.jqhtml` imports just work.
+**With a bundler**, use the first-party plugin for your tool — [`@jqhtml/vite-plugin`](https://github.com/jqhtml/jqhtml-vite), [`@jqhtml/esbuild-plugin`](https://github.com/jqhtml/jqhtml-esbuild) or [`@jqhtml/webpack-loader`](./packages/webpack-loader) (webpack and Rspack) — and `.jqhtml` imports just work.
 
 **Without a bundler** (or in any other pipeline), compile templates with the CLI:
 
@@ -92,6 +93,7 @@ npm install @jqhtml/core @jqhtml/parser
 npx jqhtml-compile user_card.jqhtml --format esm --sourcemap -o user_card.js
 
 # Other formats: iife (registers with window.jqhtml), cjs, umd
+# --sourcemap embeds the map inline; --sourcemap=external writes user_card.js.map
 npx jqhtml-compile --help
 ```
 

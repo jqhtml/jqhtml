@@ -2,7 +2,7 @@
 
 ## Overview
 
-JQHTML templates compile to JavaScript functions that return instruction arrays. No JSX transformer, no runtime parsing - just build-time compilation to efficient jQuery-based rendering.
+JQHTML templates compile to JavaScript functions that return a markup buffer of instructions. No JSX transformer, no runtime parsing - just build-time compilation to efficient jQuery-based rendering.
 
 ## Basic Component Definition
 
@@ -115,6 +115,28 @@ this.data.comment_text = "Line 1\nLine 2\nLine 3";
 | `<%br= %>` | **Escaped + nl2br** | User text with line breaks (comments, descriptions) |
 | `<% %>` | **No output** | Control flow (loops, conditionals, assignments) |
 
+### What a Value Prints
+
+The three output forms treat a value by its type:
+
+| Value | Prints |
+|-------|--------|
+| `null`, `undefined` | Nothing |
+| String, number, boolean | The value, escaped per the form (`<%!= %>` raw) |
+| An array | The literal text `(Array)` - always, in all three forms |
+| `content()` / `content('name', ...)` | The caller's markup, spliced in (`''`, printing nothing, when the caller supplied nothing) |
+| Any other object | The object printer chain (see `22_value_printers_and_dynamic_tags.md`); throws if unhandled |
+
+Arrays print `(Array)` so that data can never be mistaken for markup: an array of strings
+from `this.data` is never spliced into the page as HTML. Join or loop over it instead:
+
+```jqhtml
+<Define:TagList>
+  <span><%= this.data.tags.join(', ') %></span>
+  <% for (const tag of this.data.tags) { %><b><%= tag %></b><% } %>
+</Define:TagList>
+```
+
 ## Control Flow
 
 JQHTML uses JavaScript brace style for control flow:
@@ -158,18 +180,28 @@ JQHTML uses JavaScript brace style for control flow:
 
 ### `//` Line Comments Inside Code Blocks
 
-Inside a `<% %>` code block, a `//` that is the first non-whitespace content on a line is treated as a JavaScript line comment - everything from `//` to the end of that line is stripped before parsing:
+Inside `<% %>` code blocks and `<%= %>` / `<%!= %>` expressions, `//` is a JavaScript line comment and is stripped before compiling. A comment always runs to the end of its line: nothing after the `//` is parsed, so a `%>` inside the comment does not close the tag. Close the tag on the next line, or use `/* */`. Inside an attribute value only `/* */` works, because an expression there must stay on one line (see below):
 
 ```jqhtml
 <%
-// this line is a comment and is stripped
-let x = 5;
+// this line is a comment and is stripped - it may mention <% %>
+let x = 5; // so is this
 %>
-<div><%= x %></div>
+<% let y = 1; // note
+%> <b>shown</b>
+<div><%= x + y /* label */ %></div>
 ```
 
+```jqhtml expect-error
+<Define:Broken>
+  <% let y = 1; // note %> <b>not shown: still inside the code block</b>
+</Define:Broken>
+```
+
+When a template fails to compile because a `//` comment hid a `%>`, the error names that `%>` and the comment's line and column. If a later `%>` closes the block into valid code, the template compiles and the text between is part of the comment or the code. `//` inside strings, template literals and regex literals is not a comment.
+
 **Not interchangeable with `<%-- --%>`:**
-- `//` comments only work inside `<% %>` code blocks (JS scope), and must be the first non-whitespace text on their line
+- `//` comments only work inside `<% %>` and `<%= %>` (JS scope)
 - `<%-- --%>` template comments work anywhere in markup, including outside code blocks
 
 ## Whitespace and Formatting
@@ -257,6 +289,31 @@ renders with the indentation/newlines between `<div>` and `<p>` collapsed to a s
   </span>
 </Define:StatusBadge>
 ```
+
+## Character References in Attribute Values
+
+A quoted attribute value means what it means in static HTML. Character references in
+the literal text are resolved by the compiler, following the HTML parser's rules, so the
+value is the same on every path: a plain tag, a tag with `@event` or `$sid`, a component
+attribute, a `$` arg and a `<Define>` default.
+
+```jqhtml
+<a title="Tom &amp; Jerry" href="?a=1&copy=2">...</a>
+<!-- title is "Tom & Jerry"; href keeps "&copy=2" literal, as browsers do -->
+
+<UserCard $label="&nbsp;" style="content: &quot;x&quot;" />
+<!-- this.args.label is "\u00a0" (a no-break space); the style holds content: "x" -->
+```
+
+- Named references with or without `;` (`&amp;`, `&copy`), and numeric ones (`&#39;`,
+  `&#x27;`) are resolved. A reference without `;` that is followed by `=` or a letter
+  or digit stays literal (`&copy=2`), the historical attribute rule.
+- `"` inside a single-quoted value, and `'` inside a double-quoted one, need no escaping.
+  A backslash has no meaning in HTML attribute values; `title="a\"b"` is a compile error.
+- Interpolated values are taken literally: in `title="<%= x %>"`, entity text inside `x`
+  is not decoded (`x = "&lt;"` gives the attribute `&lt;`). Only the template's literal
+  text around the expression is resolved.
+- Element text (between tags) is left for the browser to resolve, as before.
 
 ## Conditional Attributes
 
@@ -400,6 +457,10 @@ Set default values for `$` attributes on the Define tag:
 
 **Use case**: Component configuration without backing JavaScript class - template-only components with sensible defaults.
 
+**Inheritance**: a child `<Define extends="DataGrid">`, or a JS subclass of `DataGrid`, that
+does not set `$per_page` itself gets `DataGrid`'s `25`. The nearest `<Define>` in the chain
+that sets an arg wins. See "Default Arguments (defineArgs)" in `02_component_definition.md`.
+
 ---
 
 ## Template Limitations
@@ -435,6 +496,40 @@ An attribute cannot be assigned directly to a `<%= %>` block - the interpolation
 <Component $foo=bar() />
 ```
 
+### `<%= %>` in an Attribute Value Stays on One Line
+
+A `<%= %>` or `<%!= %>` expression inside a quoted attribute value must open and close on
+the same line; spanning lines is a compile error. Literal text in the value may still span
+lines.
+
+For a `$` attribute, use the bracketed form, which takes JavaScript directly, may span
+lines and gives the same value:
+
+```jqhtml expect-error
+<Define:Role_Picker_Wrong>
+  <Select_Input $options="<%= JSON.stringify([
+    {value: 1, label: 'Member'},
+  ]) %>" />
+</Define:Role_Picker_Wrong>
+```
+
+```jqhtml
+<Define:Role_Picker>
+  <Select_Input $options=(JSON.stringify([
+    {value: 1, label: 'Member'},
+  ])) />
+</Define:Role_Picker>
+```
+
+For a regular attribute, compute the value first in a `<% %>` block:
+
+```jqhtml
+<Define:Full_Name_Badge>
+  <% const full_name = this.data.first + ' ' + this.data.last; %>
+  <b title="<%= full_name %>">...</b>
+</Define:Full_Name_Badge>
+```
+
 ## Advanced: Dynamic Component Tags and Object Interpolation
 
 Two capabilities for the uncommon case where data, not the template author, decides what
@@ -451,7 +546,7 @@ prefer literal tags and primitive interpolation whenever they suffice.
 4. **Control flow**: `<% code %>` (no output) - Use JavaScript brace style `{ }`
 5. **Comments**: `<%-- comment --%>`
 6. **this context**: Always use `this.data`, `this.args`, etc.
-7. **Default is safe in content**: `<%= expression %>` used as template content (between tags) escapes HTML unless you explicitly use `<%!= %>`. **Exception:** interpolation embedded inside a quoted attribute value (e.g. `title="<%= x %>"` or `$title="<%= x %>"`) is built as a raw JavaScript string and is NOT HTML-escaped at that point - escaping only happens if/when that value is later rendered through `<%= %>` in template content. See `03_dollar_attribute_system.md` for details on `$` attribute interpolation.
+7. **Default is safe in content**: `<%= expression %>` used as template content (between tags) escapes HTML unless you explicitly use `<%!= %>`. **Exception:** interpolation embedded inside a quoted attribute value (e.g. `title="<%= x %>"` or `$title="<%= x %>"`) is built as a raw JavaScript string and is NOT HTML-escaped at that point - escaping only happens if/when that value is later rendered through `<%= %>` in template content. Character references in the literal text of a quoted attribute value are resolved as in HTML (see Character References in Attribute Values). See `03_dollar_attribute_system.md` for details on `$` attribute interpolation.
 8. **Event binding**: `@click=this.method` - Bind DOM events directly
 9. **Conditional attributes**: `<% if (...) { %>attr="value"<% } %>` - PHTML-style
 10. **Template inheritance**: `extends="ParentName"` on `<Define>` tag
@@ -469,18 +564,21 @@ Templates compile to a JavaScript render function that pushes a flat sequence of
 
 // Compiles to something like:
 render: function(data, args, content, jqhtml) {
-  let _output = [];
-  _output.push({tag: ["div", {}, false]});
-  _output.push(jqhtml.escape_html(this.data.value));
-  _output.push("</div>");
-  return [_output, this];
+  let _output = new jqhtml.Markup(this);
+  _output.p({tag: ["div", {}, false]});
+  _output.p(jqhtml.escape_html(this.data.value));
+  _output.p("</div>");
+  return _output;
 }
 ```
 
-**Instruction array format:**
+**Markup buffer format:** each render, content and slot function creates its own
+`jqhtml.Markup` buffer, appends instructions with `p()`, and returns it. The buffer records
+the component whose template wrote it (the definer).
 - `{tag: ["element", {attributes}, self_closing]}` - Create element
 - Plain strings - Text content or closing tags (`"</div>"`)
 - `jqhtml.escape_html(value)` - Escaped interpolation
-- Component invocations - Nested instruction arrays
+- `{comp: [name, props, content_function | slots]}` - Component invocation; content and slot functions return their own buffer
+- A buffer spliced by `content()` - rendered in its definer
 
 The instruction format is internal - developers write templates, the compiler handles the rest.

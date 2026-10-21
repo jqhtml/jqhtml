@@ -1,0 +1,7 @@
+<Define:Rn_Item>
+  <ul class="items">
+    <% for (const item of this.data.items) { %>
+      <li class="item"><%= item %></li>
+    <% } %>
+  </ul>
+</Define:Rn_Item>

@@ -1,0 +1,10 @@
+<%--
+Interpolated_Sid_Precedence_Test - an interpolated $sid keeps operator precedence
+
+ARGS:
+    $i - number; positive selects the 'pos' branch of the ternary
+--%>
+<Define:Interpolated_Sid_Precedence_Test>
+  <div $sid="row_<%= this.args.i > 0 ? 'pos' : 'neg' %>" class="ternary_row">ternary</div>
+  <div $sid="name_<%= this.args.missing || 'none' %>" class="or_row">or</div>
+</Define:Interpolated_Sid_Precedence_Test>

@@ -1,0 +1,6 @@
+<Define:On_Create_Snapshot_Fidelity>
+  <div>
+    <h1>on_load() restarts from exactly the on_create() state</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:On_Create_Snapshot_Fidelity>

@@ -13,6 +13,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/render_reload_test.jqhtml" \
   "$SCRIPT_DIR/render_reload_test.js" \
   --delay=2
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -29,3 +30,6 @@ echo "   - Re-fetches data via on_load()"
 echo "   - DOES call on_load()"
 echo "   - Calls on_ready()"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

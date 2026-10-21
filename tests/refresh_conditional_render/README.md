@@ -7,7 +7,7 @@ Tests that `refresh()` only re-renders when data changes, while `reload()` alway
 1. **refresh() with no data change** - Should NOT re-render
 2. **refresh() with data change** - Should re-render
 3. **reload() always re-renders** - Even when data doesn't change
-4. **Debounce precedence** - reload(true) takes precedence over refresh()/reload(false)
+4. **Queue order** - refresh() then reload() run as separate entries, each with its own render rule
 5. **Render count tracking** - Validates that skipped renders don't increment render count
 
 ## Test Scenarios
@@ -28,10 +28,11 @@ Tests that `refresh()` only re-renders when data changes, while `reload()` alway
 2. Call `reload()` - `on_load()` sets `count: 1` again (no change)
 3. **Expected**: Re-render occurs anyway (reload() always renders)
 
-### Scenario 4: Debounce precedence
-1. Call `refresh()` (queues reload(false))
-2. Immediately call `reload()` (queues reload(true))
-3. **Expected**: reload(true) executes, always re-renders
+### Scenario 4: Queue order
+1. Call `refresh()` (reload(false)) - data unchanged
+2. Immediately call `reload()` (reload(true)) - queued behind it
+3. **Expected**: both run; the refresh() skips its render, the reload() renders (1 render).
+   They never merge, so neither borrows the other's render rule
 
 ### Scenario 5: Render count validation
 - Each scenario tracks `on_render()` calls to verify renders occurred/skipped
@@ -40,6 +41,6 @@ Tests that `refresh()` only re-renders when data changes, while `reload()` alway
 
 - **refresh()**: Calls `reload(false)`, only renders if data changed
 - **reload()**: Calls `reload(true)` (default), always renders
-- **State machine**: `next_reload_force_refresh` ensures reload(true) beats reload(false)
+- **No cross-method merging**: a `refresh()` and a `reload()` are separate queue entries
 - **Snapshot comparison**: Uses `_data_on_last_render` for comparison
 - **Early exit**: If no render occurs, skips `_wait_for_children_ready()` and `on_ready()`

@@ -1,0 +1,26 @@
+<Define:Slot_Handler_Binding_Paths>
+  <div>
+    <h1>Slot handler binding: slot-only templates, after render(), three-level forwarding</h1>
+
+    <Shb_Extends_Grid $sid="ext_grid" />
+    <Shb_Class_Grid $sid="cls_grid" />
+
+    <Shb_Box $sid="box">
+      <Slot:header>
+        <button $sid="box_slot_btn" @click=this.on_box_slot_click>slot</button>
+        <Shb_Marker $sid="box_slot_marker" />
+      </Slot:header>
+    </Shb_Box>
+
+    <Shb_Box $sid="box2">
+      <button $sid="box_default_btn" @click=this.on_box_default_click>default</button>
+    </Shb_Box>
+
+    <Shb_Middle $sid="middle">
+      <Slot:item>
+        <button class="fwd-btn" @click=this.on_forwarded_click><%= item %></button>
+        <Shb_Marker class="fwd-marker" />
+      </Slot:item>
+    </Shb_Middle>
+  </div>
+</Define:Slot_Handler_Binding_Paths>

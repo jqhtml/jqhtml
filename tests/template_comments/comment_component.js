@@ -84,6 +84,7 @@ class Comment_Component extends Jqhtml_Component {
     console.log('FINAL RESULT:');
     console.log('========================================');
 
+    window.testPassed = (!found_any && all_visible_ok);
     if (!found_any && all_visible_ok) {
       console.log('✅ ALL TESTS PASSED');
       console.log('   - No comment artifacts in output');

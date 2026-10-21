@@ -1,0 +1,4 @@
+<%-- Lq_Render - on_load() takes 80ms; render() is called 20ms into it. --%>
+<Define:Lq_Render class="lq-render">
+  <span $sid="state"><%= this.data.loaded ? 'loaded' : 'loading' %></span>
+</Define:Lq_Render>

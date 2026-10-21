@@ -14,6 +14,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/test_child.jqhtml" \
   "$SCRIPT_DIR/test_child.js" \
   --delay=5
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -29,3 +30,6 @@ echo "6.  .on('loaded') fires again on reload()"
 echo "7.  .once() on new component before event occurs"
 echo "8.  .once() returns component for chaining"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

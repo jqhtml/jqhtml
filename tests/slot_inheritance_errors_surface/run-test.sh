@@ -35,7 +35,7 @@ echo ""
 echo "A. A slot-only child whose parent template throws reports an error naming BOTH the"
 echo "   child component and the parent template, and the child ends up stopped"
 echo "B. A slot-only template with no parent template and no extends= is an error"
-echo "C. Neither failure wedges the root - it reaches ready within 1s"
+echo "C. Neither failure wedges the root - it reaches ready"
 echo ""
 
 exit $STATUS

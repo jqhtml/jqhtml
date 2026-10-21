@@ -1,0 +1,7 @@
+<%--
+Smc_Near - the nearer <Define> (extends Smc_Base). Its color and font-family beat
+Smc_Base's; the rest of Smc_Base's declarations come through whole. Single-quoted
+attribute, double quotes inside.
+--%>
+<Define:Smc_Near extends="Smc_Base" style='font-family: "Near;Font:Two"; COLOR: green'>
+</Define:Smc_Near>

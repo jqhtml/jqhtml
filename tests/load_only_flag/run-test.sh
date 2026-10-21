@@ -15,6 +15,7 @@ node "$SCRIPT_DIR/../../jqhtml-render-harness/test-runner.js" \
   "$SCRIPT_DIR/target_component.js" \
   "$SCRIPT_DIR/child_component.jqhtml" \
   --delay=3
+HARNESS_STATUS=$?
 
 echo ""
 echo "=========================================="
@@ -29,3 +30,6 @@ echo "5. No child components created (render skipped)"
 echo "6. ready event fires (lifecycle completes)"
 echo "7. this.data populated from on_load()"
 echo ""
+
+# Propagate the harness verdict (VERDICT: PASS/FAIL) as this script's exit code.
+exit $HARNESS_STATUS

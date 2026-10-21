@@ -79,6 +79,7 @@ class Test_Container extends Jqhtml_Component {
     console.log('FINAL RESULT:');
     console.log('========================================');
 
+    window.testPassed = all_passed;
     if (all_passed) {
       console.log('✅ ALL DEFAULTS TESTS PASSED');
       console.log('   - Default values applied correctly');

@@ -1,0 +1,10 @@
+<Define:Bench_Table tag="table" class="bench-table">
+  <tbody>
+    <% for (let r of this.data.rows) { %>
+      <tr data-id="<%= r.id %>">
+        <td><%= r.id %></td><td><%= r.name %></td><td><%= r.email %></td><td><%= r.city %></td>
+        <td><%= r.status %></td><td><%= r.amount %></td><td><%= r.date %></td><td><%= r.note %></td>
+      </tr>
+    <% } %>
+  </tbody>
+</Define:Bench_Table>

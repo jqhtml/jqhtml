@@ -7,14 +7,17 @@
 
 import { Jqhtml_Component } from './component.js';
 import { COMPONENT_NAME_RULE, is_component_name } from './component-name.js';
+import { Jqhtml_Markup } from './markup.js';
 
-// Template function signature matching parser output
+// Template function signature matching parser output: a markup buffer, or the
+// slot functions of a slot-only template
 export type TemplateFunction = (
   this: Jqhtml_Component,
   data: Record<string, any>,
   args: Record<string, any>,
-  content: any
-) => [any[], Jqhtml_Component];
+  content: any,
+  jqhtml?: any
+) => Jqhtml_Markup | { _slots: Record<string, (...args: any[]) => Jqhtml_Markup> };
 
 // Template definition - the ONLY way to register templates
 export interface TemplateDefinition {
@@ -35,32 +38,51 @@ const component_templates = new Map<string, TemplateDefinition>();
 // Track warnings to only show once per component name
 const warned_components = new Set<string>();
 
+// extends_conflict() verdicts, keyed by template name: the error message, or null for
+// "no conflict". Cleared by every registration, since a new class or template can change
+// either side of the comparison.
+const extends_verdicts = new Map<string, string | null>();
+
+// get_template_by_class() prototype-walk results, keyed by class. Replaced by every
+// registration (see registry_changed()), since a new template or class can change
+// which ancestor's template a walk finds. The static `template` property is never
+// cached: it is read live on every lookup, before this map is consulted.
+let template_by_class_cache = new WeakMap<object, TemplateDefinition>();
+
+/** A class or template was registered: drop every derived lookup. */
+function registry_changed(): void {
+  extends_verdicts.clear();
+  template_by_class_cache = new WeakMap();
+}
+
 // Default template for components without registered templates
 const DEFAULT_TEMPLATE: TemplateDefinition = {
   name: 'Jqhtml_Component',  // Default name
   tag: 'div',
   render: function(data, args, content) {
-    const _output = [];
+    const _output = new Jqhtml_Markup(this);
 
     // Check for _inner_html first (server-rendered content)
     if (args._inner_html) {
-      _output.push(args._inner_html);
-      return [_output, this];
+      _output.p(args._inner_html);
+      return _output;
     }
 
     // Just render the content/slots
     if (content && typeof content === 'function') {
       const result = content();  // Call with no args to get default content
-      // Handle both tuple and string returns
-      if (Array.isArray(result) && result.length === 2) {
-        // It's a [instructions, context] tuple
-        _output.push(...result[0]);
+      // Handle both markup buffer and string returns
+      if (result instanceof Jqhtml_Markup) {
+        // Its instructions, rendered in this component (not result.definer)
+        for (const instruction of result.instructions) {
+          _output.p(instruction);
+        }
       } else if (typeof result === 'string') {
         // It's a plain string
-        _output.push(result);
+        _output.p(result);
       }
     }
-    return [_output, this];
+    return _output;
   }
 };
 
@@ -94,6 +116,7 @@ export function register_component(
     }
 
     component_classes.set(name, component_class);
+    registry_changed();
     
     // If template provided, register it
     if (template) {
@@ -113,6 +136,7 @@ export function register_component(
     }
     
     component_classes.set(name, component_class);
+    registry_changed();
   }
 }
 
@@ -184,6 +208,7 @@ export function register_template(template_def: TemplateDefinition): boolean {
   }
 
   component_templates.set(name, template_def);
+  registry_changed();
 
   if ((window as any).jqhtml?.debug?.enabled) {
     console.log(`[JQHTML] Successfully registered template: ${name}`);
@@ -249,6 +274,61 @@ export function get_template(name: string): TemplateDefinition {
 }
 
 /**
+ * Check a template's `extends=""` against its component's JS class (CLAUDE.md "Template
+ * Inheritance"). Returns an error message on conflict, null otherwise.
+ *
+ * The rule: list the class's JS ancestors up to Jqhtml_Component that have a template of
+ * their own. An empty list (the class extends Jqhtml_Component directly, or only plain
+ * helper classes sit in between) cannot conflict. Otherwise `extends=` must name one of
+ * them - any ancestor, so a template may skip an intermediate layer. A template-only
+ * component (no class registered under the template's name) and an `extends=` target
+ * that has no template (resolution falls back to the prototype chain) are not conflicts.
+ *
+ * @param template_def The template being rendered
+ * @param instance_class The rendering instance's class, used when no class is registered
+ *   under the template's name but the instance's class carries that name
+ */
+export function extends_conflict(template_def: TemplateDefinition, instance_class?: any): string | null {
+  const name = template_def?.name;
+  const target = template_def?.extends;
+  if (!name || !target) return null;
+
+  const cached = extends_verdicts.get(name);
+  if (cached !== undefined) return cached;
+
+  let verdict: string | null = null;
+  const component_class: any = component_classes.get(name)
+    || (instance_class && instance_class.name === name ? instance_class : null);
+
+  // Same test resolve_parent_template() applies: a target that resolves to nothing is
+  // "missing", and resolution falls back to the prototype chain.
+  const target_class = component_classes.get(target);
+  const target_resolves = component_templates.has(target)
+    || (!!target_class && get_template_by_class(target_class) !== DEFAULT_TEMPLATE);
+
+  if (component_class && target_resolves) {
+    const templated_ancestors: string[] = [];
+    let current = Object.getPrototypeOf(component_class);
+    while (typeof current === 'function' && current.name &&
+           current.name !== 'Object' && current.name !== 'Jqhtml_Component' &&
+           current.name !== '_Jqhtml_Component' && current.name !== '_Base_Jqhtml_Component') {
+      if (component_templates.has(current.name)) templated_ancestors.push(current.name);
+      current = Object.getPrototypeOf(current);
+    }
+
+    if (templated_ancestors.length > 0 && !templated_ancestors.includes(target)) {
+      verdict =
+        `[JQHTML] ${name}: <Define:${name} extends="${target}"> conflicts with its JS class. ` +
+        `The class's templated ancestors are: ${templated_ancestors.join(', ')}. ` +
+        `extends= must name one of them, or be removed so the prototype chain decides.`;
+    }
+  }
+
+  extends_verdicts.set(name, verdict);
+  return verdict;
+}
+
+/**
  * Get template for a component class - walks up inheritance chain
  */
 export function get_template_by_class(component_class: ComponentConstructor): TemplateDefinition {
@@ -256,6 +336,9 @@ export function get_template_by_class(component_class: ComponentConstructor): Te
   if ((component_class as any).template) {
     return (component_class as any).template;
   }
+
+  const cached = template_by_class_cache.get(component_class);
+  if (cached !== undefined) return cached;
 
   // Then check registered templates by class name
   let currentClass: any = component_class;
@@ -268,12 +351,14 @@ export function get_template_by_class(component_class: ComponentConstructor): Te
 
     const template = component_templates.get(normalizedName);
     if (template) {
+      template_by_class_cache.set(component_class, template);
       return template;
     }
     // Walk up the prototype chain
     currentClass = Object.getPrototypeOf(currentClass);
   }
 
+  template_by_class_cache.set(component_class, DEFAULT_TEMPLATE);
   return DEFAULT_TEMPLATE;
 }
 

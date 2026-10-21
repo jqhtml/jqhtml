@@ -1,0 +1,7 @@
+<%--
+Ia_Slot_Child - slot-only template with NO extends=. Sets $level (beats Ia_Slot_Base);
+$size arrives from Ia_Slot_Base through the JS prototype chain.
+--%>
+<Define:Ia_Slot_Child $level="slot child">
+  <Slot:body><span>slot child body</span></Slot:body>
+</Define:Ia_Slot_Child>

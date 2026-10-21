@@ -1,0 +1,1 @@
+<Define:Plain_Row tag="li" class="plain-row"><%= this.args.row.name %></Define:Plain_Row>

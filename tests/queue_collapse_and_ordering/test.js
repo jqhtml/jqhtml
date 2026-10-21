@@ -151,12 +151,12 @@ class Queue_Collapse_And_Ordering extends Jqhtml_Component {
            q.on_load_calls - loads_before === 2);
 
     // -------------------------------------------------------------------------
-    // 5. REGRESSION: refresh() QUEUED BEHIND reload() - reload() WINS.
-    //    Both share the 'reload' queue type, so the second call collapses into the
-    //    first's pending entry; next_reload_force_refresh keeps the force-render.
+    // 5. refresh() QUEUED BEHIND reload() KEEPS ITS OWN RENDER RULE.
+    //    A refresh() and a reload() are separate queue entries that never merge, so
+    //    the reload() renders and the refresh() behind it - unchanged data - does not.
     // -------------------------------------------------------------------------
     console.log('');
-    console.log('5. refresh() QUEUED BEHIND reload() (precedence regression check):');
+    console.log('5. refresh() QUEUED BEHIND reload() (each keeps its own render rule):');
     q.freeze = true;
     const settle = await within(probe.reload(), 2000);
     assert('settling reload() (data becomes constant) resolved', settle.settled && settle.ok);
@@ -173,9 +173,9 @@ class Queue_Collapse_And_Ordering extends Jqhtml_Component {
     const [pr, pf] = await Promise.all([p_reload, p_refresh]);
     assert('reload() settled', pr.settled && pr.ok);
     assert('refresh() queued behind it settled', pf.settled && pf.ok);
-    assert('both runs rendered - reload() precedence survives the collapse -> ' +
+    assert('only the reload() rendered; the refresh() with unchanged data did not -> ' +
            (q.render_calls - renders_before),
-           q.render_calls - renders_before === 2);
+           q.render_calls - renders_before === 1);
 
     console.log('');
     console.log('SUMMARY: ' + passed + ' passed, ' + failed + ' failed');

@@ -32,7 +32,7 @@ echo "1. Three synchronous load() calls run on_load twice and ALL THREE resolve 
 echo "2. load() + render() collapse correctly, even queued behind a running reload()"
 echo "3. A caller's promise resolves BEFORE the next queued operation starts"
 echo "4. A throwing executor rejects only its own callers; the queue continues"
-echo "5. refresh() queued behind reload() still renders (reload precedence)"
+echo "5. refresh() queued behind reload() keeps its own rule: unchanged data, no render"
 echo ""
 
 exit $STATUS

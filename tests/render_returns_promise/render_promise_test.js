@@ -75,6 +75,7 @@ class Render_Promise_Test extends Jqhtml_Component {
       }
 
       console.log('');
+      window.testPassed = tests.every(t => t);
       if (tests.every(t => t)) {
         console.log('✅ ALL TESTS PASSED');
         $('#results').html('<span style="color: green;">✅ All tests passed</span>');

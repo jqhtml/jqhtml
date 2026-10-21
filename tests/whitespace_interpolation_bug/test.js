@@ -27,6 +27,7 @@ class Test_Whitespace_Interpolation extends Jqhtml_Component {
     console.log('========================================');
     console.log('EXPECTED: "Dynamic Title (PLACEHOLDER)"');
     console.log('BUG SHOWS: "Dynamic Title(PLACEHOLDER)"');
+    console.log('SUMMARY: checks complete (a failed check prints FAIL above)');
     console.log('========================================');
   }
 }

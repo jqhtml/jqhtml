@@ -538,7 +538,13 @@ function lifecycle_button(
       console.error(`[JQHTML debug] ${label} threw on <${component.component_name()}>`, error);
       return;
     }
-    Promise.resolve(result)
+    // Promise.prototype.then directly: a lifecycle call's promise acts on its own .then()
+    // while the component's on_ready()/on_loaded() runs (promotion, warning), and a
+    // button click is not an await inside one.
+    const settled = result instanceof Promise
+      ? Promise.prototype.then.call(result, (value: any) => value)
+      : Promise.resolve(result);
+    settled
       .catch((error) => {
         console.error(`[JQHTML debug] ${label} rejected on <${component.component_name()}>`, error);
       })

@@ -1,0 +1,3 @@
+<Define:Vrr_Hooked>
+  hooked <%= this.args.key %>
+</Define:Vrr_Hooked>

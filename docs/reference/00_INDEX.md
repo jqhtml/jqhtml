@@ -289,7 +289,6 @@ Comprehensive lifecycle documentation:
 - Breaking changes expected during beta
 - Clean codebase without legacy burden
 - v2 will always be v2.x.x
-- This policy changes at 1.0 release (see ROADMAP.md)
 
 ### 8. jQuery-First Philosophy
 - Built on proven technology
@@ -557,7 +556,7 @@ Integration-level settings the host application supplies when jqhtml loads, via
 ### 21. Server-Side Rendering
 **File**: `21_server_side_rendering.md`
 
-The `@jqhtml/ssr` render server and the SSR preload API. Distinct from `18_boot.md`:
+**Not production ready** (see the notice in the doc). The `@jqhtml/ssr` render server and the SSR preload API. Distinct from `18_boot.md`:
 boot() hydrates placeholders a backend wrote by hand, while this covers rendering real
 component HTML by running the actual lifecycle in jsdom on the server.
 

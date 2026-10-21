@@ -1,0 +1,6 @@
+<Define:User_Card class="card">
+  <h3><%= this.args.name %></h3>
+  <% if (this.args.admin) { %>
+    <span class="badge">Admin</span>
+  <% } %>
+</Define:User_Card>
