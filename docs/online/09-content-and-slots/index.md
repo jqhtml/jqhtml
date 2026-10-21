@@ -149,6 +149,30 @@ If using any named slots, all content must be in slots:
 </Card>
 ```
 
+## Optional Slots
+
+`content('name')` returns `''` when the caller supplied nothing: the slot was left out, or
+it holds only whitespace. A caller can't wrap a `<Slot:>` tag in `<% if %>`, so an empty
+slot is how it says "nothing here". To skip a wrapper around an empty slot, call
+`content()` once, test it, and emit it:
+
+```jqhtml
+<Define:PropertyRow>
+  <% const _note = content('note'); %>
+  <div class="value"><%= content('value') %></div>
+  <% if (_note) { %><div class="note"><%= _note %></div><% } %>
+</Define:PropertyRow>
+```
+
+```jqhtml fragment
+<PropertyRow>
+  <Slot:value>Yesterday</Slot:value>
+  <Slot:note></Slot:note>
+</PropertyRow>
+```
+
+Test truthiness only; the returned value is otherwise opaque.
+
 ## Complex Example
 
 **UserTable definition:**
@@ -258,7 +282,7 @@ Most components (95%) only need `content()`. Use slots when you need multiple di
 - `docs/reference/06_slot_system.md` - Named slots and inheritance
 
 ### Last Updated
-2026-08-18
+2026-10-21
 
 ### Editorial Notes
 - Started with simple content() before introducing slots
@@ -267,5 +291,6 @@ Most components (95%) only need `content()`. Use slots when you need multiple di
 - "All or nothing" rule is important gotcha
 - Slot forwarding omitted - too advanced for main docs
 - Server-rendered _inner_html omitted - covered in server integration chapter
+- 2026-10-21: Added "Optional Slots" (jqhtml 2.3.76): `content()` returns `''` for an absent or whitespace-only slot; call once, test truthiness, emit. Placed after the all-or-nothing rule, which is why an empty slot is the caller's way to say "nothing here".
 - 2026-08-18: Revised the "Complex Example" to demonstrate semantic composition while still teaching slots. `<Header $title="Users">` became `<PageHeader>` with `<Slot:title>`/`<Slot:actions>` (the title is authored content, so it belongs in a slot, not an argument), and the inline `<button>Edit</button>` in the row slot became `<UserRowActions $user_id=row.id />`. The slot lesson is unchanged — the example now uses one more slotted component instead of one fewer. Left alone: the `Panel`/`Card`/`DataTable` definitions earlier in the chapter, which teach `content()` and named-slot mechanics and already own their own look inside their `<Define:>` blocks.
 - 2026-07-21: Accuracy pass - softened the "inheritance chains must match" note; the framework does not actually validate/enforce this, it silently resolves via independent chain walks instead of erroring.
