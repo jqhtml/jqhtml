@@ -2072,7 +2072,7 @@ export class Jqhtml_Component {
    *
    * Resolves rather than rejects: the documented contract is that waiters on a
    * failed or stopped component are RELEASED, and existing `await comp.ready()` code
-   * does not catch. Callers that need to know can check `_stopped` afterwards.
+   * does not catch. Callers that need to know can check is_stopped() afterwards.
    *
    * The optional callback runs ONLY when the event itself fires, never on stop: it
    * is developer code written for a ready/rendered DOM, and calling it on a stopped
@@ -2726,9 +2726,29 @@ export class Jqhtml_Component {
    * never starts tracking. The two can disagree briefly: is_attached() can be true
    * before the first 'attach' has fired, and changes a moment before the matching
    * event, since the events come from the document observer.
+   *
+   * Not the same as !is_stopped(): a live component can be detached (moved, not yet
+   * inserted), and a stopped one answers false here even while its element is in the DOM.
    */
   is_attached(): boolean {
     return !this._stopped && !!this.$[0].isConnected;
+  }
+
+  /**
+   * Whether this component has been stopped. True from the moment stop() (or _stop(),
+   * reached by an ancestor's stop, a parent re-render or a jQuery removal) begins on it -
+   * before on_stop() runs - and never false again.
+   *
+   * Code that continues after an `await` outside the lifecycle hooks (an event handler,
+   * an unawaited helper, a timer) checks it before touching this.$, this.$sid(),
+   * this.sid(), this.data or this.state. ready() and rendered() resolve on stop too, so
+   * code after `await child.ready()` makes the same check.
+   *
+   * Not the same as !is_attached(): stop() leaves the DOM intact, so a stopped
+   * component's element can still be in the document.
+   */
+  is_stopped(): boolean {
+    return this._stopped;
   }
 
   /**

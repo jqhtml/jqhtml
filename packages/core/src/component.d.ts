@@ -34,6 +34,7 @@ export declare class Jqhtml_Component {
     on_attach(): void;
     on_detach(): void;
     is_attached(): boolean;
+    is_stopped(): boolean;
 
     // Public API
     gate_load(promise: Promise<any>): void;

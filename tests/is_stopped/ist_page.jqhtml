@@ -1,0 +1,4 @@
+<Define:Ist_Page>
+  <span class="val"><%= this.data.value %></span>
+  <Ist_Child $sid="child" />
+</Define:Ist_Page>

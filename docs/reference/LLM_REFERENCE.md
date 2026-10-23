@@ -621,6 +621,12 @@ server actually stored.
 - **`is_attached()`** — live: `true` when the root is in the document right now and the
   component is not stopped. Correct before the first `attach` fires and for untracked
   components; can run a moment ahead of the matching event.
+- **`is_stopped()`** — `true` from the moment `stop()` begins (however it was reached),
+  never `false` again. Code continuing after an `await` outside the lifecycle hooks (event
+  handler, unawaited helper, timer) checks it before touching the component:
+  `const res = await api(); if (this.is_stopped()) return;`. `await child.ready()` also
+  returns for a stopped child - same check. Not `!is_attached()`: stop() leaves the DOM.
+  Throws in `on_load()`: one load may serve several deduplicated components.
 
 **One lifecycle queue per component.** Every cycle - boot, or a queued `render()`,
 `load()`, `reload()`, `refresh()` - holds the component's lock from its start through the

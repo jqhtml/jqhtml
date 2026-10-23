@@ -1219,7 +1219,8 @@ class LivePriceTicker extends Jqhtml_Component {
 
 **Behavior**:
 1. Returns immediately if already stopped
-2. Recursively stops all child components
+2. Recursively stops all child components (each one, then this component, is marked
+   stopped - `is_stopped()` answers `true` - before anything else below happens to it)
 3. Sets `_Component_Stopped` class on the element
 4. De-registers the component from its parent's child registry
 5. Calls `on_stop()` - only if the component overrides it
@@ -1257,7 +1258,7 @@ waiting on a component that will never fire `ready` again.
 **Best effort, not guaranteed**: `stop()` is only as reliable as the removal path. A
 node removed with native DOM methods - `el.remove()`, `parent.removeChild(el)`,
 `container.innerHTML = ''`, or a non-jQuery library doing any of those - never reaches
-`cleanData`, so the component is simply orphaned: `_stopped` stays false, `on_stop()`
+`cleanData`, so the component is simply orphaned: `is_stopped()` stays false, `on_stop()`
 never runs, and the `stop` event never fires. `.detach()` is not a removal either, by
 jQuery's own definition (it keeps the data store so the node can be reinserted), and it
 does not stop the component. There is no destructor in JavaScript to fall back on: once
@@ -1304,6 +1305,50 @@ class LiveChart extends Jqhtml_Component {
 $('#live-chart').remove();  // stop() runs on the way out via jQuery.cleanData
 ```
 
+### is_stopped() - Was This Component Stopped?
+
+`is_stopped()` returns `true` from the moment `stop()` begins on this component - set
+before `on_stop()` runs - and never `false` again. It is `true` however the stop was
+reached: `stop()` itself, an ancestor's `stop()`, a parent re-render, a jQuery removal, a
+hook throwing during boot. Before that it is `false` in every lifecycle state, including
+before ready.
+
+**The rule it exists for.** The lifecycle hooks never run on a stopped component, but code
+that continues after an `await` OUTSIDE them - an event handler, a helper called from
+`on_ready()` without being awaited, a timer callback - runs whenever its promise settles.
+If the user navigated away or a parent re-rendered in the meantime, the component is
+stopped and its elements may be gone. Check `is_stopped()` after the await, before touching
+`this.$`, `this.$sid()`, `this.sid()`, `this.data` or `this.state`:
+
+```javascript
+async refresh_project(parent) {
+  const res = await Some_Controller.resolve(parent);
+  if (this.is_stopped()) return;
+  this.$sid('project_select').component().val(res.id);
+}
+```
+
+`ready()` and `rendered()` also resolve when the component stops (they never hang and
+never reject), so code after `await child.ready()` makes the same check:
+
+```javascript
+await child.ready();
+if (child.is_stopped()) return;
+child.apply_filter('active');
+```
+
+**Not the same as `!is_attached()`.** `stop()` leaves the DOM intact, so a stopped
+component's element can still be in the document (`is_attached()` answers `false` for it
+regardless); and a live component can be detached - moved, not yet inserted, kept off-page.
+`is_stopped()` asks whether the component is dead, `is_attached()` whether its root is in
+the document.
+
+**Not available in `on_load()` / `on_load_error()`.** Both throw there with an explanation
+of their own, as every member but `this.args`/`this.data` does. One `on_load()` may serve
+several components that share the same args (load deduplication), so it cannot answer for
+any one of them - and it does not need to: a component stopped while its load is in flight
+discards the result (no `this.data` assignment, no cache write, no `on_loaded()`).
+
 ---
 
 ### attach / detach - DOM Attachment Events
@@ -1319,7 +1364,7 @@ jQuery; attachment tracking does not.
 | `on_attach()` | hook, sync | Root entered the document |
 | `on_detach()` | hook, sync | Root left the document, or the component is being stopped while attached |
 | `'attach'` / `'detach'` | events, sticky | Fired after the matching hook; `.on()`/`.once()` as for any event |
-| `is_attached()` | method | Live: `true` when the root is in the document right now and the component is not stopped. One `isConnected` read; never starts tracking |
+| `is_attached()` | method | Live: `true` when the root is in the document right now and the component is not stopped. One `isConnected` read; never starts tracking. Not `!is_stopped()`: a live component can be detached |
 
 **The state machine**:
 
@@ -1475,6 +1520,7 @@ an override, the component continues on the fallback data instead of stopping.
 **Behavior**:
 - If component is already ready (`_ready_state >= 4`): Executes callback immediately (if provided) and returns resolved promise
 - If component is not ready yet: Returns promise that resolves when `'ready'` event fires, executing callback at the same time
+- If the component is stopped, or stops while waited on: the promise resolves without the callback running. Check `is_stopped()` after the await when the difference matters
 
 **Use when**:
 - Waiting for programmatically created components to initialize before interacting with them

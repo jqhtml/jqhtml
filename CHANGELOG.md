@@ -3,6 +3,22 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.4.1 (2026-10-23)
+
+### Features
+
+- **`is_stopped()`**: public, documented form of the stopped state. `true` from the moment
+  `stop()` (or the internal `_stop()`, reached by an ancestor's stop, a parent re-render or
+  a jQuery removal) begins on the component - before `on_stop()` runs - and never `false`
+  again. For code that continues after an `await` outside the lifecycle hooks:
+  `if (this.is_stopped()) return;`. `ready()`/`rendered()` resolve on stop, so the same
+  check follows `await child.ready()`. Documented beside `stop()` in
+  `docs/reference/14_lifecycle_complete_specification.md`; test `tests/is_stopped`.
+- `is_stopped()` and `is_attached()` called inside `on_load()` / `on_load_error()` throw
+  with their own explanation instead of the generic restriction error: one `on_load()` may
+  serve several deduplicated components, and a stopped component discards its load result
+  anyway (`data-proxy.ts`, `create_detached_context()`).
+
 ## 2.4.0 (2026-10-23)
 
 ### Features
