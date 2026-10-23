@@ -3,6 +3,19 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.4.2 (2026-10-23)
+
+### Features
+
+- **`alive(promise)`**: an await that never resumes on a stopped component.
+  `const res = await this.alive(api());` settles like the wrapped promise (a plain value
+  resolves) while the component lives, and never settles if it is stopped at the call or
+  when the wrapped promise settles, so nothing after the await runs. Decided at settle time:
+  no tracking, no cleanup in `stop()`; a rejection after the stop is swallowed. A `finally`
+  after the await does not run on a stopped component. Throws in `on_load()` /
+  `on_load_error()` with the same explanation as `is_stopped()`. Documented beside
+  `is_stopped()` as the primary idiom; test `tests/alive`.
+
 ## 2.4.1 (2026-10-23)
 
 ### Features

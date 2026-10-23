@@ -35,6 +35,7 @@ export declare class Jqhtml_Component {
     on_detach(): void;
     is_attached(): boolean;
     is_stopped(): boolean;
+    alive<T>(value: T | PromiseLike<T>): Promise<Awaited<T>>;
 
     // Public API
     gate_load(promise: Promise<any>): void;

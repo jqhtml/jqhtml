@@ -1,0 +1,6 @@
+<Define:Test_Alive>
+  <div>
+    <h1>alive(): an await that never resumes on a stopped component</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Test_Alive>

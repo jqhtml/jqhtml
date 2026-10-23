@@ -417,13 +417,14 @@ function create_detached_context(component: any, hook: string): { restricted_thi
 
       // The is_*() state queries get their own explanation: is_stopped() in particular is
       // what the docs tell developers to check after an await, and on_load() is all awaits.
-      if (prop === 'is_stopped' || prop === 'is_attached') {
-        const why = prop === 'is_stopped'
+      // alive() is the same check built into the await, so it shares the explanation.
+      if (prop === 'is_stopped' || prop === 'alive' || prop === 'is_attached') {
+        const why = prop !== 'is_attached'
           ? `${hook}() may run once for several components that share the same args (load\n` +
             `deduplication), so it cannot answer for any one of them. It also does not need to:\n` +
             `a component stopped while its load is in flight discards the result - no this.data\n` +
             `assignment, no cache write, no on_loaded(), no further lifecycle.\n` +
-            `Check is_stopped() after awaits in event handlers, timers and helpers instead.`
+            `Use ${prop}() after awaits in event handlers, timers and helpers instead.`
           : `${hook}() is a data fetch that may serve several components that share the same\n` +
             `args (load deduplication); where any one component's element sits in the DOM has\n` +
             `no bearing on it. Check is_attached() in on_ready(), on_attach()/on_detach() or\n` +

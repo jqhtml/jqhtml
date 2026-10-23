@@ -1317,8 +1317,11 @@ before ready.
 that continues after an `await` OUTSIDE them - an event handler, a helper called from
 `on_ready()` without being awaited, a timer callback - runs whenever its promise settles.
 If the user navigated away or a parent re-rendered in the meantime, the component is
-stopped and its elements may be gone. Check `is_stopped()` after the await, before touching
-`this.$`, `this.$sid()`, `this.sid()`, `this.data` or `this.state`:
+stopped and its elements may be gone. Such code must not touch `this.$`, `this.$sid()`,
+`this.sid()`, `this.data` or `this.state` on a stopped component. The primary idiom is to
+wrap the wait in [`alive()`](#alive---await-only-while-alive), which never resumes on a
+stopped component. `is_stopped()` is the explicit form, for code that must keep going
+after a stop and decide for itself where to bail out:
 
 ```javascript
 async refresh_project(parent) {
@@ -1348,6 +1351,64 @@ of their own, as every member but `this.args`/`this.data` does. One `on_load()` 
 several components that share the same args (load deduplication), so it cannot answer for
 any one of them - and it does not need to: a component stopped while its load is in flight
 discards the result (no `this.data` assignment, no cache write, no `on_loaded()`).
+
+### alive() - Await Only While Alive
+
+`alive(value)` makes the stopped check part of the wait:
+
+```javascript
+async refresh_project(parent) {
+  const res = await this.alive(Some_Controller.resolve(parent));
+  this.$sid('project_select').component().val(res.id);   // only ever runs on a live component
+}
+```
+
+It takes a promise (or any thenable, or a plain value, which behaves as a resolved promise)
+and returns a new promise that:
+
+- resolves with the wrapped promise's value, if the component is not stopped when the
+  wrapped promise settles;
+- rejects with the wrapped promise's reason, if the component is not stopped when it
+  settles - so `try`/`catch` around `await this.alive(...)` works normally while the
+  component lives;
+- **never settles** if the component is stopped when `alive()` is called, or when the
+  wrapped promise settles. Nothing after the await runs: no early return, no check, nothing
+  to forget.
+
+The test is `is_stopped()` at the moment the wrapped promise settles. Nothing is tracked:
+there is no list of pending waits and `stop()` has nothing to clean up. A never-settling
+promise costs nothing - once the component is gone nothing references it, and it is
+garbage-collected with the suspended function. A rejection that arrives after the stop is
+swallowed (`alive()` always attaches its own handler), so it never surfaces as an unhandled
+rejection; the stopped component's code is not told about it.
+
+**Use it for every wait outside `on_load()` whose continuation acts on the component:** a
+helper started from `on_ready()` or a handler, a handler's own awaits, a timer callback that
+awaits, and code after waiting on a child. Each `alive()` is its own guard, so wrap every
+await in a sequence:
+
+```javascript
+async save() {
+  const saved = await this.alive(Api.save(this.state.form));
+  const fresh = await this.alive(Api.fetch(saved.id));
+  this.$sid('status').text(fresh.status);
+}
+```
+
+`await this.alive(child.ready())` never resumes if THIS component stops first. If only the
+child stopped, it resolves, as `ready()` does today, and the child's own `is_stopped()`
+tells the caller.
+
+**`finally` does not run on a stopped component.** The suspended function is never resumed,
+so a `finally` after an `alive()` wait is skipped - by design: what it would restore
+belongs to the component that is gone. Work that must happen regardless (releasing a lock,
+finishing a download the user asked for, returning a value a caller is waiting on) does not
+belong behind `alive()`: that code awaits the plain promise and checks `is_stopped()` where
+it must stop.
+
+**Not available in `on_load()` / `on_load_error()`.** It throws there with the same
+explanation as `is_stopped()`: one `on_load()` may serve several deduplicated components,
+and jqhtml already discards a stopped component's load, so `on_load()` never needs it.
 
 ---
 

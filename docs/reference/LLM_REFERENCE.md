@@ -627,6 +627,13 @@ server actually stored.
   `const res = await api(); if (this.is_stopped()) return;`. `await child.ready()` also
   returns for a stopped child - same check. Not `!is_attached()`: stop() leaves the DOM.
   Throws in `on_load()`: one load may serve several deduplicated components.
+- **`alive(promise)`** — the primary idiom for those awaits:
+  `const res = await this.alive(api()); this.sid('x').val(res.id);`. Settles like the
+  wrapped promise (a plain value resolves) while the component lives; NEVER settles if it
+  is stopped at the call or when the promise settles, so nothing after the await runs.
+  Late rejections are swallowed. Wrap every await in a sequence. A `finally` after it does
+  not run on a stopped component - work that must happen regardless awaits the plain
+  promise and checks `is_stopped()`. Throws in `on_load()`.
 
 **One lifecycle queue per component.** Every cycle - boot, or a queued `render()`,
 `load()`, `reload()`, `refresh()` - holds the component's lock from its start through the

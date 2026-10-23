@@ -2752,6 +2752,32 @@ export class Jqhtml_Component {
   }
 
   /**
+   * Wrap a wait so that it never resumes on a stopped component:
+   *
+   *   const res = await this.alive(Some_Controller.resolve(parent));
+   *   this.sid('picker').val(res.id);   // only ever runs on a live component
+   *
+   * Returns a new promise that settles the way `value` does (a plain value resolves) if
+   * this component is not stopped when `value` settles, and NEVER settles if it is. The
+   * decision is made at settle time, so nothing is tracked and stop() has nothing to clean
+   * up; a stopped component's never-settling promise is garbage-collected with the
+   * suspended function. Already stopped at the call: never settles either, since stopped
+   * is permanent. A rejection after the stop is swallowed (the handler below is always
+   * attached), so it never surfaces as an unhandled rejection.
+   *
+   * A `finally` after the await does not run on a stopped component. Work that must happen
+   * regardless awaits the plain promise and checks is_stopped() instead.
+   */
+  alive<T>(value: T | PromiseLike<T>): Promise<Awaited<T>> {
+    return new Promise((resolve, reject) => {
+      Promise.resolve(value).then(
+        (result) => { if (!this._stopped) resolve(result as Awaited<T>); },
+        (error) => { if (!this._stopped) reject(error); }
+      );
+    });
+  }
+
+  /**
    * Flip the recorded state and fire the matching hook + event. The opposite
    * sticky event is invalidated first, so a late subscriber only ever sees the
    * current state. Hook errors are isolated; the event still fires.
