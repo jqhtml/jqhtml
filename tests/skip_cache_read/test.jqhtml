@@ -1,0 +1,6 @@
+<Define:Test_Skip_Cache_Read>
+  <div>
+    <h1>skip_cache_read: never paint from the cache, keep writing it</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Test_Skip_Cache_Read>

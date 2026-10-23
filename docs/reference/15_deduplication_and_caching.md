@@ -1160,7 +1160,8 @@ The standard `_wait_for_children_ready()` waits for children to be fully ready, 
    The element's data-nocache marker follows the key exactly as at boot and in load():
    a null key sets data-nocache="<arg>:<reason>" and gives the dev warning (gated by
    warn_uncacheable_args); a non-null key removes any data-nocache left by earlier args
-3. IF args changed AND cache_key is not null AND no on_load() of this instance failed:
+3. IF args changed AND cache_key is not null AND no on_load() of this instance failed
+   AND the component does not skip cache reads (skip_cache_read) AND it is :visible:
    a. (cache_key from step 2)
    b. IF cache_mode is 'data':
       - Read cache for new args
@@ -1467,6 +1468,57 @@ class ContactsPage extends Jqhtml_Component {
   component stopped before ready writes no marker.
 - Markers are cleared with the rest of the cache: a new cache key or a jqhtml version
   change wipes them.
+
+### Never Paint From Cache, Keep Writing It (skip_cache_read)
+
+Some surfaces are hidden behind a spinner until they reach ready on EVERY visit - an edit
+form must never be seen before its record is final. While the surface is hidden, a cached
+first paint is invisible work: every component in it hydrates cached data or paints a
+cached HTML snapshot nobody sees, then loads and re-renders anyway. `skip_cache_read`
+turns the cache READ off for a subtree while every cache WRITE carries on, so the same
+components stay warm everywhere else they are used.
+
+```javascript
+$('#dialog_body').component('ContactEditForm', { contact_id: 42, skip_cache_read: true });
+```
+
+```jqhtml
+<Define:ContactEditPage>
+  <ContactEditForm $contact_id=this.args.contact_id $skip_cache_read=true />
+</Define:ContactEditPage>
+```
+
+**Skipped (read side only):**
+- At create: no data hydration in `'data'` mode, no cached-HTML first paint in `'html'`
+  mode, and no `use_cached_data` hit. The component boots exactly as on a cache miss.
+- On `reload()` with changed args: no cache read, no render from cache.
+
+**Unchanged:**
+- The data cache is written after `on_load()`, and the HTML snapshot at ready and after a
+  changed `reload()`, exactly as without it.
+- `was_ready_before()` reads and writes its marker as usual - it is a hint, not cached
+  content.
+- Load deduplication: a deduplicated follower shares a LIVE load, never a cached one.
+
+**Inherited by the whole subtree.** Every component created inside a component carrying
+it - children its template renders, their children, components created later by a
+re-render, and components created with `$(el).component()` on an element inside its
+subtree - behaves as if it carried it too. It is resolved at create time from the nearest
+component ancestor in the DOM, so nothing is threaded through templates by hand, and a
+descendant cannot switch it back off.
+
+**Reserved.** It is consumed when the component is constructed: it is not in `this.args`,
+so it is part of neither the cache key nor the deduplication key. A component carrying it
+writes exactly where an ordinary instance reads. Only `true` turns it on.
+
+**Hidden components skip the read automatically.** Independently of `skip_cache_read`, a
+component that is not `:visible` (no layout box: `display:none` on it or on an ancestor)
+when the read would happen - at create, or on a `reload()` with changed args - skips it
+the same way and keeps writing. `visibility:hidden` and `opacity:0` still have a layout box
+and still read. The test forces layout, so it is made only when a cache key is set, and
+only for components with an `on_load()`. A component created detached (not in the
+document) skips the read too, as before. `skip_cache_read` remains the way to cover a
+surface that is visible but covered (a spinner overlay over it), or to be explicit.
 
 ### Debugging Cache Behavior
 

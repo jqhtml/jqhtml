@@ -1,0 +1,8 @@
+<%-- Scr_Late exists only after on_load(): it is created by the re-render --%>
+<Define:Scr_Page>
+  <span class="val"><%= this.data.value %></span>
+  <Scr_Child $tag=this.args.tag />
+  <% if (this.data.value !== 'init') { %>
+    <Scr_Late $tag=this.args.tag />
+  <% } %>
+</Define:Scr_Page>

@@ -314,6 +314,10 @@ export class Jqhtml_Component {
   // use_cached_data feature - skip on_load() when cache hit occurs
   private _use_cached_data_hit: boolean = false;  // True if use_cached_data=true AND cache was used
 
+  // skip_cache_read - this component (or a component it lives inside) never reads the
+  // component cache; every cache write carries on as usual. Resolved once, in the constructor.
+  private _skip_cache_read: boolean = false;
+
   // _load_only: create + load only. No render, no children, no on_render, no on_loaded, no on_ready.
   private _load_only: boolean = false;
 
@@ -415,6 +419,13 @@ export class Jqhtml_Component {
     // args (invocation overrides)
     const defineArgs = merge_define_args(template_chain);
     this.args = { ...defineArgs, ...dataAttrs, ...args };
+
+    // skip_cache_read is reserved: consumed here, never left in this.args, so it cannot
+    // reach the cache key or the dedup key (see _find_dom_parent() for inheritance)
+    if (this.args.skip_cache_read === true) {
+      this._skip_cache_read = true;
+    }
+    delete this.args.skip_cache_read;
 
     // The name this instance was invoked as. Every invocation path passes it
     // in args._component_name (template tag, $(el).component('Name'), boot
@@ -3333,6 +3344,11 @@ export class Jqhtml_Component {
       if (parent instanceof Jqhtml_Component) {
         this._dom_parent = parent;
         parent._dom_children.add(this);
+        // The nearest component ancestor has already resolved skip_cache_read from its
+        // own ancestry, so inheriting from it covers the whole chain
+        if (parent._skip_cache_read) {
+          this._skip_cache_read = true;
+        }
         break;
       }
       current = current.parent();

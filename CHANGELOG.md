@@ -3,6 +3,26 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.4.0 (2026-10-23)
+
+### Features
+
+- **`skip_cache_read`**: a reserved boolean arg (`$skip_cache_read=true` /
+  `{skip_cache_read: true}`) for a subtree hidden behind a spinner until ready on every
+  visit. It skips the cache read - no data hydration, no cached-HTML first paint, no
+  `use_cached_data` hit, no cache read on a `reload()` with changed args - so the
+  component boots as on a miss. Cache writes (data after `on_load()`, the HTML snapshot),
+  the `was_ready_before()` marker and load deduplication are unchanged. Every component
+  created inside it, by template, re-render or `$(el).component()`, inherits it from its
+  nearest component ancestor at create time; a descendant cannot turn it off. It is removed
+  from `this.args`, so it is in neither the cache key nor the dedup key. Documented in
+  `docs/reference/15_deduplication_and_caching.md`; test `tests/skip_cache_read`.
+- **A component that is not `:visible` skips the cache read.** At create and on a
+  `reload()` with changed args, a component with no layout box (`display:none` on it or an
+  ancestor) boots as on a miss, the way a detached one already did; it still writes the
+  cache. Checked only when a cache key is set (`.is(':visible')` forces layout), in
+  `read_cache_in_create()` and `check_cache_on_reload()`.
+
 ## 2.3.77 (2026-10-23)
 
 ### Features

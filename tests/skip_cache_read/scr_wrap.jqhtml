@@ -1,0 +1,4 @@
+<%-- The template spelling of the argument --%>
+<Define:Scr_Wrap>
+  <Scr_Page $tag="T" $skip_cache_read=true />
+</Define:Scr_Wrap>

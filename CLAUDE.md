@@ -697,6 +697,16 @@ that calls it writes a marker when it reaches ready. Frozen per key (still `fals
 first visit's `on_ready()`); `false` without a cache key, with unkeyable args, or when
 detached. A marker implies the subtree reached ready too (ready is bottom-up).
 
+**`skip_cache_read`** — reserved boolean arg (`$skip_cache_read=true`,
+`{skip_cache_read: true}`) for a subtree hidden until ready on every visit, where a cached
+first paint is invisible work. Skips the cache READ only: no data hydration, no html
+snapshot paint, no `use_cached_data` hit, no cache read on a changed `reload()`. Every write
+(data after `on_load()`, html snapshot) and `was_ready_before()` work as usual; dedup is
+unchanged. Inherited at create time by every component created inside it; a descendant
+cannot turn it off. Not in `this.args`, so it is in neither the cache key nor the dedup key.
+A component that is not `:visible` (`display:none` on it or an ancestor) when the read
+would happen skips it the same way, automatically (only checked when a cache key is set).
+
 **Full documentation:** `docs/reference/15_deduplication_and_caching.md`
 
 ### Server Integration (jqhtml.boot)

@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/webpack-loader",
-  "version": "2.3.77",
+  "version": "2.4.0",
   "description": "webpack and Rspack loader for JQHTML templates",
   "type": "module",
   "main": "src/index.js",
@@ -11,7 +11,7 @@
     "test": "node --test test/loader.test.js"
   },
   "dependencies": {
-    "@jqhtml/parser": "2.3.77"
+    "@jqhtml/parser": "2.4.0"
   },
   "devDependencies": {
     "webpack": "^5.96.1"

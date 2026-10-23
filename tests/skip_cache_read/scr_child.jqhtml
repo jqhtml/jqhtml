@@ -1,0 +1,4 @@
+<Define:Scr_Child>
+  <span class="val"><%= this.data.value %></span>
+  <Scr_Grand $tag=this.args.tag />
+</Define:Scr_Child>

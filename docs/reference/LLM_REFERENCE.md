@@ -707,6 +707,12 @@ ready in this cache scope - call it in `on_create()` to show a loading cover onl
 first visit. Opt-in (only components that call it write a marker), frozen per key, `false`
 without a cache key, with unkeyable args, or when detached.
 
+`skip_cache_read: true` (`$skip_cache_read=true`) makes a subtree hidden until ready skip
+the cache READ - no hydration, no html snapshot paint - while every cache write and
+`was_ready_before()` carry on. Inherited by every component created inside it; reserved
+(not in `this.args`, not in any key). A component that is not `:visible`
+(`display:none` on it or an ancestor) skips the read automatically too.
+
 ---
 
 ## Component API: DOM and component access

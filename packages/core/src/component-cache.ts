@@ -205,6 +205,21 @@ export function read_cache_in_create(component: any): void {
   // Store cache key for later use
   component._cache_key = cache_key;
 
+  // skip_cache_read, or no layout box (display:none on it or an ancestor): a cached
+  // first paint nobody can see is wasted work, so boot exactly as on a miss. The key
+  // above is kept for the writes. The visibility test forces layout, so it is made only
+  // when a cache is configured.
+  if (component._skip_cache_read ||
+      (Jqhtml_Local_Storage.has_cache_key() && !component.$.is(':visible'))) {
+    if ((window as any).jqhtml?.debug?.verbose) {
+      console.log(
+        `[Cache] Component ${component._cid} (${component.component_name()}) skipping cache read in create()`,
+        { cache_key, reason: component._skip_cache_read ? 'skip_cache_read' : 'not visible' }
+      );
+    }
+    return;
+  }
+
   // Get cache mode
   const cache_mode = Jqhtml_Local_Storage.get_cache_mode();
 
@@ -303,7 +318,11 @@ export function check_cache_on_reload(component: any, args_changed: boolean): bo
   mark_cacheability(component, key_result);
 
   // An instance whose on_load() has ever failed is out of caching for good.
-  if (!args_changed || cache_key === null || component._load_failed) {
+  // skip_cache_read or not visible: no read, the key above is kept for the writes.
+  if (!args_changed || cache_key === null || component._load_failed || component._skip_cache_read) {
+    return false;
+  }
+  if (Jqhtml_Local_Storage.has_cache_key() && !component.$.is(':visible')) {
     return false;
   }
 
