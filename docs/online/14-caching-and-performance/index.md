@@ -275,6 +275,43 @@ class ProductGrid extends Jqhtml_Component {
 - You want deduplication for a component whose args are objects
 - You need finer control over cache granularity
 
+## Showing a Spinner Only on the First Visit
+
+A page component often hides its half-initialized children behind a spinner until
+`on_ready()`. On a revisit the cache paints the page almost at once, and a spinner would
+hide that. `was_ready_before()` tells the two apart: it returns `true` when an earlier
+instance of this component with the same args (or `cache_id()`) reached ready in the
+current cache scope.
+
+```javascript
+class ContactsPage extends Jqhtml_Component {
+  on_create() {
+    this.state.cold = !this.was_ready_before();
+  }
+
+  on_ready() {
+    if (this.state.cold) {
+      this.$sid('spinner').remove();
+      this.$sid('surface').removeClass('invisible');
+    }
+  }
+}
+```
+
+```jqhtml
+<Define:ContactsPage>
+  <% if (this.state.cold) { %><Spinner $sid="spinner" /><% } %>
+  <div $sid="surface" class="<%= this.state.cold ? 'invisible' : '' %>">
+    <ContactsList />
+  </div>
+</Define:ContactsPage>
+```
+
+Only components that call `was_ready_before()` record that they reached ready, so the
+rest of the page stores nothing extra. The answer is fixed for the args it was asked with -
+it stays `false` in the first visit's own `on_ready()`. It is `false` when no cache key is
+set or the args cannot be keyed, and a new cache key clears it with the rest of the cache.
+
 ## Cache Invalidation
 
 To invalidate the cache, set a new cache key:
@@ -358,9 +395,10 @@ Both flags cascade from parent to children automatically.
 - `docs/reference/15_deduplication_and_caching.md` - Complete deduplication and caching specification
 
 ### Last Updated
-2026-08-19
+2026-10-23
 
 ### Editorial Notes
+- 2026-10-23: Added "Showing a Spinner Only on the First Visit" for `was_ready_before()` (jqhtml 2.3.77). Framed by its intended use; the marker storage detail is reduced to "only components that call it record anything".
 - 2026-08-19: Rewrote "Args Must Be Serializable" as "Which Args Can Be Keyed". The old text
   said both caching and deduplication require JSON-serializable args and to prefer primitives;
   that is no longer true and was actively misleading. Plain data (objects/arrays of primitives)

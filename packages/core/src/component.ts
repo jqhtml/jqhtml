@@ -324,6 +324,8 @@ export class Jqhtml_Component {
   // Skips initial render and cache read — just on_load then render.
   // Override with _force_initial_render to keep normal double-render behavior.
   _is_detached: boolean = false;
+  // was_ready_before(): the answer captured for a key, and whether this instance wrote its marker
+  private _ready_before: { key: string; answer: boolean; written: boolean } | null = null;
 
   // _force_initial_render: override detached optimization — render even when not in DOM.
   // Use when you need the loading spinner visible immediately after appending.
@@ -1242,6 +1244,11 @@ export class Jqhtml_Component {
 
     this._log_lifecycle('create', 'start');
 
+    // Detect detached elements — skip cache and initial render for elements not in DOM
+    // _force_initial_render overrides this optimization. Set before on_create() so
+    // was_ready_before() called there sees it.
+    this._is_detached = !this.$[0].isConnected && !this._force_initial_render;
+
     // Call on_create() synchronously - it MUST be synchronous
     const result = this._call_locked_sync_hook('on_create');
     if (result && typeof (result as any).then === 'function') {
@@ -1251,10 +1258,6 @@ export class Jqhtml_Component {
       );
       // Don't await - on_create MUST be sync. The warning is enough.
     }
-
-    // Detect detached elements — skip cache and initial render for elements not in DOM
-    // _force_initial_render overrides this optimization
-    this._is_detached = !this.$[0].isConnected && !this._force_initial_render;
 
     // Make this.data jqhtml's own copy of what on_create() left, for EVERY component -
     // the same serializer round trip every on_load() result goes through. on_create()
@@ -1852,7 +1855,49 @@ export class Jqhtml_Component {
     this._ready_owed = false;
     this._ready_state = 4;
     this._update_debug_attrs();
+    this._write_ready_marker();
     this.trigger('ready');
+  }
+
+  /**
+   * Whether a previous instance of this component, under the cache key of its current
+   * args (or cache_id()), reached ready in the current cache scope. A hint for the
+   * application (e.g. show a spinner only on a cold first visit); jqhtml never acts on it.
+   *
+   * Opt-in: only a component that calls this records a marker when it reaches ready, so
+   * components that never ask cost nothing and store nothing. The answer is captured the
+   * first time it is asked for a key and frozen for that key: this instance reaching
+   * ready does not turn its own answer true. New args (a different key) are looked up
+   * afresh. False for unkeyable args, a detached component, or no cache key set.
+   *
+   * Ready is reached bottom-up, so a marker implies the component's whole subtree
+   * reached ready at least once in that scope.
+   */
+  was_ready_before(): boolean {
+    if (this._is_detached) return false;
+    const { cache_key } = generate_cache_key(this);
+    if (cache_key === null) return false;
+    if (this._ready_before?.key !== cache_key) {
+      this._ready_before = {
+        key: cache_key,
+        answer: Jqhtml_Local_Storage.get(`${cache_key}::ready`) !== null,
+        written: false,
+      };
+    }
+    return this._ready_before.answer;
+  }
+
+  /**
+   * At a ready point, record the marker was_ready_before() reads - only for the key this
+   * component asked about, once, and not when the answer was already true.
+   * @private
+   */
+  private _write_ready_marker(): void {
+    const asked = this._ready_before;
+    if (asked === null || asked.answer || asked.written || this._is_detached) return;
+    if (generate_cache_key(this).cache_key !== asked.key) return;
+    Jqhtml_Local_Storage.set(`${asked.key}::ready`, 1);
+    asked.written = true;
   }
 
   /**

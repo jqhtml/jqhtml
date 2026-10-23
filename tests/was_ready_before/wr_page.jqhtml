@@ -1,0 +1,4 @@
+<Define:Wr_Page>
+  <span class="page">page</span>
+  <Wr_Leaf />
+</Define:Wr_Page>

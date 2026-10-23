@@ -3,6 +3,25 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 2.3.77 (2026-10-23)
+
+### Features
+
+- **`was_ready_before()`**: whether an earlier instance of this component with the same
+  cache key (name + args, or `cache_id()`) reached ready in the current cache scope.
+  Callable from `on_create()`, so a page component can show a loading cover on a cold
+  first visit and let the cached paint show on a revisit. Opt-in: a component that calls
+  it writes a `<cache_key>::ready` marker through the cache storage when it reaches ready;
+  components that never call it write nothing. Works with or without `on_load()`, in both
+  cache modes. The answer is frozen per key (still `false` in a first visit's own
+  `on_ready()`); a `reload()` to new args looks up the new key. `false` without a cache
+  key, with unkeyable args, or for a component created detached; a component stopped
+  before ready writes no marker. Markers are cleared with the cache on a scope or version
+  change. A hint only: jqhtml never acts on it. Documented in
+  `docs/reference/15_deduplication_and_caching.md`; test `tests/was_ready_before`.
+- A component's detached state is now determined before `on_create()` instead of after it,
+  so `was_ready_before()` sees it there. Nothing else reads it before that point.
+
 ## 2.3.76 (2026-10-21)
 
 ### Bug Fixes

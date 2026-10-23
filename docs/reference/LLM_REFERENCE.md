@@ -702,6 +702,11 @@ class ProductList extends Jqhtml_Component {
 }
 ```
 
+`was_ready_before()` returns whether an earlier instance with the same cache key reached
+ready in this cache scope - call it in `on_create()` to show a loading cover only on a cold
+first visit. Opt-in (only components that call it write a marker), frozen per key, `false`
+without a cache key, with unkeyable args, or when detached.
+
 ---
 
 ## Component API: DOM and component access

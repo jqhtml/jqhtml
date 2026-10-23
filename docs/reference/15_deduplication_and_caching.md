@@ -1428,6 +1428,46 @@ class ProductGrid extends Jqhtml_Component {
 - If `cache_id()` throws an error, caching is silently disabled for that component instance
 - The component continues to function normally without caching
 
+### Was This Component Ready Before? (was_ready_before)
+
+`was_ready_before()` answers, synchronously and before the first render, whether an earlier
+instance of this component with the same cache key (name + args, or `cache_id()`) reached
+ready in the current cache scope. It is a hint for the application; jqhtml never acts on it.
+
+The intended use is a loading cover over a page-level component. On a first visit, show a
+spinner and keep the surface hidden until `on_ready()`. On a revisit, skip the spinner so
+the cached paint shows at once; a child that misses its cache simply pops in when its load
+finishes.
+
+```javascript
+class ContactsPage extends Jqhtml_Component {
+  on_create() {
+    this.state.cold = !this.was_ready_before();   // template shows <Spinner /> while cold
+  }
+
+  on_ready() {
+    if (this.state.cold) this.$sid('spinner').remove();
+  }
+}
+```
+
+**Behavior:**
+- **Opt-in.** Calling it records interest: when the component then reaches ready, it writes
+  a small marker (`<cache_key>::ready`) through the same storage as every cache entry. A
+  component that never calls it writes nothing, so list rows and leaf components cost
+  nothing. It works with or without `on_load()`, in both cache modes.
+- **Frozen per key.** The answer is captured the first time it is asked for a key. This
+  instance reaching ready does not turn its own answer true (it is still `false` in
+  `on_ready()` of a first visit). After `reload()` with new args, the next call looks up the
+  new key; a `reload()`, `refresh()` or `render()` with the same args keeps the answer.
+- **Subtree.** Ready is reached bottom-up, so a marker means the component's whole subtree
+  reached ready at least once in that scope - the children very probably cached too.
+- **False** when no cache key is set (`set_cache_key()`), the args cannot be keyed (or
+  `cache_id()` throws), the component was created detached, or no marker exists. A
+  component stopped before ready writes no marker.
+- Markers are cleared with the rest of the cache: a new cache key or a jqhtml version
+  change wipes them.
+
 ### Debugging Cache Behavior
 
 Enable verbose mode to see cache operations in the console:
@@ -1895,6 +1935,7 @@ class Dashboard extends Jqhtml_Component {
 | `jqhtml.get_cache_mode()` | Returns current cache mode ('data' or 'html') |
 | `jqhtml.register_cache_class(Class)` | Register ES6 class for data mode serialization |
 | `cache_id()` method | Override default cache key on a component |
+| `was_ready_before()` method | Whether this component with these args reached ready before (hint, e.g. skip a spinner on revisit) |
 | `use_cached_data: true` | Skip `on_load()` revalidation when cache hit (data mode only) |
 | `jqhtml.debug.verbose = true` | Enable cache operation logging |
 

@@ -690,6 +690,13 @@ A second parameter selects the mode: `set_cache_key(key, 'data' | 'html')`. Defa
 
 Components can override the cache key via a `cache_id()` method when `this.args` doesn't capture what matters.
 
+**`was_ready_before()`** — whether an earlier instance with the same cache key reached
+ready in this cache scope. Call it in `on_create()` to decide whether to show a loading
+cover (cold first visit) or let the cached paint show (revisit). Opt-in: only a component
+that calls it writes a marker when it reaches ready. Frozen per key (still `false` in a
+first visit's `on_ready()`); `false` without a cache key, with unkeyable args, or when
+detached. A marker implies the subtree reached ready too (ready is bottom-up).
+
 **Full documentation:** `docs/reference/15_deduplication_and_caching.md`
 
 ### Server Integration (jqhtml.boot)

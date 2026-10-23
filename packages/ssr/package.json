@@ -1,6 +1,6 @@
 {
   "name": "@jqhtml/ssr",
-  "version": "2.3.76",
+  "version": "2.3.77",
   "description": "Server-Side Rendering for JQHTML components - renders components to HTML for SEO",
   "main": "src/index.js",
   "bin": {

@@ -1,0 +1,6 @@
+<Define:Test_Was_Ready_Before>
+  <div>
+    <h1>was_ready_before(): a component with these args reached ready before</h1>
+    <div $sid="stage"></div>
+  </div>
+</Define:Test_Was_Ready_Before>
